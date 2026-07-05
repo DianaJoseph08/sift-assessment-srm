@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SRM Group of Institutions — Resume Shortlisting Agent</title>
+    <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.width = '100vw';
+        div.style.height = '100vh';
+        div.style.background = '#FEF2F2';
+        div.style.color = '#991B1B';
+        div.style.padding = '30px';
+        div.style.boxSizing = 'border-box';
+        div.style.fontFamily = 'monospace';
+        div.style.zIndex = '999999';
+        div.innerHTML = '<h2>Global Script Error Detected:</h2>' +
+                        '<p><strong>Message:</strong> ' + message + '</p>' +
+                        '<p><strong>Source:</strong> ' + source + '</p>' +
+                        '<p><strong>Line:</strong> ' + lineno + ' | <strong>Col:</strong> ' + colno + '</p>' +
+                        '<pre style="background: #FEE2E2; padding: 15px; border-radius: 8px; overflow: auto; max-height: 50vh;">' + (error && error.stack ? error.stack : 'No stack trace') + '</pre>';
+        document.body.appendChild(div);
+        return false;
+      };
+      window.addEventListener('unhandledrejection', function(event) {
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.width = '100vw';
+        div.style.height = '100vh';
+        div.style.background = '#FEF2F2';
+        div.style.color = '#991B1B';
+        div.style.padding = '30px';
+        div.style.boxSizing = 'border-box';
+        div.style.fontFamily = 'monospace';
+        div.style.zIndex = '999999';
+        div.innerHTML = '<h2>Unhandled Promise Rejection Detected:</h2>' +
+                        '<p><strong>Reason:</strong> ' + event.reason + '</p>' +
+                        '<pre style="background: #FEE2E2; padding: 15px; border-radius: 8px; overflow: auto; max-height: 50vh;">' + (event.reason && event.reason.stack ? event.reason.stack : 'No stack trace') + '</pre>';
+        document.body.appendChild(div);
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
