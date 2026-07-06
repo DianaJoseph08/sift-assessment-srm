@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIFT — Technical Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #F8FAFC;
+      --panel: #FFFFFF;
+      --ink: #0F172A;
+      --sub: #475569;
+      --border: #E2E8F0;
+      --accent: #FF6B35;
+      --accent-soft: #FFF1EB;
+      --accent-deep: #D44D1D;
+      --green: #10B981;
+      --green-soft: #ECFDF5;
+      --red: #EF4444;
+      --red-soft: #FEF2F2;
+      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      font-size: 15px;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar Navigation */
+    aside {
+      width: 280px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      padding: 30px 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-mark {
+      background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+      color: white;
+      font-weight: 800;
+      font-size: 18px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(255, 107, 53, 0.2);
+    }
+
+    .logo-text h1 {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .logo-text p {
+      font-size: 11px;
+      color: var(--sub);
+      font-weight: 500;
+    }
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    nav a {
+      color: var(--sub);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    nav a:hover {
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    nav a.active {
+      background: var(--accent-soft);
+      color: var(--accent-deep);
+      font-weight: 600;
+    }
+
+    /* Main Content Area */
+    main {
+      margin-left: 280px;
+      flex: 1;
+      padding: 50px 80px;
+      max-width: 1100px;
+      background: var(--bg);
+    }
+
+    header {
+      margin-bottom: 40px;
+      border-bottom: 1.5px solid var(--border);
+      padding-bottom: 24px;
+    }
+
+    header h2 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    header .subtitle {
+      font-size: 16px;
+      color: var(--sub);
+    }
+
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+    }
+
+    h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      color: var(--ink);
+    }
+
+    p {
+      color: var(--sub);
+      margin-bottom: 16px;
+      font-size: 14.5px;
+    }
+
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 16px;
+      color: var(--sub);
+      font-size: 14px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: #0F172A;
+      color: #F8FAFC;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 18px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    code {
+      font-family: var(--font-mono);
+      background: #F1F5F9;
+      color: #0F172A;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    /* Callouts */
+    .alert {
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+      border-left: 4px solid transparent;
+    }
+
+    .alert-warning {
+      background: var(--red-soft);
+      color: #991B1B;
+      border-color: var(--red);
+    }
+
+    .alert-info {
+      background: var(--accent-soft);
+      color: var(--accent-deep);
+      border-color: var(--accent);
+    }
+
+    /* Database Table styling */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+    }
+
+    table th, table td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    table th {
+      background: #F8FAFC;
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    table tr:nth-child(even) {
+      background: #FAFAFA;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 20px 0;
+      color: #94A3B8;
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside>
+    <div class="logo-container">
+      <div class="logo-mark">S</div>
+      <div class="logo-text">
+        <h1>SIFT</h1>
+        <p>Technical Documentation</p>
+      </div>
+    </div>
+    <nav>
+      <a href="#overview" class="active">1. Stack Overview</a>
+      <a href="#database">2. Database Schema</a>
+      <a href="#proctoring">3. Proctoring & Security</a>
+      <a href="#voice">4. Voice Discussion</a>
+      <a href="#ai">5. AI Model Integration</a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main>
+    <header>
+      <h2>SIFT — Technical Documentation</h2>
+      <div class="subtitle">System Architecture, Security Safeguards & Database Engineering</div>
+    </header>
+
+    <!-- 1. Technology Stack -->
+    <section id="overview">
+      <h3>1. Technology Stack Overview</h3>
+      <p>SIFT is constructed as a lightweight, robust, single-port deployable web application comprising a modern Single Page Application (SPA) frontend and a RESTful backend server.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Layer</th>
+            <th>Technology</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Frontend</strong></td>
+            <td>React.js (v18) + Vite</td>
+            <td>Builds a fast, modern UI with flexible CSS variables and responsive views.</td>
+          </tr>
+          <tr>
+            <td><strong>Backend</strong></td>
+            <td>Express.js (Node.js)</td>
+            <td>Directs API endpoints, file uploads, AI adapters, and static client hosting.</td>
+          </tr>
+          <tr>
+            <td><strong>Database</strong></td>
+            <td>SQLite3</td>
+            <td>Reliable file-based relational database stored locally at <code>server/sift.db</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>AI engine</strong></td>
+            <td>Ollama / Gemini / Claude</td>
+            <td>Multi-provider adapter supporting local offline LLMs and cloud-based models.</td>
+          </tr>
+          <tr>
+            <td><strong>Document Parsing</strong></td>
+            <td>pdf-parse & mammoth</td>
+            <td>Extracts text profiles directly from uploaded PDFs and DOCX resumes.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 2. Database Schema -->
+    <section id="database">
+      <h3>2. Database Schema</h3>
+      <p>The database uses SQLite to maintain persistence. The tables are configured with proper foreign key structures to handle candidates and their evaluations relative to define roles.</p>
+      
+      <h4>A. Jobs Table (<code>jobs</code>)</h4>
+      <p>Stores the details of defined recruiter job openings.</p>
+      <pre><code>CREATE TABLE jobs (
+  id TEXT PRIMARY KEY,
+  title TEXT,
+  department TEXT,
+  seniority TEXT,
+  minYears INTEGER,
+  location TEXT,
+  mustHave TEXT,     -- JSON array of must-have skills
+  niceToHave TEXT,   -- JSON array of nice-to-have skills
+  description TEXT,
+  createdAt TEXT
+)</code></pre>
+
+      <h4>B. Candidates Table (<code>candidates</code>)</h4>
+      <p>Stores candidate resume evaluations, interview transcripts, and proctoring logs.</p>
+      <pre><code>CREATE TABLE candidates (
+  id TEXT PRIMARY KEY,
+  jobId TEXT,
+  candidateName TEXT,
+  email TEXT,
+  currentTitle TEXT,
+  yearsExperience INTEGER,
+  education TEXT,
+  topSkills TEXT,      -- JSON array of top skills
+  subScores TEXT,      -- JSON object of categorized scores
+  overallScore INTEGER,
+  recommendation TEXT,
+  summary TEXT,
+  strengths TEXT,      -- JSON array of strengths
+  gaps TEXT,           -- JSON array of gaps
+  missingMustHaves TEXT,
+  interviewQuestions TEXT,
+  interviewFocus TEXT,
+  fileBase64 TEXT,
+  filename TEXT,
+  status TEXT DEFAULT 'Applied',
+  interview TEXT,      -- JSON object containing transcript & proctoring metrics
+  createdAt TEXT,
+  FOREIGN KEY(jobId) REFERENCES jobs(id)
+)</code></pre>
+    </section>
+
+    <!-- 3. Proctoring & Security -->
+    <section id="proctoring">
+      <h3>3. Proctoring & Security Architecture</h3>
+      <p>To guarantee academic integrity and prevent candidates from utilizing external resources (like ChatGPT) during mock assessments, SIFT employs browser-level sensors coupled with deterministic backend validation overrides.</p>
+      
+      <div class="alert alert-warning">
+        <strong>Fraud Penalization Policy:</strong> If a candidate switches tabs even once or copy-pastes any response into the chatbox, the backend automatically overrides their technical score, capping it at a failing grade of <strong>30%</strong>.
+      </div>
+
+      <h4>A. Client-side Focus & Clipboard Listeners</h4>
+      <p>The candidate portal registers window blur events to detect tab switching, and paste events to detect clipboard copy-pasting:</p>
+      <pre><code>// App.jsx Focus Loss Monitor
+window.addEventListener("blur", () => {
+  setTabSwitches(prev => prev + 1);
+  setShowWarning(true);
+});
+
+// App.jsx Copy-Paste Monitor
+onPaste={() => {
+  setPasteCount(prev => prev + 1);
+}}</code></pre>
+
+      <h4>B. Backend Score Overwrite Enforcer</h4>
+      <p>Before saving the evaluation to the database, SIFT's Express server inspects the proctoring logs. If cheating is caught, it caps the score and prepends an audit alert to the summary:</p>
+      <pre><code>function enforceProctoringOverride(evaluation, proctoring) {
+  if (!proctoring) return evaluation;
+  const { tabSwitches, pasteCount } = proctoring;
+
+  if (pasteCount > 0 || tabSwitches > 0) {
+    evaluation.score = Math.min(evaluation.score || 0, 30);
+    evaluation.summary = `[PROCTORING ALERT: Serious fraud detected. Candidate completed the assessment with ${pasteCount} copy-paste actions and ${tabSwitches} tab switches. The technical score was automatically overwritten to fail.] ` + evaluation.summary;
+  }
+  return evaluation;
+}</code></pre>
+    </section>
+
+    <!-- 4. Voice Discussion -->
+    <section id="voice">
+      <h3>4. Voice Discussion System (STT & TTS)</h3>
+      <p>SIFT features a built-in voice discussion suite to simulate real-world interactive speech assessments without loading external plugins.</p>
+      
+      <div class="alert alert-info">
+        <strong>Browser Native:</strong> Web Speech engines run locally inside the candidate's browser, utilizing Google Chrome or Microsoft Edge's speech components.
+      </div>
+
+      <h4>A. Speech-to-Text (Voice Typing)</h4>
+      <p>Utilizes the browser's <code>SpeechRecognition</code> parser. Chunks of recorded audio are converted to text and appended in real-time into the text input value:</p>
+      <pre><code>const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = new SpeechRecognition();
+recognition.onresult = (event) => {
+  const resultText = event.results[0][0].transcript;
+  setInput(prev => prev + " " + resultText);
+};</code></pre>
+
+      <h4>B. Text-to-Speech (Read Aloud)</h4>
+      <p>Utilizes <code>window.speechSynthesis</code>. Under every AI interviewer bubble, a manual <strong>🔊 Listen</strong> button is provided. Clicking this button activates a user-initiated speech utterance that reads the text aloud, successfully bypassing browser media autoplay blocks.</p>
+    </section>
+
+    <!-- 5. AI model Integration -->
+    <section id="ai">
+      <h3>5. AI Model Integration & Adapters</h3>
+      <p>The system uses a modular controller inside <code>server/analyze.js</code> to connect seamlessly to different LLM models based on environment variables:</p>
+      <ul>
+        <li><strong>Local Ollama (Offline)</strong>: Communicates with local daemon on <code>http://localhost:11434/api/chat</code>.</li>
+        <li><strong>Google Gemini API (Free Cloud)</strong>: Dispatches requests using standard HTTP POST requests to <code>gemini-2.5-flash</code>.</li>
+        <li><strong>Anthropic Claude API (Premium Cloud)</strong>: Leverages the official SDK to request evaluations from <code>claude-3-5-sonnet</code>.</li>
+      </ul>
+      <p>All adapters require the model to respond strictly with valid JSON conforming to SIFT's standardized schemas to ensure smooth database logging.</p>
+    </section>
+
+    <footer>
+      SRM Group of Institutions — SIFT technical documentation portal. All rights reserved.
+    </footer>
+  </main>
+
+  <script>
+    // Smooth scrolling active link tracker
+    const links = document.querySelectorAll('nav a');
+    const sections = document.querySelectorAll('section');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop;
+        if (pageYOffset >= sectionTop - 120) {
+          current = section.getAttribute('id');
+        }
+      });
+
+      links.forEach(a => {
+        a.classList.remove('active');
+        if (a.getAttribute('href').slice(1) === current) {
+          a.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -57,11 +57,11 @@ export async function sendInterviewChat(job, candidate, history) {
 }
 
 /** Submit the interview transcript to generate the confidence score. */
-export async function evaluateInterview(job, candidate, history) {
+export async function evaluateInterview(job, candidate, history, proctoring) {
   const res = await fetch("/api/interview/evaluate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job, candidate, history }),
+    body: JSON.stringify({ job, candidate, history, proctoring }),
   });
 
   if (!res.ok) {

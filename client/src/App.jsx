@@ -861,6 +861,15 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview }) {
                           {r.interview.proctoring.tabSwitches > 0 ? `${r.interview.proctoring.tabSwitches} switches (Warning)` : "✔ 0 switches"}
                         </span>
                       </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+                        <span style={{ color: C.sub }}>Copy-Paste Actions:</span>
+                        <span style={{
+                          fontWeight: 700,
+                          color: (r.interview.proctoring.pasteCount || 0) > 0 ? REC["Weak Match"].dot : "#16A34A"
+                        }}>
+                          {(r.interview.proctoring.pasteCount || 0) > 0 ? `${r.interview.proctoring.pasteCount} paste actions (Warning)` : "✔ 0 pastes"}
+                        </span>
+                      </div>
                     </div>
                   )}
 
@@ -1558,6 +1567,10 @@ function RemoteAssessmentPortal({ candidateId }) {
   const [loadingChat, setLoadingChat] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
   const [tabSwitches, setTabSwitches] = useState(0);
+  const [pasteCount, setPasteCount] = useState(0);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState(null);
   const [showWarning, setShowWarning] = useState(false);
   const [finished, setFinished] = useState(false);
 
@@ -1624,6 +1637,85 @@ function RemoteAssessmentPortal({ candidateId }) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history, loadingChat]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = "en-US";
+
+      rec.onstart = () => {
+        setIsListening(true);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      rec.onresult = (e) => {
+        const resultText = e.results[0][0].transcript;
+        setInput(prev => (prev ? prev + " " + resultText : resultText));
+      };
+
+      rec.onerror = (e) => {
+        console.error("Speech recognition error:", e.error);
+        setIsListening(false);
+      };
+
+      setRecognition(rec);
+    }
+  }, []);
+
+  // Automatic Text-to-Speech (TTS) reader for interviewer questions
+  useEffect(() => {
+    if (voiceEnabled && history.length > 0) {
+      const lastMsg = history[history.length - 1];
+      if (lastMsg.role === "interviewer") {
+        speak(lastMsg.content);
+      }
+    }
+  }, [history, voiceEnabled]);
+
+  // Cleanup speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const speak = (text) => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    const englishVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Zira") || v.name.includes("Microsoft")));
+    if (englishVoice) utterance.voice = englishVoice;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleListening = () => {
+    if (!recognition) {
+      alert("Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
+      return;
+    }
+    
+    // Stop speaking if AI is reading
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    if (isListening) {
+      recognition.stop();
+    } else {
+      recognition.start();
+    }
+  };
 
   // Webcam request handler
   const requestMedia = async () => {
@@ -1694,7 +1786,7 @@ function RemoteAssessmentPortal({ candidateId }) {
     try {
       const dummyCand = { id: candidateId, label: candidateInfo?.candidateName || "Candidate", result: { topSkills: candidateInfo?.skills || [] } };
       // 1. Evaluate transcript
-      const evaluation = await evaluateInterview({ title: candidateInfo?.jobTitle || "" }, dummyCand, history);
+      const evaluation = await evaluateInterview({ title: candidateInfo?.jobTitle || "" }, dummyCand, history, { tabSwitches, pasteCount });
       
       // 2. Submit to server
       const submitRes = await fetch("/api/candidate-interview-submit", {
@@ -1707,7 +1799,8 @@ function RemoteAssessmentPortal({ candidateId }) {
           transcript: history,
           proctoring: {
             tabSwitches,
-            mediaAccess: Boolean(cameraStream)
+            mediaAccess: Boolean(cameraStream),
+            pasteCount
           }
         })
       });
@@ -1893,6 +1986,30 @@ function RemoteAssessmentPortal({ candidateId }) {
                       <div style={{ fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
                         {m.content}
                       </div>
+                      {isAI && (
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+                          <button 
+                            type="button"
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: C.accentDeep,
+                              fontSize: 11,
+                              cursor: "pointer",
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                              fontWeight: 600
+                            }}
+                            onClick={() => speak(m.content)}
+                            title="Listen to this question"
+                          >
+                            🔊 Listen
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1916,10 +2033,34 @@ function RemoteAssessmentPortal({ candidateId }) {
                 type="text"
                 style={inputStyle}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={loadingChat ? "Waiting for AI..." : "Type your technical answer here..."}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  if ("speechSynthesis" in window) {
+                    window.speechSynthesis.cancel();
+                  }
+                }}
+                onPaste={() => {
+                  setPasteCount(prev => prev + 1);
+                  console.log("Proctoring alert: copy-paste detected!");
+                }}
+                placeholder={loadingChat ? "Waiting for AI..." : isListening ? "Listening... Speak now!" : "Type or speak your answer here..."}
                 disabled={loadingChat || evaluating}
               />
+              <button 
+                type="button" 
+                style={{ 
+                  ...btn(isListening ? "primary" : "ghost"), 
+                  padding: "0 12px", 
+                  background: isListening ? "#EF4444" : "transparent",
+                  color: isListening ? "#FFFFFF" : C.ink,
+                  border: isListening ? "none" : `1px solid ${C.line}`
+                }} 
+                onClick={toggleListening}
+                disabled={loadingChat || evaluating}
+                title="Speak your answer"
+              >
+                {isListening ? "🎤 Stop" : "🎤 Speak"}
+              </button>
               <button type="submit" style={{ ...btn("primary"), padding: "0 22px" }} disabled={loadingChat || evaluating || !input.trim()}>
                 Send
               </button>
@@ -1953,9 +2094,43 @@ function RemoteAssessmentPortal({ candidateId }) {
                 <span style={{ fontWeight: 700, color: C.ink }}>{Math.floor(history.length / 2)}</span>
               </div>
               
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.sub }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.sub, marginBottom: 12 }}>
                 <span>Tab Warnings:</span>
                 <span style={{ fontWeight: 700, color: tabSwitches > 0 ? REC["Weak Match"].dot : "#16A34A" }}>{tabSwitches}</span>
+              </div>
+
+              <div style={{ height: 1, background: C.lineSoft, margin: "14px 0" }} />
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <SubHead style={{ marginBottom: 4 }}>Voice Interview Mode</SubHead>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 12, color: C.sub }}>Read Aloud (TTS):</span>
+                  <button 
+                    type="button"
+                    style={{
+                      ...btn(voiceEnabled ? "primary" : "ghost"),
+                      padding: "4px 10px",
+                      fontSize: 11,
+                      border: voiceEnabled ? "none" : `1px solid ${C.line}`
+                    }}
+                    onClick={() => {
+                      const newMode = !voiceEnabled;
+                      setVoiceEnabled(newMode);
+                      if (newMode && history.length > 0) {
+                        const lastMsg = history[history.length - 1];
+                        if (lastMsg.role === "interviewer") {
+                          speak(lastMsg.content);
+                        }
+                      } else {
+                        if ("speechSynthesis" in window) {
+                          window.speechSynthesis.cancel();
+                        }
+                      }
+                    }}
+                  >
+                    {voiceEnabled ? "On" : "Off"}
+                  </button>
+                </div>
               </div>
             </div>
 

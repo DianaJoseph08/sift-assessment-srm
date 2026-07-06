@@ -73,11 +73,11 @@ app.post("/api/interview/chat", async (req, res) => {
 // Conversational AI Interviewer Evaluation Endpoint
 app.post("/api/interview/evaluate", async (req, res) => {
   try {
-    const { job, candidate, history } = req.body || {};
+    const { job, candidate, history, proctoring } = req.body || {};
     if (!job || !candidate || !Array.isArray(history)) {
       return res.status(400).json({ error: "Missing job, candidate, or history in payload" });
     }
-    const evaluation = await evaluateInterview(job, candidate, history);
+    const evaluation = await evaluateInterview(job, candidate, history, proctoring);
     res.json(evaluation);
   } catch (err) {
     console.error("[interview-evaluate] error:", err.message);

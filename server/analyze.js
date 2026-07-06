@@ -3,7 +3,7 @@ import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
-const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : "claude-sonnet-4-6");
+const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-2.5-flash" : "claude-sonnet-4-6"));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
 
 /**
@@ -170,6 +170,8 @@ export async function analyzeResume(job, resume) {
   let result;
   if (PROVIDER === "ollama") {
     result = await analyzeWithOllama(content);
+  } else if (PROVIDER === "gemini") {
+    result = await analyzeWithGemini(content);
   } else {
     result = await analyzeWithClaude(content);
   }
@@ -254,6 +256,38 @@ async function analyzeWithOllama(content) {
   return extractJSON(text);
 }
 
+async function analyzeWithGemini(content) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY is not set.");
+  
+  let userMessage = content;
+  if (Array.isArray(content)) {
+    userMessage = content.map((c) => c.text || "").join("\n");
+  }
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: userMessage }] }],
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini request failed: ${response.status} - ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return extractJSON(text);
+}
+
 export async function getNextInterviewQuestion(job, candidate, history) {
   const candidateName = candidate.result?.candidateName || candidate.label || "Candidate";
   const skillsList = (candidate.result?.topSkills || []).join(", ") || "the skills on their resume";
@@ -280,6 +314,8 @@ Follow these rules strictly:
 
   if (PROVIDER === "ollama") {
     return await chatWithOllama(systemPrompt, messages);
+  } else if (PROVIDER === "gemini") {
+    return await chatWithGemini(systemPrompt, messages);
   } else {
     return await chatWithClaude(systemPrompt, messages);
   }
@@ -325,25 +361,66 @@ async function chatWithOllama(systemPrompt, messages) {
   return data.message?.content || "";
 }
 
-export async function evaluateInterview(job, candidate, history) {
+async function chatWithGemini(systemPrompt, messages) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY is not set.");
+
+  const formattedContents = messages.map(m => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }]
+  }));
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: formattedContents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        temperature: 0.7
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini chat failed: ${response.status} - ${errText}`);
+  }
+
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
+export async function evaluateInterview(job, candidate, history, proctoring) {
   const candidateName = candidate.result?.candidateName || candidate.label || "Candidate";
   const transcriptText = history.map(h => `${h.role === "interviewer" ? "Interviewer" : "Candidate"}: ${h.content}`).join("\n");
 
   const systemPrompt = "You are a strict, highly analytical technical assessor who evaluates mock interview transcripts critically and outputs a structured feedback report in JSON.";
 
+  const proctoringInfo = proctoring
+    ? `\nPROCTORING METRICS DURING INTERVIEW:
+- Window focus losses / tab switches: ${proctoring.tabSwitches || 0}
+- Copy-paste actions in input box: ${proctoring.pasteCount || 0}`
+    : "";
+
   const prompt = `Evaluate the following interview transcript for the role of "${job.title}".
 Candidate Name: ${candidateName}
-Resume Skills: ${(candidate.result?.topSkills || []).join(", ")}
+Resume Skills: ${(candidate.result?.topSkills || []).join(", ")}${proctoringInfo}
 
 Interview Transcript:
 ${transcriptText}
 
 Output a JSON object ONLY with this schema:
 {
-  "score": number (0-100, representing a confidence score of their technical and communication capability based on their answers. Be critical. Short, evasive, shallow, or AI-generated-looking answers must receive a low score. Standard candidate answers should score 50-70. Reserve scores above 85 only for exceptional technical depth),
-  "summary": "string (a concise paragraph summarizing their performance, technical depth, gaps identified, and communication skills)"
+  "score": number (0-100, representing a confidence score of their technical capability based on their answers. Be critical. Short, evasive, shallow, or AI-generated-looking answers must receive a low score. Note: If copy-paste actions > 0, they copy-pasted responses from an external helper (like ChatGPT) instead of typing them. In this case, you MUST heavily penalize their score below 50, even if the text looks technical!),
+  "summary": "string (a concise paragraph summarizing their performance, technical depth, and specifically mentioning if suspicious copy-paste or tab switching activity was detected)"
 }
 Return ONLY valid JSON. Do not include any markdown formatting, code block backticks, or other text outside the JSON object.`;
+
+  if (PROVIDER === "gemini") {
+    const evaluation = await evaluateWithGemini(prompt, systemPrompt);
+    return enforceProctoringOverride(evaluation, proctoring);
+  }
 
   let resultText;
   if (PROVIDER === "ollama") {
@@ -386,5 +463,52 @@ Return ONLY valid JSON. Do not include any markdown formatting, code block backt
       .join("");
   }
 
-  return extractJSON(resultText);
+  const evaluation = extractJSON(resultText);
+  return enforceProctoringOverride(evaluation, proctoring);
+}
+
+async function evaluateWithGemini(prompt, systemPrompt) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY is not set.");
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini evaluation failed: ${response.status} - ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return extractJSON(text);
+}
+
+function enforceProctoringOverride(evaluation, proctoring) {
+  if (!proctoring) return evaluation;
+
+  const tabSwitches = proctoring.tabSwitches || 0;
+  const pasteCount = proctoring.pasteCount || 0;
+
+  const isFraud = pasteCount > 0 || tabSwitches > 0;
+
+  if (isFraud) {
+    console.log(`[Proctoring] Enforcing score penalty: ${pasteCount} pastes, ${tabSwitches} switches`);
+    const originalScore = evaluation.score;
+    evaluation.score = Math.min(evaluation.score || 0, 30);
+    const warningHeader = `[PROCTORING ALERT: Serious fraud detected. Candidate completed the assessment with ${pasteCount} copy-paste actions and ${tabSwitches} tab switches. The technical score was automatically overwritten to fail.] `;
+    evaluation.summary = warningHeader + (evaluation.summary || "");
+  }
+
+  return evaluation;
 }
