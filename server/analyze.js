@@ -3,7 +3,7 @@ import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
-const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-2.5-flash" : "claude-sonnet-4-6"));
+const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-2.5-flash" : (PROVIDER === "groq" ? "llama-3.3-70b-specdec" : "claude-sonnet-4-6")));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
 
 /**
@@ -172,6 +172,8 @@ export async function analyzeResume(job, resume) {
     result = await analyzeWithOllama(content);
   } else if (PROVIDER === "gemini") {
     result = await analyzeWithGemini(content);
+  } else if (PROVIDER === "groq") {
+    result = await analyzeWithGroq(content);
   } else {
     result = await analyzeWithClaude(content);
   }
@@ -316,6 +318,8 @@ Follow these rules strictly:
     return await chatWithOllama(systemPrompt, messages);
   } else if (PROVIDER === "gemini") {
     return await chatWithGemini(systemPrompt, messages);
+  } else if (PROVIDER === "groq") {
+    return await chatWithGroq(systemPrompt, messages);
   } else {
     return await chatWithClaude(systemPrompt, messages);
   }
@@ -421,6 +425,10 @@ Return ONLY valid JSON. Do not include any markdown formatting, code block backt
     const evaluation = await evaluateWithGemini(prompt, systemPrompt);
     return enforceProctoringOverride(evaluation, proctoring);
   }
+  if (PROVIDER === "groq") {
+    const evaluation = await evaluateWithGroq(prompt, systemPrompt);
+    return enforceProctoringOverride(evaluation, proctoring);
+  }
 
   let resultText;
   if (PROVIDER === "ollama") {
@@ -491,6 +499,105 @@ async function evaluateWithGemini(prompt, systemPrompt) {
 
   const data = await response.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return extractJSON(text);
+}
+
+async function analyzeWithGroq(content) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error("GROQ_API_KEY is not set.");
+
+  let userMessage = content;
+  if (Array.isArray(content)) {
+    userMessage = content.map((c) => c.text || "").join("\n");
+  }
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: userMessage }
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq request failed: ${response.status} - ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content || "";
+  return extractJSON(text);
+}
+
+async function chatWithGroq(systemPrompt, messages) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error("GROQ_API_KEY is not set.");
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.map(m => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content
+        }))
+      ],
+      temperature: 0.7
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq chat failed: ${response.status} - ${errText}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
+}
+
+async function evaluateWithGroq(prompt, systemPrompt) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error("GROQ_API_KEY is not set.");
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq evaluation failed: ${response.status} - ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content || "";
   return extractJSON(text);
 }
 

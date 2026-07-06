@@ -1,6 +1,6 @@
 async function test() {
-  const key = "AQ.Ab8RN6IWLwJVnj0kl3KxAeJ8kSkNwIrVfNdv1wD8ug_8waVFaQ";
-  console.log("Testing new Gemini API key validity...");
+  const key = "AQ.Ab8RN6IB0R62zQ5wTGlyrA1jzXUnCBx2ueLkj8V124uShc-X-Q";
+  console.log("Testing third Gemini API key validity...");
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
       method: "POST",
