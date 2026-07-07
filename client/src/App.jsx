@@ -2459,11 +2459,14 @@ function App() {
     goto(3);
 
     try {
-      await runPool(candidatesToScreen, 3, async (cand) => {
+      await runPool(candidatesToScreen, 1, async (cand) => {
         updateActiveJob((j) => ({
           ...j,
           candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "analyzing" } : c)),
         }));
+
+        // Add a 2-second sleep between requests to respect free-tier rate limits (TPM)
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
         let resume;
         if (cand.kind === "file") {
@@ -2662,7 +2665,7 @@ function App() {
                       let defModel = "";
                       if (prov === "ollama") defModel = "llama3.1";
                       if (prov === "gemini") defModel = "gemini-2.5-flash";
-                      if (prov === "groq") defModel = "llama-3.3-70b-versatile";
+                      if (prov === "groq") defModel = "llama-3.1-8b-instant";
                       if (prov === "claude") defModel = "claude-3-5-sonnet-20241022";
                       setAiConfig({ ...aiConfig, provider: prov, model: defModel });
                     }}
