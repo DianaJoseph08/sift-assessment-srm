@@ -2203,9 +2203,9 @@ function App() {
   const [aiConfig, setAiConfig] = useState(() => {
     try {
       const saved = localStorage.getItem("sift_ai_config");
-      return saved ? JSON.parse(saved) : { provider: "ollama", model: "llama3.1", apiKey: "" };
+      return saved ? JSON.parse(saved) : { provider: "default", model: "", apiKey: "" };
     } catch (e) {
-      return { provider: "ollama", model: "llama3.1", apiKey: "" };
+      return { provider: "default", model: "", apiKey: "" };
     }
   });
 
@@ -2638,13 +2638,15 @@ function App() {
                     value={aiConfig.provider}
                     onChange={(e) => {
                       const prov = e.target.value;
-                      let defModel = "llama3.1";
+                      let defModel = "";
+                      if (prov === "ollama") defModel = "llama3.1";
                       if (prov === "gemini") defModel = "gemini-2.5-flash";
                       if (prov === "groq") defModel = "llama-3.3-70b-versatile";
                       if (prov === "claude") defModel = "claude-3-5-sonnet-20241022";
                       setAiConfig({ ...aiConfig, provider: prov, model: defModel });
                     }}
                   >
+                    <option value="default">Use Server Configuration (Default)</option>
                     <option value="ollama">Local Ollama (Offline)</option>
                     <option value="groq">Groq Cloud (Free)</option>
                     <option value="gemini">Google Gemini (Free Cloud)</option>
@@ -2652,24 +2654,32 @@ function App() {
                   </select>
                 </Field>
 
-                <Field label="Model Name">
-                  <input 
-                    style={inputStyle} 
-                    value={aiConfig.model}
-                    onChange={(e) => setAiConfig({ ...aiConfig, model: e.target.value })}
-                  />
-                </Field>
+                {aiConfig.provider !== "default" ? (
+                  <>
+                    <Field label="Model Name">
+                      <input 
+                        style={inputStyle} 
+                        value={aiConfig.model}
+                        onChange={(e) => setAiConfig({ ...aiConfig, model: e.target.value })}
+                      />
+                    </Field>
 
-                {aiConfig.provider !== "ollama" && (
-                  <Field label="API Key" hint="Stored securely in your local browser only.">
-                    <input 
-                      type="password"
-                      style={inputStyle} 
-                      value={aiConfig.apiKey || ""}
-                      placeholder={`Enter your ${aiConfig.provider} API Key`}
-                      onChange={(e) => setAiConfig({ ...aiConfig, apiKey: e.target.value })}
-                    />
-                  </Field>
+                    {aiConfig.provider !== "ollama" && (
+                      <Field label="API Key" hint="Stored securely in your local browser only.">
+                        <input 
+                          type="password"
+                          style={inputStyle} 
+                          value={aiConfig.apiKey || ""}
+                          placeholder={`Enter your ${aiConfig.provider} API Key`}
+                          onChange={(e) => setAiConfig({ ...aiConfig, apiKey: e.target.value })}
+                        />
+                      </Field>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12.5, color: C.sub, background: C.lineSoft, padding: "10px 12px", borderRadius: 8, lineHeight: 1.45 }}>
+                    💡 SIFT will use your server's environment variables (configured on Render/localhost) to run the screening.
+                  </div>
                 )}
               </div>
 

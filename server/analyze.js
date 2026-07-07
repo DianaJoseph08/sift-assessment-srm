@@ -168,9 +168,9 @@ export async function analyzeResume(job, resume, aiConfig = {}) {
   // 3. Build prompt and run analysis
   const content = await buildContent(job, resume, rawText, extractedEmails);
   
-  const provider = aiConfig.provider || PROVIDER;
-  const model = aiConfig.model || MODEL;
-  const apiKey = aiConfig.apiKey;
+  const provider = (aiConfig.provider && aiConfig.provider !== "default") ? aiConfig.provider : PROVIDER;
+  const model = (aiConfig.provider && aiConfig.provider !== "default" && aiConfig.model) ? aiConfig.model : MODEL;
+  const apiKey = (aiConfig.provider && aiConfig.provider !== "default") ? aiConfig.apiKey : undefined;
 
   let result;
   if (provider === "ollama") {
