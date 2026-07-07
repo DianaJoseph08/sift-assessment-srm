@@ -1,15 +1,22 @@
 async function test() {
-  console.log("Checking Ollama availability on http://localhost:11434...");
+  console.log("Checking if local Ollama server is running on port 11434...");
   try {
-    const res = await fetch("http://localhost:11434/api/tags");
-    if (!res.ok) {
-      console.error("Ollama responded with HTTP error:", res.status);
-      return;
+    const response = await fetch("http://localhost:11434/api/tags");
+    if (response.ok) {
+      const data = await response.json();
+      console.log("Ollama is RUNNING!");
+      console.log("Downloaded models on your machine:");
+      if (data.models && data.models.length > 0) {
+        data.models.forEach(m => console.log(` - ${m.name}`));
+      } else {
+        console.log(" No models downloaded yet!");
+      }
+    } else {
+      console.error("Ollama responded with status:", response.status);
     }
-    const data = await res.json();
-    console.log("Ollama is running. Available models:", data.models?.map(m => m.name));
   } catch (err) {
-    console.error("Ollama is not running or unreachable:", err.message);
+    console.error("Ollama is NOT running on your laptop. Error:", err.message);
+    console.log("Please open the Ollama application on your computer and try again.");
   }
 }
 test();

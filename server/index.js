@@ -23,7 +23,7 @@ app.get("/api/health", (_req, res) => {
 // Screen one resume against one job
 app.post("/api/analyze", async (req, res) => {
   try {
-    const { job, resume, aiConfig } = req.body || {};
+    const { job, resume } = req.body || {};
     if (!job || !job.title || !job.description) {
       return res.status(400).json({ error: "Missing or incomplete job definition" });
     }
@@ -47,7 +47,7 @@ app.post("/api/analyze", async (req, res) => {
       }
     }
 
-    const result = await analyzeResume(job, finalResume, aiConfig);
+    const result = await analyzeResume(job, finalResume);
     res.json(result);
   } catch (err) {
     console.error("[analyze] error:", err.message);

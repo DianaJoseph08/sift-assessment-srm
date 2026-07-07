@@ -2199,19 +2199,6 @@ function App() {
   const [storageError, setStorageError] = useState(false);
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [remoteCandidateId, setRemoteCandidateId] = useState(null);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [aiConfig, setAiConfig] = useState(() => {
-    try {
-      const saved = localStorage.getItem("sift_ai_config");
-      return saved ? JSON.parse(saved) : { provider: "default", model: "", apiKey: "" };
-    } catch (e) {
-      return { provider: "default", model: "", apiKey: "" };
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem("sift_ai_config", JSON.stringify(aiConfig));
-  }, [aiConfig]);
 
   // Parse candidateId query parameter on mount
   useEffect(() => {
@@ -2481,7 +2468,7 @@ function App() {
         const { candidates: _, ...jobCriteria } = activeJob;
 
         try {
-          const result = await analyzeCandidate(jobCriteria, resume, aiConfig);
+          const result = await analyzeCandidate(jobCriteria, resume);
           updateActiveJob((j) => ({
             ...j,
             candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "done", result, base64: null } : c)),

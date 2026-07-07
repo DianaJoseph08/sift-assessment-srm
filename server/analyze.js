@@ -138,7 +138,7 @@ async function buildContent(job, resume, rawText, extractedEmails) {
 /**
  * Screen a single resume against a job. Returns the structured evaluation.
  */
-export async function analyzeResume(job, resume, aiConfig = {}) {
+export async function analyzeResume(job, resume) {
   // 1. Get raw text of the resume
   let rawText = "";
   if (resume.type === "text") {
@@ -168,19 +168,15 @@ export async function analyzeResume(job, resume, aiConfig = {}) {
   // 3. Build prompt and run analysis
   const content = await buildContent(job, resume, rawText, extractedEmails);
   
-  const provider = (aiConfig.provider && aiConfig.provider !== "default") ? aiConfig.provider : PROVIDER;
-  const model = (aiConfig.provider && aiConfig.provider !== "default" && aiConfig.model) ? aiConfig.model : MODEL;
-  const apiKey = (aiConfig.provider && aiConfig.provider !== "default") ? aiConfig.apiKey : undefined;
-
   let result;
-  if (provider === "ollama") {
-    result = await analyzeWithOllama(content, model);
-  } else if (provider === "gemini") {
-    result = await analyzeWithGemini(content, model, apiKey);
-  } else if (provider === "groq") {
-    result = await analyzeWithGroq(content, model, apiKey);
+  if (PROVIDER === "ollama") {
+    result = await analyzeWithOllama(content);
+  } else if (PROVIDER === "gemini") {
+    result = await analyzeWithGemini(content);
+  } else if (PROVIDER === "groq") {
+    result = await analyzeWithGroq(content);
   } else {
-    result = await analyzeWithClaude(content, model, apiKey);
+    result = await analyzeWithClaude(content);
   }
 
   // 4. Post-process email extraction to enforce correctness and prevent hallucinations
