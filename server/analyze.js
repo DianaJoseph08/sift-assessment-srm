@@ -287,9 +287,12 @@ async function analyzeWithGemini(content, model = MODEL, apiKey) {
     userMessage = content.map((c) => c.text || "").join("\n");
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "x-goog-api-key": key
+    },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: userMessage }] }],
       systemInstruction: { parts: [{ text: SYSTEM }] },
@@ -394,9 +397,12 @@ async function chatWithGemini(systemPrompt, messages) {
     parts: [{ text: m.content }]
   }));
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "x-goog-api-key": key
+    },
     body: JSON.stringify({
       contents: formattedContents,
       systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -499,9 +505,12 @@ async function evaluateWithGemini(prompt, systemPrompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set.");
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "x-goog-api-key": key
+    },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       systemInstruction: { parts: [{ text: systemPrompt }] },
