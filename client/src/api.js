@@ -6,11 +6,11 @@
  *   { type: "text", text: string }
  *   { type: "file", filename: string, base64: string }
  */
-export async function analyzeCandidate(job, resume) {
+export async function analyzeCandidate(job, resume, aiConfig) {
   const res = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job, resume }),
+    body: JSON.stringify({ job, resume, aiConfig }),
   });
 
   if (!res.ok) {

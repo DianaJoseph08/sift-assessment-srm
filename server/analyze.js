@@ -10,11 +10,11 @@ const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
  * Lazily build an Anthropic client so a missing key produces a clear,
  * request-time error instead of crashing the server on boot.
  */
-function getClaudeClient() {
-  const key = process.env.ANTHROPIC_API_KEY;
+function getClaudeClient(customKey) {
+  const key = customKey || process.env.ANTHROPIC_API_KEY;
   if (!key) {
     throw new Error(
-      "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key."
+      "ANTHROPIC_API_KEY is not set. Please add your key in the settings panel."
     );
   }
   return new Anthropic({ apiKey: key, maxRetries: 3 });
@@ -138,7 +138,7 @@ async function buildContent(job, resume, rawText, extractedEmails) {
 /**
  * Screen a single resume against a job. Returns the structured evaluation.
  */
-export async function analyzeResume(job, resume) {
+export async function analyzeResume(job, resume, aiConfig = {}) {
   // 1. Get raw text of the resume
   let rawText = "";
   if (resume.type === "text") {
@@ -167,15 +167,20 @@ export async function analyzeResume(job, resume) {
 
   // 3. Build prompt and run analysis
   const content = await buildContent(job, resume, rawText, extractedEmails);
+  
+  const provider = aiConfig.provider || PROVIDER;
+  const model = aiConfig.model || MODEL;
+  const apiKey = aiConfig.apiKey;
+
   let result;
-  if (PROVIDER === "ollama") {
-    result = await analyzeWithOllama(content);
-  } else if (PROVIDER === "gemini") {
-    result = await analyzeWithGemini(content);
-  } else if (PROVIDER === "groq") {
-    result = await analyzeWithGroq(content);
+  if (provider === "ollama") {
+    result = await analyzeWithOllama(content, model);
+  } else if (provider === "gemini") {
+    result = await analyzeWithGemini(content, model, apiKey);
+  } else if (provider === "groq") {
+    result = await analyzeWithGroq(content, model, apiKey);
   } else {
-    result = await analyzeWithClaude(content);
+    result = await analyzeWithClaude(content, model, apiKey);
   }
 
   // 4. Post-process email extraction to enforce correctness and prevent hallucinations
@@ -208,10 +213,10 @@ export async function analyzeResume(job, resume) {
   return result;
 }
 
-async function analyzeWithClaude(content) {
-  const client = getClaudeClient();
+async function analyzeWithClaude(content, model = MODEL, apiKey) {
+  const client = getClaudeClient(apiKey);
   const message = await client.messages.create({
-    model: MODEL,
+    model: model,
     max_tokens: 1200,
     system: SYSTEM,
     messages: [{ role: "user", content }],
@@ -225,7 +230,7 @@ async function analyzeWithClaude(content) {
   return extractJSON(text);
 }
 
-async function analyzeWithOllama(content) {
+async function analyzeWithOllama(content, model = MODEL) {
   let userMessage = content;
   if (Array.isArray(content)) {
     userMessage = content.map((c) => c.text || "").join("\n");
@@ -235,7 +240,7 @@ async function analyzeWithOllama(content) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
+      model: model,
       messages: [
         { role: "system", content: SYSTEM },
         { role: "user", content: userMessage }
@@ -258,8 +263,8 @@ async function analyzeWithOllama(content) {
   return extractJSON(text);
 }
 
-async function analyzeWithGemini(content) {
-  const key = process.env.GEMINI_API_KEY;
+async function analyzeWithGemini(content, model = MODEL, apiKey) {
+  const key = apiKey || process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set.");
   
   let userMessage = content;
@@ -267,7 +272,7 @@ async function analyzeWithGemini(content) {
     userMessage = content.map((c) => c.text || "").join("\n");
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -502,8 +507,8 @@ async function evaluateWithGemini(prompt, systemPrompt) {
   return extractJSON(text);
 }
 
-async function analyzeWithGroq(content) {
-  const key = process.env.GROQ_API_KEY;
+async function analyzeWithGroq(content, model = MODEL, apiKey) {
+  const key = apiKey || process.env.GROQ_API_KEY;
   if (!key) throw new Error("GROQ_API_KEY is not set.");
 
   let userMessage = content;
@@ -518,7 +523,7 @@ async function analyzeWithGroq(content) {
       "Authorization": `Bearer ${key}`
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: model,
       messages: [
         { role: "system", content: SYSTEM },
         { role: "user", content: userMessage }

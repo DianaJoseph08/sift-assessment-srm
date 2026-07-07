@@ -2199,6 +2199,19 @@ function App() {
   const [storageError, setStorageError] = useState(false);
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [remoteCandidateId, setRemoteCandidateId] = useState(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [aiConfig, setAiConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sift_ai_config");
+      return saved ? JSON.parse(saved) : { provider: "ollama", model: "llama3.1", apiKey: "" };
+    } catch (e) {
+      return { provider: "ollama", model: "llama3.1", apiKey: "" };
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("sift_ai_config", JSON.stringify(aiConfig));
+  }, [aiConfig]);
 
   // Parse candidateId query parameter on mount
   useEffect(() => {
@@ -2444,7 +2457,7 @@ function App() {
         const { candidates: _, ...jobCriteria } = activeJob;
 
         try {
-          const result = await analyzeCandidate(jobCriteria, resume);
+          const result = await analyzeCandidate(jobCriteria, resume, aiConfig);
           updateActiveJob((j) => ({
             ...j,
             candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "done", result, base64: null } : c)),
@@ -2502,20 +2515,29 @@ function App() {
             </div>
           </div>
           
-          {view === "wizard" && (
-            <button
-              onClick={() => setView("dashboard")}
-              style={{
-                ...btn("ghost"),
-                padding: "8px 14px",
-                display: "flex",
-                alignItems: "center",
-                gap: 6
-              }}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button 
+              onClick={() => setShowSettingsModal(true)}
+              style={{ ...btn("ghost"), padding: "8px 12px", display: "flex", alignItems: "center", gap: 6 }}
+              title="Configure LLM Model Settings"
             >
-              <Home size={15} /> Back to Dashboard
+              ⚙️ AI Settings
             </button>
-          )}
+            {view === "wizard" && (
+              <button
+                onClick={() => setView("dashboard")}
+                style={{
+                  ...btn("ghost"),
+                  padding: "8px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <Home size={15} /> Back to Dashboard
+              </button>
+            )}
+          </div>
         </header>
 
         <div style={{ height: 1, background: C.line, margin: "16px 0 20px" }} />
@@ -2583,6 +2605,82 @@ function App() {
             onClose={() => setActiveInterviewCandidate(null)}
             onSaveInterview={handleSaveInterview}
           />
+        )}
+
+        {/* Settings Modal */}
+        {showSettingsModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+            background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+            zIndex: 1500, display: "flex", justifyContent: "center", alignItems: "center"
+          }}>
+            <div style={{
+              background: C.paper, border: `1px solid ${C.line}`, borderRadius: 16,
+              width: "100%", maxWidth: 480, padding: 24, boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+              animation: "fade-up 0.15s ease-out"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                <h3 style={{ fontFamily: DISPLAY, fontSize: 18, fontWeight: 800, color: C.ink, margin: 0 }}>
+                  AI Model Configuration
+                </h3>
+                <button 
+                  style={{ background: "none", border: "none", cursor: "pointer", color: C.faint, fontSize: 18 }} 
+                  onClick={() => setShowSettingsModal(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <Field label="LLM Provider">
+                  <select 
+                    style={inputStyle} 
+                    value={aiConfig.provider}
+                    onChange={(e) => {
+                      const prov = e.target.value;
+                      let defModel = "llama3.1";
+                      if (prov === "gemini") defModel = "gemini-2.5-flash";
+                      if (prov === "groq") defModel = "llama-3.3-70b-versatile";
+                      if (prov === "claude") defModel = "claude-3-5-sonnet-20241022";
+                      setAiConfig({ ...aiConfig, provider: prov, model: defModel });
+                    }}
+                  >
+                    <option value="ollama">Local Ollama (Offline)</option>
+                    <option value="groq">Groq Cloud (Free)</option>
+                    <option value="gemini">Google Gemini (Free Cloud)</option>
+                    <option value="claude">Anthropic Claude (Premium Cloud)</option>
+                  </select>
+                </Field>
+
+                <Field label="Model Name">
+                  <input 
+                    style={inputStyle} 
+                    value={aiConfig.model}
+                    onChange={(e) => setAiConfig({ ...aiConfig, model: e.target.value })}
+                  />
+                </Field>
+
+                {aiConfig.provider !== "ollama" && (
+                  <Field label="API Key" hint="Stored securely in your local browser only.">
+                    <input 
+                      type="password"
+                      style={inputStyle} 
+                      value={aiConfig.apiKey || ""}
+                      placeholder={`Enter your ${aiConfig.provider} API Key`}
+                      onChange={(e) => setAiConfig({ ...aiConfig, apiKey: e.target.value })}
+                    />
+                  </Field>
+                )}
+              </div>
+
+              <button 
+                style={{ ...btn("primary"), width: "100%", justifyContent: "center", marginTop: 22 }}
+                onClick={() => setShowSettingsModal(false)}
+              >
+                Save Configuration
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
