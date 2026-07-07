@@ -2414,6 +2414,27 @@ function App() {
     if (!activeJob) return;
     setFatal("");
     
+    // Sync current state to database immediately before screening starts to prevent race condition
+    const cleanedJobs = jobs.map((job) => ({
+      ...job,
+      candidates: (job.candidates || []).map((c) => {
+        if (c.status === "done" && c.result) {
+          const { base64, ...rest } = c;
+          return rest;
+        }
+        return c;
+      })
+    }));
+    try {
+      await fetch("/api/save-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobs: cleanedJobs }),
+      });
+    } catch (e) {
+      console.error("Pre-screening database sync failed:", e);
+    }
+    
     // Determine which candidates need screening
     const candidatesToScreen = forceAll
       ? activeJob.candidates
