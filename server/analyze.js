@@ -40,9 +40,11 @@ function schemaBlock(job, extractedEmails = []) {
 
   return `Return ONLY a JSON object — no markdown, no backticks, no commentary — matching this schema:
 {
- "requiredDiscipline": "1-2 words. The core academic or professional discipline required by the job (e.g., Mathematics, Physics, Computer Science). Note: If the job title contains an academic field like 'Mathematics', the required discipline MUST be 'Mathematics'. Do not extract sub-fields like 'Nonlinear Dynamics'.",
- "candidateDiscipline": "1-2 words. The candidate's primary academic discipline based on their highest degree (e.g. Physics, Mathematics, Computer Science, Mechatronics).",
- "domainFitReasoning": "Evaluate whether candidate's highest degree discipline (candidateDiscipline) is a direct, exact match for requiredDiscipline. If the job is an academic teaching/professor role, a Ph.D. or Master's in a different field (e.g., Ph.D. in Physics or Mechatronics for a Mathematics role) is a SEVERE mismatch, even if they do relevant mathematical research. State this mismatch clearly.",
+ "requiredDiscipline": "1-2 words. The core academic or professional discipline required by the job (e.g., Mathematics, Physics, Computer Science). Note: If the job title contains an academic field like 'Mathematics', the required discipline MUST be 'Mathematics'.",
+ "candidateDiscipline": "1-2 words. The candidate's primary academic discipline based on their highest degree (e.g. Physics, Mathematics, Computer Science, Mechatronics, Mechanical Engineering).",
+ "domainFitReasoning": "Evaluate whether the candidate's background matches the required discipline. Apply these rules: 
+  1. ACADEMIC ROLES (e.g. Job titles containing 'Professor', 'Lecturer', 'Faculty', 'Teacher'): The candidate's highest degree (Ph.D./Master's) MUST match the required discipline exactly. A different degree is a SEVERE mismatch, even with overlapping research.
+  2. INDUSTRY ROLES (e.g. Job titles like 'Software Engineer', 'Developer', 'Analyst', 'Manager'): Do NOT enforce strict academic degree discipline matching. Focus primarily on their technical skills, projects, and experience. A candidate with a different degree major (e.g., Mechanical Engineering degree for a Software Engineer job) is perfectly acceptable if they possess the required skills.",
  "candidateName": string,
  "email": "string (the candidate's actual personal or contact email address. You MUST select it ONLY from this list of parsed emails: ${emailsList}. Choose the one that belongs to the candidate — usually the first one or the one matching/containing their name. If the list is empty or none match the candidate, return 'N/A'. Never guess, fabricate, or hallucinate an email not explicitly present in the list.)",
  "currentTitle": string,
@@ -53,13 +55,13 @@ function schemaBlock(job, extractedEmails = []) {
     "skills": number (0-100, deduct 15 points per missing must-have),
     "experience": number (0-100),
     "education": number (0-100),
-    "domain": number (0-100; if candidateDiscipline and requiredDiscipline do NOT match EXACTLY, domain fit MUST be under 30)
+    "domain": number (0-100; Rule: For academic teaching roles, if degree discipline does not match required discipline exactly, domain fit MUST be under 30. For industry/corporate roles, evaluate domain fit based on their career skills/domain, not their degree name.)
  },
- "overallScore": number (0-100; if candidateDiscipline and requiredDiscipline do NOT match EXACTLY, overallScore MUST be under 40, no exceptions),
- "recommendation": "Strong Match" | "Good Match" | "Possible Match" | "Weak Match" (if requiredDiscipline is 'Mathematics' and highest degree is in 'Physics', 'Engineering', or 'Mechatronics', they MUST be graded as Weak Match),
+ "overallScore": number (0-100; Rule: For academic teaching roles, if degree discipline does not match required discipline exactly, overallScore MUST be under 40. For industry/corporate roles, do NOT apply the discipline mismatch penalty—evaluate them fairly based on skills, experience, and projects.),
+ "recommendation": "Strong Match" | "Good Match" | "Possible Match" | "Weak Match" (mismatched disciplines for ACADEMIC roles must be Weak Match; INDUSTRY roles should be graded purely on skills and experience fit),
  "summary": string (one sentence),
  "strengths": string[] (2-4 items),
- "gaps": string[] (1-4 items; list the domain/discipline mismatch explicitly if it exists),
+ "gaps": string[] (1-4 items; list the degree mismatch explicitly if it is an ACADEMIC role),
  "missingMustHaves": string[] (missing must-have skills; [] if none),
  "interviewQuestions": string[] (exactly 3, tailored),
  "interviewFocus": string
