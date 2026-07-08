@@ -278,6 +278,28 @@ async function analyzeWithOllama(content, model = MODEL) {
   return extractJSON(text);
 }
 
+async function fetchWithRetry(url, options, maxRetries = 3, initialDelay = 1500) {
+  let delay = initialDelay;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.status === 503 || response.status === 429) {
+        console.warn(`[API Retry] Received status ${response.status}. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2.5;
+        continue;
+      }
+      return response;
+    } catch (err) {
+      if (i === maxRetries - 1) throw err;
+      console.warn(`[API Retry] Network error: ${err.message}. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2.5;
+    }
+  }
+  return fetch(url, options);
+}
+
 async function analyzeWithGemini(content, model = MODEL, apiKey) {
   const key = apiKey || process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set.");
@@ -287,7 +309,7 @@ async function analyzeWithGemini(content, model = MODEL, apiKey) {
     userMessage = content.map((c) => c.text || "").join("\n");
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -397,7 +419,7 @@ async function chatWithGemini(systemPrompt, messages) {
     parts: [{ text: m.content }]
   }));
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -505,7 +527,7 @@ async function evaluateWithGemini(prompt, systemPrompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set.");
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
