@@ -4,7 +4,7 @@ import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
 const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-2.5-flash" : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
-const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
+const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
 /**
  * Lazily build an Anthropic client so a missing key produces a clear,
@@ -389,12 +389,12 @@ async function chatWithClaude(systemPrompt, messages) {
     .join("");
 }
 
-async function chatWithOllama(systemPrompt, messages) {
+async function chatWithOllama(systemPrompt, messages, model = "llama3.1") {
   const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
+      model: model,
       messages: [
         { role: "system", content: systemPrompt },
         ...messages
@@ -491,7 +491,7 @@ Return ONLY valid JSON. Do not include any markdown formatting, code block backt
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
+        model: "llama3.1",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: prompt }
