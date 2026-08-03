@@ -3,7 +3,7 @@ import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
-const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-1.5-flash" : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
+const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-1.5-pro" : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
 /**
@@ -190,10 +190,12 @@ export async function analyzeResume(job, resume, overrideProvider) {
   const activeProvider = overrideProvider || PROVIDER;
   
   let activeModel = MODEL;
-  if (activeProvider === "ollama") activeModel = "llama3.1";
-  else if (activeProvider === "gemini") activeModel = "gemini-1.5-flash";
-  else if (activeProvider === "groq") activeModel = "llama-3.1-8b-instant";
-  else activeModel = "claude-sonnet-4-6";
+  if (overrideProvider) {
+    if (overrideProvider === "ollama") activeModel = "llama3.1";
+    else if (overrideProvider === "gemini") activeModel = "gemini-1.5-pro";
+    else if (overrideProvider === "groq") activeModel = "llama-3.1-8b-instant";
+    else activeModel = "claude-sonnet-4-6";
+  }
 
   let result;
   if (activeProvider === "ollama") {
