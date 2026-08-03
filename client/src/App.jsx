@@ -2535,6 +2535,7 @@ function App() {
                 style={{ fontFamily: BODY, fontSize: 13, color: C.ink, background: C.paper, border: `1px solid ${C.line}`, padding: "6px 10px", borderRadius: 6, outline: "none" }}
               >
                 <option value="ollama">Local LLM (llama)</option>
+                <option value="gemini">Gemini API</option>
                 <option value="claude">Claude API</option>
               </select>
               <button
