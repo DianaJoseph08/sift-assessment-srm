@@ -157,7 +157,7 @@ async function buildContent(job, resume, rawText, extractedEmails) {
 /**
  * Screen a single resume against a job. Returns the structured evaluation.
  */
-export async function analyzeResume(job, resume) {
+export async function analyzeResume(job, resume, overrideProvider) {
   // 1. Get raw text of the resume
   let rawText = "";
   if (resume.type === "text") {
@@ -187,15 +187,18 @@ export async function analyzeResume(job, resume) {
   // 3. Build prompt and run analysis
   const content = await buildContent(job, resume, rawText, extractedEmails);
   
+  const activeProvider = overrideProvider || PROVIDER;
+  const activeModel = activeProvider === "ollama" ? "llama3.1" : "claude-sonnet-4-6";
+
   let result;
-  if (PROVIDER === "ollama") {
-    result = await analyzeWithOllama(content);
-  } else if (PROVIDER === "gemini") {
-    result = await analyzeWithGemini(content);
-  } else if (PROVIDER === "groq") {
-    result = await analyzeWithGroq(content);
+  if (activeProvider === "ollama") {
+    result = await analyzeWithOllama(content, activeModel);
+  } else if (activeProvider === "gemini") {
+    result = await analyzeWithGemini(content, activeModel);
+  } else if (activeProvider === "groq") {
+    result = await analyzeWithGroq(content, activeModel);
   } else {
-    result = await analyzeWithClaude(content);
+    result = await analyzeWithClaude(content, activeModel);
   }
 
   // 4. Post-process email extraction to enforce correctness and prevent hallucinations
@@ -335,7 +338,7 @@ async function analyzeWithGemini(content, model = MODEL, apiKey) {
   return extractJSON(text);
 }
 
-export async function getNextInterviewQuestion(job, candidate, history) {
+export async function getNextInterviewQuestion(job, candidate, history, overrideProvider) {
   const candidateName = candidate.result?.candidateName || candidate.label || "Candidate";
   const skillsList = (candidate.result?.topSkills || []).join(", ") || "the skills on their resume";
 
@@ -359,11 +362,13 @@ Follow these rules strictly:
     }))
   ];
 
-  if (PROVIDER === "ollama") {
+  const activeProvider = overrideProvider || PROVIDER;
+
+  if (activeProvider === "ollama") {
     return await chatWithOllama(systemPrompt, messages);
-  } else if (PROVIDER === "gemini") {
+  } else if (activeProvider === "gemini") {
     return await chatWithGemini(systemPrompt, messages);
-  } else if (PROVIDER === "groq") {
+  } else if (activeProvider === "groq") {
     return await chatWithGroq(systemPrompt, messages);
   } else {
     return await chatWithClaude(systemPrompt, messages);
@@ -443,7 +448,7 @@ async function chatWithGemini(systemPrompt, messages) {
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
-export async function evaluateInterview(job, candidate, history, proctoring) {
+export async function evaluateInterview(job, candidate, history, proctoring, overrideProvider) {
   const candidateName = candidate.result?.candidateName || candidate.label || "Candidate";
   const transcriptText = history.map(h => `${h.role === "interviewer" ? "Interviewer" : "Candidate"}: ${h.content}`).join("\n");
 
@@ -469,17 +474,19 @@ Output a JSON object ONLY with this schema:
 }
 Return ONLY valid JSON. Do not include any markdown formatting, code block backticks, or other text outside the JSON object.`;
 
-  if (PROVIDER === "gemini") {
+  const activeProvider = overrideProvider || PROVIDER;
+
+  if (activeProvider === "gemini") {
     const evaluation = await evaluateWithGemini(prompt, systemPrompt);
     return enforceProctoringOverride(evaluation, proctoring);
   }
-  if (PROVIDER === "groq") {
+  if (activeProvider === "groq") {
     const evaluation = await evaluateWithGroq(prompt, systemPrompt);
     return enforceProctoringOverride(evaluation, proctoring);
   }
 
   let resultText;
-  if (PROVIDER === "ollama") {
+  if (activeProvider === "ollama") {
     const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

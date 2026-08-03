@@ -2199,6 +2199,7 @@ function App() {
   const [storageError, setStorageError] = useState(false);
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [remoteCandidateId, setRemoteCandidateId] = useState(null);
+  const [llmProvider, setLlmProvider] = useState("ollama");
 
   // Parse candidateId query parameter on mount
   useEffect(() => {
@@ -2468,7 +2469,7 @@ function App() {
         const { candidates: _, ...jobCriteria } = activeJob;
 
         try {
-          const result = await analyzeCandidate(jobCriteria, resume);
+          const result = await analyzeCandidate(jobCriteria, resume, llmProvider);
           updateActiveJob((j) => ({
             ...j,
             candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "done", result, base64: null } : c)),
@@ -2527,18 +2528,28 @@ function App() {
           </div>
           
           {view === "wizard" && (
-            <button
-              onClick={() => setView("dashboard")}
-              style={{
-                ...btn("ghost"),
-                padding: "8px 14px",
-                display: "flex",
-                alignItems: "center",
-                gap: 6
-              }}
-            >
-              <Home size={15} /> Back to Dashboard
-            </button>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <select 
+                value={llmProvider} 
+                onChange={(e) => setLlmProvider(e.target.value)}
+                style={{ fontFamily: BODY, fontSize: 13, color: C.ink, background: C.paper, border: `1px solid ${C.line}`, padding: "6px 10px", borderRadius: 6, outline: "none" }}
+              >
+                <option value="ollama">Local LLM (llama)</option>
+                <option value="claude">Claude API</option>
+              </select>
+              <button
+                onClick={() => setView("dashboard")}
+                style={{
+                  ...btn("ghost"),
+                  padding: "8px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <Home size={15} /> Back to Dashboard
+              </button>
+            </div>
           )}
         </header>
 

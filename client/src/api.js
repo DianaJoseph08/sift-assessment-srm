@@ -6,11 +6,11 @@
  *   { type: "text", text: string }
  *   { type: "file", filename: string, base64: string }
  */
-export async function analyzeCandidate(job, resume) {
+export async function analyzeCandidate(job, resume, provider) {
   const res = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job, resume }),
+    body: JSON.stringify({ job, resume, provider }),
   });
 
   if (!res.ok) {
@@ -37,11 +37,11 @@ export function fileToBase64(file) {
 }
 
 /** Ask the interviewer chatbot for the next question. */
-export async function sendInterviewChat(job, candidate, history) {
+export async function sendInterviewChat(job, candidate, history, provider) {
   const res = await fetch("/api/interview/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job, candidate, history }),
+    body: JSON.stringify({ job, candidate, history, provider }),
   });
 
   if (!res.ok) {
@@ -57,11 +57,11 @@ export async function sendInterviewChat(job, candidate, history) {
 }
 
 /** Submit the interview transcript to generate the confidence score. */
-export async function evaluateInterview(job, candidate, history, proctoring) {
+export async function evaluateInterview(job, candidate, history, proctoring, provider) {
   const res = await fetch("/api/interview/evaluate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job, candidate, history, proctoring }),
+    body: JSON.stringify({ job, candidate, history, proctoring, provider }),
   });
 
   if (!res.ok) {

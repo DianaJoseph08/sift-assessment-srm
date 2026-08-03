@@ -23,7 +23,7 @@ app.get("/api/health", (_req, res) => {
 // Screen one resume against one job
 app.post("/api/analyze", async (req, res) => {
   try {
-    const { job, resume } = req.body || {};
+    const { job, resume, provider } = req.body || {};
     if (!job || !job.title || !job.description) {
       return res.status(400).json({ error: "Missing or incomplete job definition" });
     }
@@ -47,7 +47,7 @@ app.post("/api/analyze", async (req, res) => {
       }
     }
 
-    const result = await analyzeResume(job, finalResume);
+    const result = await analyzeResume(job, finalResume, provider);
     res.json(result);
   } catch (err) {
     console.error("[analyze] error:", err.message);
@@ -58,11 +58,11 @@ app.post("/api/analyze", async (req, res) => {
 // Conversational AI Interviewer Chat Endpoint
 app.post("/api/interview/chat", async (req, res) => {
   try {
-    const { job, candidate, history } = req.body || {};
+    const { job, candidate, history, provider } = req.body || {};
     if (!job || !candidate || !Array.isArray(history)) {
       return res.status(400).json({ error: "Missing job, candidate, or history in payload" });
     }
-    const question = await getNextInterviewQuestion(job, candidate, history);
+    const question = await getNextInterviewQuestion(job, candidate, history, provider);
     res.json({ question });
   } catch (err) {
     console.error("[interview-chat] error:", err.message);
@@ -73,11 +73,11 @@ app.post("/api/interview/chat", async (req, res) => {
 // Conversational AI Interviewer Evaluation Endpoint
 app.post("/api/interview/evaluate", async (req, res) => {
   try {
-    const { job, candidate, history, proctoring } = req.body || {};
+    const { job, candidate, history, proctoring, provider } = req.body || {};
     if (!job || !candidate || !Array.isArray(history)) {
       return res.status(400).json({ error: "Missing job, candidate, or history in payload" });
     }
-    const evaluation = await evaluateInterview(job, candidate, history, proctoring);
+    const evaluation = await evaluateInterview(job, candidate, history, proctoring, provider);
     res.json(evaluation);
   } catch (err) {
     console.error("[interview-evaluate] error:", err.message);
