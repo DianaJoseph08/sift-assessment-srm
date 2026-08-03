@@ -540,7 +540,9 @@ function Analyzing({ candidates }) {
               </span>
             )}
             {c.status === "error" && (
-              <span style={{ fontSize: 12.5, color: REC["Weak Match"].fg, fontWeight: 600 }}>Failed</span>
+              <span style={{ fontSize: 12.5, color: REC["Weak Match"].fg, fontWeight: 600 }} title={c.error}>
+                Failed: {c.error ? (c.error.length > 50 ? c.error.substring(0, 50) + "..." : c.error) : "Unknown error"}
+              </span>
             )}
             {(c.status === "analyzing" || c.status === "queued") && (
               <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: C.faint }}>
