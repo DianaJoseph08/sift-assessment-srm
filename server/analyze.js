@@ -3,7 +3,7 @@ import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
-const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-1.5-flash-latest" : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
+const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-1.5-flash" : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
 /**
@@ -191,7 +191,7 @@ export async function analyzeResume(job, resume, overrideProvider) {
   
   let activeModel = MODEL;
   if (activeProvider === "ollama") activeModel = "llama3.1";
-  else if (activeProvider === "gemini") activeModel = "gemini-1.5-flash-latest";
+  else if (activeProvider === "gemini") activeModel = "gemini-1.5-flash";
   else if (activeProvider === "groq") activeModel = "llama-3.1-8b-instant";
   else activeModel = "claude-sonnet-4-6";
 
@@ -317,7 +317,7 @@ async function analyzeWithGemini(content, model = MODEL, apiKey) {
     userMessage = content.map((c) => c.text || "").join("\n");
   }
 
-  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -429,7 +429,7 @@ async function chatWithGemini(systemPrompt, messages) {
     parts: [{ text: m.content }]
   }));
 
-  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -539,7 +539,7 @@ async function evaluateWithGemini(prompt, systemPrompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set.");
 
-  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
