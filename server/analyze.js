@@ -188,7 +188,12 @@ export async function analyzeResume(job, resume, overrideProvider) {
   const content = await buildContent(job, resume, rawText, extractedEmails);
   
   const activeProvider = overrideProvider || PROVIDER;
-  const activeModel = activeProvider === "ollama" ? "llama3.1" : "claude-sonnet-4-6";
+  
+  let activeModel = MODEL;
+  if (activeProvider === "ollama") activeModel = "llama3.1";
+  else if (activeProvider === "gemini") activeModel = "gemini-2.5-flash";
+  else if (activeProvider === "groq") activeModel = "llama-3.1-8b-instant";
+  else activeModel = "claude-sonnet-4-6";
 
   let result;
   if (activeProvider === "ollama") {
