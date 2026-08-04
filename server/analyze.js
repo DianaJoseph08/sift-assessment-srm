@@ -3,7 +3,7 @@ import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-1.5-flash-002";
 const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
