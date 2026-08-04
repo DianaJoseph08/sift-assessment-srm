@@ -3,7 +3,8 @@ import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
-const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? "gemini-1.5-pro" : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
+const GEMINI_MODEL = "gemini-2.0-flash";
+const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
 /**
@@ -189,13 +190,11 @@ export async function analyzeResume(job, resume, overrideProvider) {
   
   const activeProvider = overrideProvider || PROVIDER;
   
-  let activeModel = MODEL;
-  if (overrideProvider) {
-    if (overrideProvider === "ollama") activeModel = "llama3.1";
-    else if (overrideProvider === "gemini") activeModel = "gemini-1.5-pro";
-    else if (overrideProvider === "groq") activeModel = "llama-3.1-8b-instant";
-    else activeModel = "claude-sonnet-4-6";
-  }
+  let activeModel;
+  if (activeProvider === "ollama") activeModel = "llama3.1";
+  else if (activeProvider === "gemini") activeModel = GEMINI_MODEL;
+  else if (activeProvider === "groq") activeModel = "llama-3.1-8b-instant";
+  else activeModel = "claude-sonnet-4-6";
 
   let result;
   if (activeProvider === "ollama") {
@@ -319,7 +318,7 @@ async function analyzeWithGemini(content, model = MODEL, apiKey) {
     userMessage = content.map((c) => c.text || "").join("\n");
   }
 
-  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -431,7 +430,7 @@ async function chatWithGemini(systemPrompt, messages) {
     parts: [{ text: m.content }]
   }));
 
-  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -541,7 +540,7 @@ async function evaluateWithGemini(prompt, systemPrompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set.");
 
-  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent`, {
+  const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
