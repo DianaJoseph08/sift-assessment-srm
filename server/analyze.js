@@ -272,7 +272,7 @@ async function analyzeWithOllama(content, model = MODEL) {
       stream: false,
       format: "json",
       options: {
-        temperature: 0.1
+        temperature: 0
       }
     }),
   });
@@ -329,7 +329,7 @@ async function analyzeWithGemini(content, model = MODEL, apiKey) {
       systemInstruction: { parts: [{ text: SYSTEM }] },
       generationConfig: {
         responseMimeType: "application/json",
-        temperature: 0.1
+        temperature: 0
       }
     })
   });
@@ -505,7 +505,7 @@ Return ONLY valid JSON. Do not include any markdown formatting, code block backt
         stream: false,
         format: "json",
         options: {
-          temperature: 0.1
+          temperature: 0
         }
       }),
     });
@@ -551,7 +551,7 @@ async function evaluateWithGemini(prompt, systemPrompt) {
       systemInstruction: { parts: [{ text: systemPrompt }] },
       generationConfig: {
         responseMimeType: "application/json",
-        temperature: 0.1
+        temperature: 0
       }
     })
   });
@@ -581,7 +581,7 @@ async function analyzeWithGroq(content, model = MODEL, apiKey) {
       { role: "system", content: SYSTEM },
       { role: "user", content: userMessage }
     ],
-    temperature: 0.1,
+    temperature: 0,
     response_format: { type: "json_object" }
   });
 
@@ -664,7 +664,7 @@ async function evaluateWithGroq(prompt, systemPrompt) {
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
       ],
-      temperature: 0.1,
+      temperature: 0,
       response_format: { type: "json_object" }
     })
   });
