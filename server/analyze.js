@@ -96,8 +96,41 @@ Follow this systematic, step-by-step evaluation process for every candidate:
 function extractJSON(text) {
   let t = text.replace(/```json/gi, "").replace(/```/g, "").trim();
   const s = t.indexOf("{");
-  const e = t.lastIndexOf("}");
-  if (s === -1 || e === -1) throw new Error("No JSON found in model response");
+  if (s === -1) throw new Error("No JSON found in model response");
+  
+  // Find the last closing brace
+  let e = t.lastIndexOf("}");
+  
+  // If no closing brace or JSON appears truncated, try to repair it
+  if (e === -1 || e < s) {
+    // Attempt to close open JSON by appending closing chars
+    let partial = t.slice(s);
+    // Count unclosed braces and brackets
+    let braces = 0, brackets = 0, inString = false, escape = false;
+    for (let i = 0; i < partial.length; i++) {
+      const ch = partial[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inString) { escape = true; continue; }
+      if (ch === '"' && !escape) { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') braces++;
+      else if (ch === '}') braces--;
+      else if (ch === '[') brackets++;
+      else if (ch === ']') brackets--;
+    }
+    // Remove trailing incomplete key/value
+    partial = partial.replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
+    partial = partial.replace(/,\s*"[^"]*"?\s*$/, '');
+    // Close any open arrays then objects
+    for (let i = 0; i < brackets; i++) partial += ']';
+    for (let i = 0; i < braces; i++) partial += '}';
+    try {
+      return JSON.parse(partial);
+    } catch (_) {
+      throw new Error("Model response was truncated and could not be repaired. Try re-running.");
+    }
+  }
+  
   return JSON.parse(t.slice(s, e + 1));
 }
 
@@ -241,7 +274,7 @@ async function analyzeWithClaude(content, model = MODEL, apiKey) {
   const client = getClaudeClient(apiKey);
   const message = await client.messages.create({
     model: model,
-    max_tokens: 1200,
+    max_tokens: 2048,
     system: SYSTEM,
     messages: [{ role: "user", content }],
   });
