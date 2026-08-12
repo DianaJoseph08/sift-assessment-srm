@@ -2539,6 +2539,7 @@ function App() {
                 <option value="ollama">Local LLM (llama)</option>
                 <option value="gemini">Gemini API</option>
                 <option value="claude">Claude API</option>
+                <option value="groq">Groq API (Free)</option>
               </select>
               <button
                 onClick={() => setView("dashboard")}
