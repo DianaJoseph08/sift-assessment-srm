@@ -2455,8 +2455,9 @@ function App() {
           candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "analyzing" } : c)),
         }));
 
-        // Add a 2-second sleep between requests to respect free-tier rate limits (TPM)
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Add sleep between requests to respect rate limits (Groq free tier needs ~25s gap)
+        const delayMs = llmProvider === "groq" ? 25000 : 2000;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
 
         let resume;
         if (cand.kind === "file") {

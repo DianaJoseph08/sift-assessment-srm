@@ -575,32 +575,46 @@ async function analyzeWithGroq(content, model = MODEL, apiKey) {
     userMessage = content.map((c) => c.text || "").join("\n");
   }
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${key}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: userMessage }
-      ],
-      temperature: 0.1,
-      response_format: { type: "json_object" }
-    })
+  const body = JSON.stringify({
+    model: model,
+    messages: [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: userMessage }
+    ],
+    temperature: 0.1,
+    response_format: { type: "json_object" }
   });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Groq request failed: ${response.status} - ${errText}`);
-  }
+  // Retry up to 3 times on 429 rate limit, waiting for retry-after seconds
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+      body
+    });
 
-  const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || "";
-  return extractJSON(text);
+    if (response.status === 429) {
+      const errData = await response.json().catch(() => ({}));
+      // Groq returns retry-after in error body or headers
+      const retryAfter = response.headers.get("retry-after") || 30;
+      const waitMs = (parseFloat(retryAfter) + 2) * 1000;
+      console.warn(`[Groq] Rate limited. Waiting ${waitMs / 1000}s before retry ${attempt + 1}/3...`);
+      await new Promise(r => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Groq request failed: ${response.status} - ${errText}`);
+    }
+
+    const data = await response.json();
+    const text = data.choices?.[0]?.message?.content || "";
+    return extractJSON(text);
+  }
+  throw new Error("Groq rate limit exceeded after 3 retries. Please wait a minute and try again.");
 }
+
 
 async function chatWithGroq(systemPrompt, messages) {
   const key = process.env.GROQ_API_KEY;
