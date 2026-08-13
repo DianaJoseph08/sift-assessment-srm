@@ -372,7 +372,7 @@ function RoleStep({ job, setJob, onNext }) {
 }
 
 /* ============================== STEP 2: CANDIDATES ============================== */
-function CandidateStep({ candidates, setCandidates, onBack, onRun }) {
+function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults, llmProvider }) {
   const [drag, setDrag] = useState(false);
   const [paste, setPaste] = useState("");
   const [err, setErr] = useState("");
@@ -380,9 +380,9 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun }) {
   const pasteCount = useRef(0);
 
   const unscreenedCount = candidates.filter((c) => c.status !== "done" || !c.result).length;
-  const buttonText = unscreenedCount > 0 
-    ? `Screen ${unscreenedCount} New Resume${unscreenedCount > 1 ? "s" : ""}` 
-    : "View Results";
+  const screenedCount = candidates.length - unscreenedCount;
+  
+  const providerLabel = llmProvider === "claude" ? "Claude API" : llmProvider === "gemini" ? "Gemini API" : llmProvider === "groq" ? "Groq API" : "Local LLM";
 
   const addFiles = async (files) => {
     setErr("");
@@ -490,6 +490,15 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun }) {
                       )}
                     </div>
                   </div>
+                  {hasScore && (
+                    <button
+                      title="Clear score & re-screen this resume"
+                      style={{ border: "none", background: "none", cursor: "pointer", padding: 2, display: "flex", alignItems: "center" }}
+                      onClick={() => setCandidates((cs) => cs.map((x) => (x.id === c.id ? { ...x, status: "idle", result: null, error: null } : x)))}
+                    >
+                      <RotateCcw size={14} color={C.accent} />
+                    </button>
+                  )}
                   <X size={16} color={C.faint} style={{ cursor: "pointer" }}
                     onClick={() => setCandidates((cs) => cs.filter((x) => x.id !== c.id))} />
                 </div>
@@ -499,13 +508,36 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun }) {
         )}
       </Panel>
 
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10 }}>
+      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button style={btn("ghost")} onClick={onBack}><ArrowLeft size={16} /> Back to role</button>
-        <button style={{ ...btn("primary"), marginLeft: "auto",
-          opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
-          onClick={() => candidates.length && onRun()}>
-          <Sparkles size={16} /> {buttonText}
-        </button>
+
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {screenedCount > 0 && (
+            <button
+              style={btn("soft")}
+              title={`Force re-evaluate all ${candidates.length} candidates using ${providerLabel}`}
+              onClick={() => candidates.length && onRun(true)}
+            >
+              <RotateCcw size={15} /> Re-analyze All with {providerLabel}
+            </button>
+          )}
+
+          {unscreenedCount > 0 ? (
+            <button
+              style={{ ...btn("primary"), opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
+              onClick={() => candidates.length && onRun(false)}
+            >
+              <Sparkles size={16} /> Screen {unscreenedCount} New Resume{unscreenedCount > 1 ? "s" : ""}
+            </button>
+          ) : (
+            <button
+              style={{ ...btn("primary"), opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
+              onClick={onGotoResults}
+            >
+              <ArrowRight size={16} /> View Results
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2595,7 +2627,7 @@ function App() {
             {step === 1 && <RoleStep job={jobDetails} setJob={handleUpdateJobDetails} onNext={() => goto(2)} />}
             {step === 2 && (
               <CandidateStep candidates={candidates} setCandidates={handleUpdateCandidates}
-                onBack={() => goto(1)} onRun={() => runScreening(false)} />
+                onBack={() => goto(1)} onRun={(force) => runScreening(force)} onGotoResults={() => goto(3)} llmProvider={llmProvider} />
             )}
             {step === 3 && screening === "running" && <Analyzing candidates={candidates} />}
             {step === 3 && screening === "done" && (
