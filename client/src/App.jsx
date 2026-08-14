@@ -123,7 +123,7 @@ const SrmLogo = ({ collapsed = false, theme = "light" }) => (
       <circle cx="70" cy="102" r="23" fill="#034DA1" />
       
       <path d="M68,118 L68,110 Q68,104 64,102 Q68,104 72,102 Q72,110 72,118 Z" fill="#FFFFFF" />
-      <path d="M53,102 C51,99 52,94 56,93 C55,89 59,85 63,87 C66,83 72,83 75,86 C79,84 83,87 83,91 C87,92 88,97 85,100 Z" fill="#FFFFFF" />
+      <path d="M53,102 C51,99 52,94 56,93 C55,89 59,85 63,87 C66,83 72,83 75,86 C79,84 83,87 83,91 Z" fill="#FFFFFF" />
       
       {!collapsed && (
         <>
@@ -179,7 +179,40 @@ function uid() {
   return "id_" + Math.random().toString(36).substr(2, 9);
 }
 
-/* ============================== UI COMPONENTS ============================== */
+/* Helper button styles */
+const btn = (type, C) => {
+  const base = {
+    padding: "8px 14px",
+    borderRadius: 7,
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: "pointer",
+    border: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    fontFamily: BODY,
+    transition: "all 0.15s ease",
+  };
+  if (type === "primary") return { ...base, background: C.accent, color: "#FFFFFF" };
+  if (type === "soft") return { ...base, background: C.accentSoft, color: C.accent, border: `1px solid ${C.accent}` };
+  if (type === "ghost") return { ...base, background: "transparent", color: C.ink, border: `1px solid ${C.line}` };
+  return base;
+};
+
+const inputStyle = (C) => ({
+  width: "100%",
+  padding: "9px 12px",
+  borderRadius: 7,
+  border: `1px solid ${C.line}`,
+  background: C.bg,
+  color: C.ink,
+  fontSize: 13.5,
+  fontFamily: BODY,
+  outline: "none",
+  boxSizing: "border-box",
+});
+
 const Panel = ({ title, sub, children, style, C, action }) => (
   <div style={{
     background: C.paper,
@@ -343,7 +376,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
 }
 
 /* ============================== WELCOME & AGENCY DASHBOARD ============================== */
-function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, onNavigateTab, C }) {
+function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, C }) {
   const filteredJobs = useMemo(() => {
     if (!activeCompany) return jobs;
     return jobs.filter(j => j.companyId === activeCompany.id);
@@ -358,19 +391,6 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
       const shortlisted = (j.candidates || []).filter(c => c.status === "done" && c.result && c.result.overallScore >= 70);
       return acc + shortlisted.length;
     }, 0);
-  }, [filteredJobs]);
-
-  const avgFit = useMemo(() => {
-    let sum = 0, count = 0;
-    filteredJobs.forEach(j => {
-      (j.candidates || []).forEach(c => {
-        if (c.status === "done" && c.result && c.result.overallScore) {
-          sum += c.result.overallScore;
-          count++;
-        }
-      });
-    });
-    return count > 0 ? Math.round(sum / count) : 0;
   }, [filteredJobs]);
 
   const recentShortlist = useMemo(() => {
@@ -507,7 +527,6 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
 
       {/* Main Dashboard Section */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
-        {/* Client Companies & Openings Overview */}
         <Panel title={activeCompany ? `Job Openings for ${activeCompany.name}` : "Client Company Job Openings"} sub="Manage jobs and upload candidate resumes for evaluation" C={C}>
           {filteredJobs.length === 0 ? (
             <div style={{ textAlign: "center", padding: "36px 0", color: C.faint }}>
@@ -577,7 +596,6 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
           )}
         </Panel>
 
-        {/* Top Shortlisted Recommendations */}
         <Panel title="Top Client Recommendations" sub="Highest scoring candidates ready to recommend to client companies" C={C}>
           {recentShortlist.length === 0 ? (
             <div style={{ textAlign: "center", padding: "30px 0", color: C.faint, fontSize: 13 }}>
@@ -585,7 +603,7 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {recentShortlist.map(({ candidate, job }, idx) => (
+              {recentShortlist.map(({ candidate, job }) => (
                 <div key={candidate.id} style={{ padding: 12, borderRadius: 8, border: `1px solid ${C.line}`, background: C.bg }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div>
@@ -642,7 +660,6 @@ function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onS
         </button>
       </div>
 
-      {/* Search Bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 14px" }}>
         <Search size={18} color={C.sub} />
         <input
@@ -654,7 +671,6 @@ function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onS
         />
       </div>
 
-      {/* Company Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
         {filtered.map((comp) => {
           const compJobs = jobs.filter(j => j.companyId === comp.id);
@@ -709,7 +725,7 @@ function ActivityLogsView({ logs, C }) {
   const [search, setSearch] = useState("");
 
   const filteredLogs = useMemo(() => {
-    return logs.filter(l => l.message.toLowerCase().includes(search.toLowerCase()) || l.companyName.toLowerCase().includes(search.toLowerCase()) || l.type.toLowerCase().includes(search.toLowerCase()));
+    return logs.filter(l => (l.message || "").toLowerCase().includes(search.toLowerCase()) || (l.companyName || "").toLowerCase().includes(search.toLowerCase()) || (l.type || "").toLowerCase().includes(search.toLowerCase()));
   }, [logs, search]);
 
   return (
@@ -748,7 +764,7 @@ function ActivityLogsView({ logs, C }) {
                     {log.details && <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>{log.details}</div>}
                   </div>
                 </div>
-                <div style={{ textAlignment: "right", fontSize: 11, color: C.faint }}>
+                <div style={{ textAlign: "right", fontSize: 11, color: C.faint }}>
                   {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
@@ -821,17 +837,17 @@ function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, C }
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Groq API Key</label>
-            <input type="password" value={groqKey} onChange={e => setGroqKey(e.target.value)} placeholder="gsk_..." style={{ width: "100%", padding: 8, borderRadius: 6, border: `1px solid ${C.line}`, marginTop: 4, background: C.bg, color: C.ink, fontFamily: BODY }} />
+            <input type="password" value={groqKey} onChange={e => setGroqKey(e.target.value)} placeholder="gsk_..." style={inputStyle(C)} />
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Google Gemini API Key</label>
-            <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." style={{ width: "100%", padding: 8, borderRadius: 6, border: `1px solid ${C.line}`, marginTop: 4, background: C.bg, color: C.ink, fontFamily: BODY }} />
+            <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." style={inputStyle(C)} />
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Anthropic Claude API Key</label>
-            <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-..." style={{ width: "100%", padding: 8, borderRadius: 6, border: `1px solid ${C.line}`, marginTop: 4, background: C.bg, color: C.ink, fontFamily: BODY }} />
+            <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-..." style={inputStyle(C)} />
           </div>
-          <button onClick={handleSaveKeys} style={{ padding: "10px 16px", background: C.accent, color: "#FFF", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontFamily: BODY, marginTop: 6 }}>
+          <button onClick={handleSaveKeys} style={btn("primary", C)}>
             Save API Keys
           </button>
           {savedMsg && <div style={{ fontSize: 12.5, color: "#16A34A", fontWeight: 700 }}>{savedMsg}</div>}
@@ -852,10 +868,6 @@ export default function App() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [llmProvider, setLlmProvider] = useState("groq");
-  
-  // Wizard & Interview state
-  const [step, setStep] = useState(1);
-  const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
 
   const C = THEMES[themeKey] || THEMES.light;
@@ -872,7 +884,10 @@ export default function App() {
 
         if (jobsRes.ok) {
           const jData = await jobsRes.json();
-          if (Array.isArray(jData) && jData.length > 0) setJobs(jData);
+          if (Array.isArray(jData) && jData.length > 0) {
+            setJobs(jData);
+            if (!activeJobId) setActiveJobId(jData[0].id);
+          }
         }
 
         if (compRes.ok) {
@@ -893,7 +908,6 @@ export default function App() {
     fetchData();
   }, []);
 
-  // Sync Companies to Server
   const saveCompaniesToServer = async (compList) => {
     try {
       await fetch("/api/save-companies", {
@@ -936,7 +950,6 @@ export default function App() {
     setJobs(prev => [newJob, ...prev]);
     setActiveJobId(newId);
     setActiveTab("jobs");
-    setStep(1);
   };
 
   const activeJob = useMemo(() => jobs.find((j) => j.id === activeJobId), [jobs, activeJobId]);
@@ -971,8 +984,7 @@ export default function App() {
                 setActiveCompany={setActiveCompany}
                 onCreateCompany={() => setShowAddCompanyModal(true)}
                 onCreateJob={handleCreateJobForCompany}
-                onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); setStep(3); }}
-                onNavigateTab={setActiveTab}
+                onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); }}
                 C={C}
               />
             )}
@@ -1013,7 +1025,7 @@ export default function App() {
                   </div>
                   <button
                     onClick={handleCreateJobForCompany}
-                    style={{ padding: "9px 16px", background: C.accent, color: "#FFF", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: BODY }}
+                    style={btn("primary", C)}
                   >
                     + Post New Opening Job
                   </button>
@@ -1031,7 +1043,7 @@ export default function App() {
                       {jobs.map(j => (
                         <button
                           key={j.id}
-                          onClick={() => { setActiveJobId(j.id); setStep(1); }}
+                          onClick={() => setActiveJobId(j.id)}
                           style={{
                             padding: "8px 14px",
                             borderRadius: 8,
@@ -1092,23 +1104,23 @@ export default function App() {
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Company Name *</label>
-                  <input name="name" required placeholder="e.g. Motherson Group" style={{ width: "100%", padding: 8, borderRadius: 6, border: `1px solid ${C.line}`, marginTop: 4, background: C.bg, color: C.ink, fontFamily: BODY }} />
+                  <input name="name" required placeholder="e.g. Motherson Group" style={inputStyle(C)} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Industry</label>
-                  <input name="industry" placeholder="e.g. Automotive & Manufacturing" style={{ width: "100%", padding: 8, borderRadius: 6, border: `1px solid ${C.line}`, marginTop: 4, background: C.bg, color: C.ink, fontFamily: BODY }} />
+                  <input name="industry" placeholder="e.g. Automotive & Manufacturing" style={inputStyle(C)} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>HR / Contact Email</label>
-                  <input name="email" type="email" placeholder="hr@clientcompany.com" style={{ width: "100%", padding: 8, borderRadius: 6, border: `1px solid ${C.line}`, marginTop: 4, background: C.bg, color: C.ink, fontFamily: BODY }} />
+                  <input name="email" type="email" placeholder="hr@clientcompany.com" style={inputStyle(C)} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Notes / Guidelines</label>
-                  <textarea name="notes" placeholder="Specific hiring guidelines for this company..." style={{ width: "100%", padding: 8, borderRadius: 6, border: `1px solid ${C.line}`, marginTop: 4, background: C.bg, color: C.ink, fontFamily: BODY, minHeight: 60 }} />
+                  <textarea name="notes" placeholder="Specific hiring guidelines for this company..." style={{ ...inputStyle(C), minHeight: 60 }} />
                 </div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
-                  <button type="button" onClick={() => setShowAddCompanyModal(false)} style={{ padding: "8px 14px", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 6, color: C.sub, cursor: "pointer" }}>Cancel</button>
-                  <button type="submit" style={{ padding: "8px 16px", background: C.accent, color: "#FFF", border: "none", borderRadius: 6, fontWeight: 700, cursor: "pointer" }}>Save Company</button>
+                  <button type="button" onClick={() => setShowAddCompanyModal(false)} style={btn("ghost", C)}>Cancel</button>
+                  <button type="submit" style={btn("primary", C)}>Save Company</button>
                 </div>
               </div>
             </form>
