@@ -525,101 +525,33 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
         </Panel>
       </div>
 
-      {/* Main Dashboard Section */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
-        <Panel title={activeCompany ? `Job Openings for ${activeCompany.name}` : "Client Company Job Openings"} sub="Manage jobs and upload candidate resumes for evaluation" C={C}>
-          {filteredJobs.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "36px 0", color: C.faint }}>
-              <Briefcase size={36} style={{ opacity: 0.5, marginBottom: 10 }} />
-              <div style={{ fontSize: 14, fontWeight: 600 }}>No job openings found</div>
-              <div style={{ fontSize: 12.5, marginTop: 4 }}>Click "Post Opening Job" to create a new role for screening</div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {filteredJobs.map((j) => {
-                const screened = (j.candidates || []).filter(c => c.status === "done").length;
-                const shortlisted = (j.candidates || []).filter(c => c.status === "done" && c.result && c.result.overallScore >= 70).length;
-                return (
-                  <div key={j.id} style={{
-                    padding: 16,
-                    borderRadius: 10,
-                    border: `1px solid ${C.line}`,
-                    background: C.bg,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 16
-                  }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 11, background: C.accentSoft, color: C.accent, padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>
-                          🏢 {j.companyName}
-                        </span>
-                        <span style={{ fontSize: 11, color: C.sub }}>{j.seniority} • {j.minYears}+ yrs exp</span>
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: C.ink, marginTop: 4, fontFamily: DISPLAY }}>
-                        {j.title}
-                      </div>
-                      <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
-                        Must-have: {(j.mustHave || []).slice(0, 3).join(", ") || "None specified"}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{shortlisted} / {screened}</div>
-                        <div style={{ fontSize: 11, color: C.sub }}>Shortlisted</div>
-                      </div>
-                      <button
-                        onClick={() => onSelectJob(j.id)}
-                        style={{
-                          padding: "8px 14px",
-                          background: C.accent,
-                          color: "#FFFFFF",
-                          border: "none",
-                          borderRadius: 6,
-                          fontSize: 12.5,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          fontFamily: BODY,
-                        }}
-                      >
-                        Screen Resumes <ChevronRight size={14} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Panel>
-
-        <Panel title="Top Client Recommendations" sub="Highest scoring candidates ready to recommend to client companies" C={C}>
-          {recentShortlist.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "30px 0", color: C.faint, fontSize: 13 }}>
-              No scored candidates yet. Run screening to see top recommendations.
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {recentShortlist.map(({ candidate, job }) => (
-                <div key={candidate.id} style={{ padding: 12, borderRadius: 8, border: `1px solid ${C.line}`, background: C.bg }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink }}>{candidate.result.candidateName || candidate.label}</div>
-                      <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>🏢 {job.companyName} — {job.title}</div>
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: gradeColor(candidate.result.overallScore) }}>
-                      {candidate.result.overallScore}%
-                    </span>
+      {/* Minimal Dashboard Section */}
+      <Panel title="Top Client Candidate Recommendations" sub="Highest scoring candidates ready to recommend to client companies" C={C}>
+        {recentShortlist.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "30px 0", color: C.faint, fontSize: 13 }}>
+            No scored candidates yet. Go to <strong style={{ color: C.accent }}>Job Openings &amp; Screening</strong> tab to screen resumes and generate recommendations.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+            {recentShortlist.map(({ candidate, job }) => (
+              <div key={candidate.id} style={{ padding: 14, borderRadius: 10, border: `1px solid ${C.line}`, background: C.bg, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{candidate.result.candidateName || candidate.label}</div>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>🏢 {job.companyName} — {job.title}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: gradeColor(candidate.result.overallScore) }}>
+                    {candidate.result.overallScore}%
+                  </span>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: REC[candidate.result.recommendation]?.dot || C.sub, marginTop: 2 }}>
+                    {candidate.result.recommendation}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }
