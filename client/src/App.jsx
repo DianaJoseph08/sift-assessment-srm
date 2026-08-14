@@ -910,7 +910,7 @@ export default function App() {
     saveCompaniesToServer(updated);
   };
 
-  const handleDeleteCompany = (comp: string) => {
+  const handleDeleteCompany = (comp) => {
     const updated = companies.filter(c => c.id !== comp);
     setCompanies(updated);
     saveCompaniesToServer(updated);
