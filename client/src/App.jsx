@@ -2556,9 +2556,7 @@ function App() {
                 letterSpacing: "-.01em", color: C.ink }}>
                 AI Resume Screening &amp; Shortlist Portal
               </h1>
-              <div style={{ fontSize: 13.5, color: C.sub, marginTop: 3 }}>
-                Autonomous offline candidate screening, fit scoring, and ranking engine.
-              </div>
+
             </div>
           </div>
           
