@@ -10,8 +10,21 @@ const db = new DatabaseSync(dbPath);
 
 // Create tables if they do not exist
 db.exec(`
+  CREATE TABLE IF NOT EXISTS companies (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    industry TEXT,
+    contact_email TEXT,
+    notes TEXT,
+    created_at TEXT
+  );
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
+    company_id TEXT,
+    company_name TEXT,
     title TEXT,
     seniority TEXT,
     minYears INTEGER,
@@ -22,6 +35,14 @@ db.exec(`
     screening TEXT
   );
 `);
+
+// Migration safeguard for existing DBs without company_id / company_name
+try {
+  db.exec("ALTER TABLE jobs ADD COLUMN company_id TEXT");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE jobs ADD COLUMN company_name TEXT");
+} catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS candidates (
@@ -38,6 +59,81 @@ db.exec(`
     FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
   );
 `);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS activity_logs (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT,
+    type TEXT,
+    message TEXT,
+    company_name TEXT,
+    details TEXT
+  );
+`);
+
+/**
+ * Companies Management
+ */
+export function getCompanies() {
+  const query = db.prepare("SELECT * FROM companies ORDER BY rowid DESC");
+  const rows = query.all();
+  return rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    industry: r.industry || "General",
+    contactEmail: r.contact_email || "",
+    notes: r.notes || "",
+    createdAt: r.created_at || new Date().toISOString()
+  }));
+}
+
+export function saveCompanies(companies) {
+  db.exec("BEGIN TRANSACTION");
+  try {
+    db.exec("DELETE FROM companies");
+    const insert = db.prepare(`
+      INSERT INTO companies (id, name, industry, contact_email, notes, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    for (const c of companies) {
+      insert.run(c.id, c.name, c.industry || "", c.contactEmail || "", c.notes || "", c.createdAt || new Date().toISOString());
+    }
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+/**
+ * Activity Logs
+ */
+export function getLogs() {
+  const query = db.prepare("SELECT * FROM activity_logs ORDER BY rowid DESC LIMIT 200");
+  const rows = query.all();
+  return rows.map(r => ({
+    id: r.id,
+    timestamp: r.timestamp,
+    type: r.type,
+    message: r.message,
+    companyName: r.company_name || "",
+    details: r.details || ""
+  }));
+}
+
+export function addLog(type, message, companyName = "", details = "") {
+  try {
+    const insert = db.prepare(`
+      INSERT INTO activity_logs (id, timestamp, type, message, company_name, details)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const id = `log_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const timestamp = new Date().toISOString();
+    insert.run(id, timestamp, type, message, companyName, details);
+  } catch (e) {
+    console.error("Failed to insert log:", e.message);
+  }
+}
 
 /**
  * Retrieve all jobs, joining candidates per job.
@@ -64,6 +160,8 @@ export function getJobs() {
     
     return {
       id: job.id,
+      companyId: job.company_id || "comp_default",
+      companyName: job.company_name || "General Client",
       title: job.title || "",
       seniority: job.seniority || "Senior",
       minYears: Number(job.minYears || 0),
@@ -101,8 +199,8 @@ export function saveJobs(jobs) {
     db.exec("DELETE FROM jobs");
     
     const insertJob = db.prepare(`
-      INSERT INTO jobs (id, title, seniority, minYears, location, description, mustHave, niceToHave, screening)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO jobs (id, company_id, company_name, title, seniority, minYears, location, description, mustHave, niceToHave, screening)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertCandidate = db.prepare(`
@@ -113,6 +211,8 @@ export function saveJobs(jobs) {
     for (const job of jobs) {
       insertJob.run(
         job.id,
+        job.companyId || "comp_default",
+        job.companyName || "General Client",
         job.title || "",
         job.seniority || "",
         job.minYears || 0,

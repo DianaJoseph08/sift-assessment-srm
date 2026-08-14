@@ -6,7 +6,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { analyzeResume, getNextInterviewQuestion, evaluateInterview } from "./analyze.js";
-import { getJobs, saveJobs, getCandidate, saveCandidateInterview } from "./db.js";
+import { getJobs, saveJobs, getCandidate, saveCandidateInterview, getCompanies, saveCompanies, getLogs, addLog } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8787;
@@ -18,6 +18,55 @@ app.use(express.json({ limit: "30mb" })); // resumes are sent as base64
 // Health check
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, keyConfigured: Boolean(process.env.ANTHROPIC_API_KEY) });
+});
+
+// Fetch companies
+app.get("/api/companies", (_req, res) => {
+  try {
+    const companies = getCompanies();
+    res.json(companies);
+  } catch (err) {
+    console.error("[get-companies] error:", err.message);
+    res.status(500).json({ error: "Failed to read companies" });
+  }
+});
+
+// Save companies
+app.post("/api/save-companies", (req, res) => {
+  try {
+    const { companies } = req.body || {};
+    if (!Array.isArray(companies)) {
+      return res.status(400).json({ error: "Invalid payload: companies must be an array" });
+    }
+    saveCompanies(companies);
+    addLog("COMPANY_UPDATE", `Updated client companies list (${companies.length} companies)`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[save-companies] error:", err.message);
+    res.status(500).json({ error: err.message || "Failed to save companies" });
+  }
+});
+
+// Fetch activity logs
+app.get("/api/logs", (_req, res) => {
+  try {
+    const logs = getLogs();
+    res.json(logs);
+  } catch (err) {
+    console.error("[get-logs] error:", err.message);
+    res.status(500).json({ error: "Failed to read activity logs" });
+  }
+});
+
+// Add activity log manually
+app.post("/api/log", (req, res) => {
+  try {
+    const { type, message, companyName, details } = req.body || {};
+    addLog(type || "INFO", message || "", companyName || "", details || "");
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Screen one resume against one job
@@ -48,9 +97,11 @@ app.post("/api/analyze", async (req, res) => {
     }
 
     const result = await analyzeResume(job, finalResume, provider);
+    addLog("SCREENING", `Screened resume for candidate ${result.candidateName || 'Candidate'} (${result.recommendation || 'Score: ' + result.overallScore})`, job.companyName || "", `Job: ${job.title} | Score: ${result.overallScore}`);
     res.json(result);
   } catch (err) {
     console.error("[analyze] error:", err.message);
+    addLog("ERROR", `Screening failed: ${err.message}`, job?.companyName || "", `Job: ${job?.title || "Unknown"}`);
     res.status(500).json({ error: err.message || "Analysis failed" });
   }
 });
@@ -78,6 +129,7 @@ app.post("/api/interview/evaluate", async (req, res) => {
       return res.status(400).json({ error: "Missing job, candidate, or history in payload" });
     }
     const evaluation = await evaluateInterview(job, candidate, history, proctoring, provider);
+    addLog("INTERVIEW", `Completed AI interview for ${candidate.result?.candidateName || candidate.label}`, job.companyName || "", `Score: ${evaluation.score}/100`);
     res.json(evaluation);
   } catch (err) {
     console.error("[interview-evaluate] error:", err.message);
@@ -85,7 +137,7 @@ app.post("/api/interview/evaluate", async (req, res) => {
   }
 });
 
-// Secure Candidate Info Endpoint (only returns candidate name, job title, and skills)
+// Secure Candidate Info Endpoint
 app.get("/api/candidate-interview-info", (req, res) => {
   try {
     const { candidateId } = req.query || {};
@@ -97,13 +149,13 @@ app.get("/api/candidate-interview-info", (req, res) => {
       return res.status(404).json({ error: "Candidate session not found" });
     }
     
-    // Fetch job details securely
     const jobs = getJobs();
     const job = jobs.find(j => j.id === cand.jobId);
     
     res.json({
       candidateName: cand.result?.candidateName || cand.label,
       jobTitle: job ? job.title : "Untitled Role",
+      companyName: job ? (job.companyName || "Client Company") : "Client Company",
       skills: cand.result?.topSkills || []
     });
   } catch (err) {
@@ -126,6 +178,7 @@ app.post("/api/candidate-interview-submit", (req, res) => {
       transcript,
       proctoring
     });
+    addLog("REMOTE_INTERVIEW", `Remote candidate assessment submitted (${score}/100)`);
     res.json({ ok: true });
   } catch (err) {
     console.error("[candidate-interview-submit] error:", err.message);
@@ -159,7 +212,7 @@ app.post("/api/save-jobs", (req, res) => {
   }
 });
 
-// Serve the built frontend in production (npm run build then npm start)
+// Serve the built frontend in production
 const dist = path.join(__dirname, "..", "dist");
 if (fs.existsSync(dist)) {
   app.use(express.static(dist));
@@ -167,11 +220,11 @@ if (fs.existsSync(dist)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`\n  SRM backend listening on http://localhost:${PORT}`);
+  console.log(`\n  SRM Multi-Company Agency Portal listening on http://localhost:${PORT}`);
   if (process.env.LLM_PROVIDER === "ollama") {
     console.log(`  LLM Provider: Local Ollama (${process.env.MODEL || "llama3.1"})`);
   } else if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn("  WARNING: ANTHROPIC_API_KEY is not set — screening will fail unless LLM_PROVIDER=ollama.");
+    console.warn("  WARNING: ANTHROPIC_API_KEY is not set — default screening will use configured provider.");
   }
   console.log("");
 });
