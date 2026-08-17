@@ -362,21 +362,36 @@ function evaluateHeuristically(job, resumeText, fileName) {
   };
 }
 
-async function analyzeWithClaude(content, model = MODEL, apiKey) {
+async function analyzeWithClaude(content, model = "claude-3-5-sonnet-20241022", apiKey) {
   const client = getClaudeClient(apiKey);
-  const message = await client.messages.create({
-    model: model,
-    max_tokens: 2048,
-    system: SYSTEM,
-    messages: [{ role: "user", content }],
-  });
+  try {
+    const message = await client.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2048,
+      system: SYSTEM,
+      messages: [{ role: "user", content }],
+    });
 
-  const text = (message.content || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+    const text = (message.content || [])
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("");
 
-  return extractJSON(text);
+    return extractJSON(text);
+  } catch (err) {
+    if (err.status === 429 || err.status === 529 || (err.message && err.message.includes("overloaded"))) {
+      console.warn("[Claude] Sonnet overloaded/limited. Retrying with claude-3-haiku-20240307...");
+      const message = await client.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 2048,
+        system: SYSTEM,
+        messages: [{ role: "user", content }],
+      });
+      const text = (message.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+      return extractJSON(text);
+    }
+    throw err;
+  }
 }
 
 async function analyzeWithOllama(content, model = MODEL) {
