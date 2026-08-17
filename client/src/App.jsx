@@ -142,6 +142,17 @@ const SAMPLE_COMPANIES = [
   { id: "comp_bosch", name: "Bosch India", industry: "Automotive Engineering", contactEmail: "ta@bosch.in", notes: "R&D hiring for Embedded & Mechatronics roles", createdAt: new Date().toISOString() }
 ];
 
+const SAMPLE_JOB = {
+  title: "Senior Machine Learning Engineer",
+  seniority: "Senior",
+  minYears: 5,
+  location: "Bengaluru / Hybrid",
+  description:
+    "We are hiring a Senior Machine Learning Engineer to design, build, and deploy production ML systems. You will own models end to end — from data pipelines and experimentation to deployment, monitoring, and iteration. You will collaborate with product and data teams to ship recommendation and prediction features at scale.",
+  mustHave: ["Python", "PyTorch or TensorFlow", "Machine Learning", "Model Deployment / MLOps", "SQL"],
+  niceToHave: ["Kubernetes", "Recommendation Systems", "AWS or GCP", "Spark"],
+};
+
 const SAMPLE_RESUMES = [
   {
     label: "Vinay_Kotha_UG_NX_Designer.pdf",
@@ -175,11 +186,32 @@ Skills: Machine Learning, Optimization Algorithms, Python, TensorFlow, R, Probab
   }
 ];
 
-function uid() {
-  return "id_" + Math.random().toString(36).substr(2, 9);
+let _id = 0;
+const uid = () => `c${++_id}_${Date.now()}`;
+
+async function runPool(items, limit, worker) {
+  let i = 0;
+  const next = async () => {
+    while (i < items.length) {
+      const cur = i++;
+      await worker(items[cur], cur);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, next));
 }
 
-/* Helper button styles */
+function downloadCSV(rows, filename) {
+  const blob = new Blob([Papa.unparse(rows)], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 const btn = (type, C) => {
   const base = {
     padding: "8px 14px",
@@ -213,6 +245,19 @@ const inputStyle = (C) => ({
   boxSizing: "border-box",
 });
 
+function Field({ label, hint, children, C }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 700, letterSpacing: ".06em",
+        textTransform: "uppercase", color: C.sub, marginBottom: 6 }}>
+        {label}
+      </label>
+      {children}
+      {hint && <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>{hint}</div>}
+    </div>
+  );
+}
+
 const Panel = ({ title, sub, children, style, C, action }) => (
   <div style={{
     background: C.paper,
@@ -235,480 +280,604 @@ const Panel = ({ title, sub, children, style, C, action }) => (
   </div>
 );
 
-/* ============================== SIDEBAR NAVIGATION ============================== */
-function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, activeCompany, setActiveCompany, C }) {
-  const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: Home },
-    { id: "companies", label: "Client Companies", icon: Building2, badge: companies.length },
-    { id: "jobs", label: "Job Openings & Screening", icon: Briefcase },
-    { id: "logs", label: "Activity & Audit Logs", icon: Activity },
-    { id: "settings", label: "Settings & AI Keys", icon: Settings },
+function SkillEditor({ skills, onChange, placeholder, C }) {
+  const [v, setV] = useState("");
+  const add = () => {
+    const t = v.trim();
+    if (t && !skills.includes(t)) onChange([...skills, t]);
+    setV("");
+  };
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          style={inputStyle(C)} value={v} placeholder={placeholder}
+          onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+        />
+        <button style={{ ...btn("soft", C), padding: "0 14px" }} onClick={add}><Plus size={16} /></button>
+      </div>
+      {skills.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 9 }}>
+          {skills.map((s) => (
+            <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: 6,
+              background: C.accentSoft, color: C.accent, fontSize: 13, fontWeight: 600,
+              padding: "5px 9px", borderRadius: 7 }}>
+              {s}
+              <X size={13} style={{ cursor: "pointer" }}
+                onClick={() => onChange(skills.filter((x) => x !== s))} />
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stepper({ step, maxReached, go, C }) {
+  const steps = ["Define Job Criteria", "Add Resumes", "Review Shortlist & Recommend"];
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 20 }}>
+      {steps.map((label, i) => {
+        const n = i + 1;
+        const active = n === step;
+        const done = n < step && maxReached >= n;
+        const reachable = n <= maxReached;
+        return (
+          <React.Fragment key={n}>
+            <div
+              onClick={() => reachable && go(n)}
+              style={{ display: "flex", alignItems: "center", gap: 8,
+                cursor: reachable ? "pointer" : "default", opacity: reachable ? 1 : 0.5 }}>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", display: "flex",
+                alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700,
+                background: active ? C.accent : done ? C.accentSoft : C.paper,
+                color: active ? "#FFFFFF" : done ? C.accent : C.faint,
+                border: `1px solid ${active ? C.accent : C.line}` }}>
+                {done ? <Check size={14} /> : n}
+              </div>
+              <span style={{ fontSize: 13, fontWeight: active ? 700 : 500,
+                color: active ? C.ink : C.sub }}>{label}</span>
+            </div>
+            {n < 3 && <div style={{ width: 24, height: 1, background: C.line }} />}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function MiniBar({ label, value, C }) {
+  return (
+    <div style={{ marginBottom: 7 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5,
+        color: C.sub, marginBottom: 3 }}>
+        <span style={{ fontWeight: 600 }}>{label}</span>
+        <span style={{ fontWeight: 700, color: C.ink }}>{Math.round(value)}</span>
+      </div>
+      <div style={{ height: 6, background: C.lineSoft, borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: "100%",
+          background: gradeColor(value), borderRadius: 4 }} />
+      </div>
+    </div>
+  );
+}
+
+const SubHead = ({ children, style, C }) => (
+  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase",
+    color: C.sub, ...style }}>{children}</div>
+);
+const List = ({ items, color, icon, C }) => (
+  <ul style={{ listStyle: "none", margin: "5px 0 0", padding: 0 }}>
+    {(items || []).map((t, i) => (
+      <li key={i} style={{ display: "flex", gap: 7, fontSize: 12.8, color: C.ink,
+        lineHeight: 1.5, marginBottom: 4 }}>
+        <span style={{ color, flexShrink: 0, marginTop: 2 }}>{icon}</span>{t}
+      </li>
+    ))}
+  </ul>
+);
+
+/* ============================== STEP 1: ROLE DEFINITION ============================== */
+function RoleStep({ job, setJob, companies, onNext, C }) {
+  const ready = (job.title || "").trim() && (job.description || "").trim();
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1.05fr .95fr", gap: 22 }}>
+      <Panel title="Define Job Criteria" sub="Specify the role requirements and select target client company" C={C}>
+        <Field label="Target Client Company" C={C}>
+          <select
+            style={inputStyle(C)}
+            value={job.companyId || ""}
+            onChange={(e) => {
+              const comp = companies.find(c => c.id === e.target.value);
+              setJob({ ...job, companyId: e.target.value, companyName: comp ? comp.name : "" });
+            }}
+          >
+            {companies.map(c => (
+              <option key={c.id} value={c.id}>🏢 {c.name} ({c.industry})</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Job title" C={C}>
+          <input style={inputStyle(C)} value={job.title || ""}
+            placeholder="e.g. Senior Machine Learning Engineer"
+            onChange={(e) => setJob({ ...job, title: e.target.value })} />
+        </Field>
+
+        <div style={{ display: "flex", gap: 14 }}>
+          <div style={{ flex: 1 }}>
+            <Field label="Seniority" C={C}>
+              <select style={inputStyle(C)} value={job.seniority || "Senior"}
+                onChange={(e) => setJob({ ...job, seniority: e.target.value })}>
+                {["Intern", "Junior", "Mid-level", "Senior", "Lead / Principal", "Director"].map((s) =>
+                  <option key={s}>{s}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div style={{ width: 120 }}>
+            <Field label="Min. years" C={C}>
+              <input type="number" min={0} style={inputStyle(C)} value={job.minYears || 0}
+                onChange={(e) => setJob({ ...job, minYears: Number(e.target.value) })} />
+            </Field>
+          </div>
+        </div>
+
+        <Field label="Location / work mode" C={C}>
+          <input style={inputStyle(C)} value={job.location || ""}
+            placeholder="e.g. Chennai / Hybrid / Remote"
+            onChange={(e) => setJob({ ...job, location: e.target.value })} />
+        </Field>
+
+        <Field label="Job description" C={C}>
+          <textarea style={{ ...inputStyle(C), minHeight: 130, resize: "vertical", lineHeight: 1.55 }}
+            value={job.description || ""}
+            placeholder="Key responsibilities, skills, and qualifications required for this client..."
+            onChange={(e) => setJob({ ...job, description: e.target.value })} />
+        </Field>
+      </Panel>
+
+      <div>
+        <Panel title="Skills Criteria" sub="Must-have skills carry the primary weight during AI evaluation" C={C}>
+          <Field label="Must-have skills" hint="Press Enter or + to add each required skill." C={C}>
+            <SkillEditor skills={job.mustHave || []} placeholder="Add a required skill…"
+              onChange={(v) => setJob({ ...job, mustHave: v })} C={C} />
+          </Field>
+          <Field label="Nice-to-have skills" C={C}>
+            <SkillEditor skills={job.niceToHave || []} placeholder="Add a bonus skill…"
+              onChange={(v) => setJob({ ...job, niceToHave: v })} C={C} />
+          </Field>
+        </Panel>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 16, alignItems: "center" }}>
+          <button style={btn("ghost", C)} onClick={() => setJob({ ...job, ...SAMPLE_JOB })}>
+            <Sparkles size={15} /> Load sample role details
+          </button>
+          <button
+            style={{ ...btn("primary", C), opacity: ready ? 1 : 0.45, cursor: ready ? "pointer" : "not-allowed", marginLeft: "auto" }}
+            onClick={() => ready && onNext()}
+          >
+            Next: Add Resumes <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================== STEP 2: ADD CANDIDATES ============================== */
+function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults, llmProvider, C }) {
+  const [drag, setDrag] = useState(false);
+  const [paste, setPaste] = useState("");
+  const [err, setErr] = useState("");
+  const fileRef = useRef(null);
+  const pasteCount = useRef(0);
+
+  const unscreenedCount = candidates.filter((c) => c.status !== "done" || !c.result).length;
+  const screenedCount = candidates.length - unscreenedCount;
+  
+  const providerLabel = llmProvider === "claude" ? "Claude API" : llmProvider === "gemini" ? "Gemini API" : llmProvider === "groq" ? "Groq API" : "Local LLM";
+
+  const addFiles = async (files) => {
+    setErr("");
+    for (const f of Array.from(files)) {
+      try {
+        const base64 = await fileToBase64(f);
+        setCandidates((cs) => [...cs, {
+          id: uid(), kind: "file", filename: f.name, base64,
+          fileSize: f.size, label: f.name, status: "idle", result: null, error: null,
+        }]);
+      } catch {
+        setErr(`Could not read "${f.name}".`);
+      }
+    }
+  };
+  const addPaste = () => {
+    if (!paste.trim()) return;
+    pasteCount.current += 1;
+    setCandidates((cs) => [...cs, {
+      id: uid(), kind: "text", text: paste.trim(),
+      label: `Pasted resume ${pasteCount.current}`, status: "idle", result: null, error: null,
+    }]);
+    setPaste("");
+  };
+  const loadSamples = () =>
+    setCandidates(SAMPLE_RESUMES.map((r) => ({
+      id: uid(), kind: "text", text: r.text, label: r.label,
+      status: "idle", result: null, error: null,
+    })));
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22 }}>
+      <Panel title="Add Resumes" sub="Upload candidate files or paste resume text for evaluation" C={C}>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={(e) => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
+          onClick={() => fileRef.current?.click()}
+          style={{ border: `1.5px dashed ${drag ? C.accent : C.lineDark}`,
+            background: drag ? C.accentSoft : C.paper, borderRadius: 12, padding: "30px 18px",
+            textAlign: "center", cursor: "pointer", transition: "all .15s" }}>
+          <Upload size={26} color={C.accent} style={{ marginBottom: 8 }} />
+          <div style={{ fontWeight: 700, color: C.ink, fontSize: 14 }}>Drop candidate resumes here</div>
+          <div style={{ fontSize: 12.5, color: C.faint, marginTop: 3 }}>Supports PDF, DOCX and TXT files</div>
+          <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.txt" style={{ display: "none" }}
+            onChange={(e) => addFiles(e.target.files)} />
+        </div>
+
+        <div style={{ margin: "16px 0 7px", fontSize: 12, fontWeight: 700, letterSpacing: ".06em",
+          textTransform: "uppercase", color: C.sub }}>Or paste raw resume text</div>
+        <textarea style={{ ...inputStyle(C), minHeight: 92, resize: "vertical" }}
+          value={paste} placeholder="Paste candidate resume text here…"
+          onChange={(e) => setPaste(e.target.value)} />
+        <div style={{ display: "flex", gap: 9, marginTop: 9 }}>
+          <button style={btn("soft", C)} onClick={addPaste}><Plus size={15} /> Add text resume</button>
+          <button style={btn("ghost", C)} onClick={loadSamples}>
+            <Sparkles size={15} /> Load 4 sample resumes
+          </button>
+        </div>
+        {err && (
+          <div style={{ marginTop: 10, fontSize: 12.5, color: REC["Weak Match"].fg,
+            display: "flex", gap: 6, alignItems: "center" }}>
+            <FileWarning size={14} /> {err}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title={`Candidate Pool (${candidates.length})`}
+        sub="Resumes queued for AI screening against client criteria" C={C}>
+        {candidates.length === 0 ? (
+          <div style={{ color: C.faint, fontSize: 13.5, padding: "30px 0", textAlign: "center" }}>
+            No resumes added yet. Upload or paste resumes to continue.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+            {candidates.map((c) => {
+              const hasScore = c.status === "done" && c.result;
+              return (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10,
+                  background: C.paper, border: `1px solid ${C.line}`, borderRadius: 9, padding: "10px 12px",
+                  opacity: hasScore ? 0.85 : 1 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 7,
+                    background: hasScore ? C.lineSoft : C.accentSoft,
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <FileText size={15} color={hasScore ? C.sub : C.accent} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: C.ink,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {hasScore ? (c.result.candidateName || c.label) : c.label}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11.5, color: C.faint }}>
+                        {c.kind === "file"
+                          ? (hasScore ? `${c.filename} (${(c.fileSize / 1024).toFixed(1)} KB)` : `${(c.fileSize / 1024).toFixed(1)} KB`)
+                          : `${(c.text || "").length} chars`}
+                      </span>
+                      {hasScore && (
+                        <>
+                          <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: REC[c.result.recommendation]?.dot || C.sub }}>
+                            Score: {c.result.overallScore}% ({c.result.recommendation}) [Preserved]
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {hasScore && (
+                    <button
+                      title="Clear score & re-screen this resume"
+                      style={{ border: "none", background: "none", cursor: "pointer", padding: 2, display: "flex", alignItems: "center" }}
+                      onClick={() => setCandidates((cs) => cs.map((x) => (x.id === c.id ? { ...x, status: "idle", result: null, error: null } : x)))}
+                    >
+                      <RotateCcw size={14} color={C.accent} />
+                    </button>
+                  )}
+                  <X size={16} color={C.faint} style={{ cursor: "pointer" }}
+                    onClick={() => setCandidates((cs) => cs.filter((x) => x.id !== c.id))} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
+
+      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button style={btn("ghost", C)} onClick={onBack}><ArrowLeft size={16} /> Back to role</button>
+
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {screenedCount > 0 && (
+            <button
+              style={btn("soft", C)}
+              title={`Force re-evaluate all ${candidates.length} candidates using ${providerLabel}`}
+              onClick={() => candidates.length && onRun(true)}
+            >
+              <RotateCcw size={15} /> Re-analyze All with {providerLabel}
+            </button>
+          )}
+
+          {unscreenedCount > 0 ? (
+            <button
+              style={{ ...btn("primary", C), opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
+              onClick={() => candidates.length && onRun(false)}
+            >
+              <Sparkles size={16} /> Screen {unscreenedCount} New Resume{unscreenedCount > 1 ? "s" : ""}
+            </button>
+          ) : (
+            <button
+              style={{ ...btn("primary", C), opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
+              onClick={onGotoResults}
+            >
+              <ArrowRight size={16} /> View Results
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================== STEP 3a: ANALYZING PROGRESS ============================== */
+function Analyzing({ candidates, C }) {
+  const done = candidates.filter((c) => c.status === "done" || c.status === "error").length;
+  const pct = Math.round((done / Math.max(1, candidates.length)) * 100);
+  return (
+    <Panel title="The AI Agent is screening candidates"
+      sub="Reading resume content, evaluating fit against client requirements, and calculating match scores..." C={C}>
+      <div style={{ height: 9, background: C.lineSoft, borderRadius: 6, overflow: "hidden", marginBottom: 6 }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: C.accent, borderRadius: 6, transition: "width .4s" }} />
+      </div>
+      <div style={{ fontSize: 13, color: C.sub, marginBottom: 16 }}>
+        {done} of {candidates.length} resumes evaluated
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        {candidates.map((c) => (
+          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10,
+            padding: "9px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 9,
+            opacity: c.status === "done" && c.result ? 0.75 : 1 }}>
+            <span style={{ flex: 1, fontSize: 13.5, color: C.ink, fontWeight: 600 }}>
+              {c.result?.candidateName || c.label}
+            </span>
+            {c.status === "done" && c.result && (
+              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5,
+                fontWeight: 700, color: REC[c.result.recommendation]?.dot || C.sub }}>
+                <Check size={14} /> Score: {c.result?.overallScore}%
+              </span>
+            )}
+            {c.status === "error" && (
+              <span style={{ fontSize: 12.5, color: REC["Weak Match"].fg, fontWeight: 600 }} title={c.error}>
+                Failed: {c.error ? (c.error.length > 50 ? c.error.substring(0, 50) + "..." : c.error) : "Unknown error"}
+              </span>
+            )}
+            {(c.status === "analyzing" || c.status === "queued") && (
+              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: C.faint }}>
+                <Loader2 size={14} className="spin" />
+                {c.status === "analyzing" ? "Analysing…" : "Queued"}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+/* ============================== STEP 3b: RESULTS & RECOMMENDATIONS ============================== */
+function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
+  const [open, setOpen] = useState(false);
+  const r = c.result;
+
+  if (c.status === "error" || !r) {
+    return (
+      <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+        <AlertCircle size={17} color={REC["Weak Match"].fg} />
+        <span style={{ fontWeight: 600, color: C.ink }}>{c.label}</span>
+        <span style={{ fontSize: 12.5, color: C.faint, marginLeft: "auto" }}>
+          {c.error || "Could not be analysed"} — try re-running.
+        </span>
+      </div>
+    );
+  }
+
+  const m = recMeta(r.recommendation);
+  const shortlisted = r.overallScore >= threshold;
+  const radar = [
+    { dim: "Skills", v: r.subScores?.skills ?? 0 },
+    { dim: "Experience", v: r.subScores?.experience ?? 0 },
+    { dim: "Education", v: r.subScores?.education ?? 0 },
+    { dim: "Domain", v: r.subScores?.domain ?? 0 },
   ];
 
   return (
-    <aside style={{
-      width: 260,
-      background: C.sidebar,
-      color: C.sidebarText,
-      display: "flex",
-      flexDirection: "column",
-      flexShrink: 0,
-      minHeight: "100vh",
-      borderRight: `1px solid ${C.line}`,
-      padding: "20px 16px",
-      boxSizing: "border-box",
-      position: "sticky",
-      top: 0,
-    }}>
-      {/* Brand Header */}
-      <div style={{ padding: "0 4px 20px", borderBottom: `1px solid ${C.lineDark}` }}>
-        <SrmLogo theme="dark" />
-        <div style={{ marginTop: 10, fontSize: 11, color: "#64748B", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-          Agency Shortlist Engine
+    <div style={{ background: C.panel, border: `1px solid ${shortlisted ? m.dot : C.line}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 17px", cursor: "pointer" }} onClick={() => setOpen(!open)}>
+        <div style={{ fontFamily: DISPLAY, fontSize: 22, fontWeight: 600, color: C.faint, width: 30 }}>
+          {rank}
         </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 16, fontWeight: 700, color: C.ink }}>{r.candidateName || c.label}</span>
+            {shortlisted && (
+              <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10.5, fontWeight: 800, letterSpacing: ".05em", color: C.accent, background: C.accentSoft, padding: "3px 7px", borderRadius: 5 }}>
+                <Star size={11} /> SHORTLISTED
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 12.5, color: C.sub, marginTop: 2, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span>{r.currentTitle} · {r.yearsExperience} yrs exp</span>
+            {r.email && r.email !== "N/A" && (
+              <>
+                <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
+                <span style={{ color: C.faint, fontStyle: "italic" }}>{r.email}</span>
+              </>
+            )}
+          </div>
+        </div>
+        
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: m.dot, lineHeight: 1 }}>
+              {r.overallScore}%
+            </div>
+            <div style={{ fontSize: 9, color: C.faint, fontWeight: 700, letterSpacing: ".04em" }}>RESUME FIT</div>
+          </div>
+        </div>
+
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: m.fg, background: m.bg, padding: "5px 9px", borderRadius: 6, whiteSpace: "nowrap" }}>
+          {r.recommendation}
+        </span>
+        {open ? <ChevronDown size={18} color={C.faint} /> : <ChevronRight size={18} color={C.faint} />}
       </div>
 
-      {/* Client Company Quick Selector */}
-      <div style={{ margin: "18px 0", padding: "12px 10px", background: "rgba(255,255,255,0.04)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ fontSize: 10.5, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-          Target Client Company
-        </div>
-        <select
-          value={activeCompany?.id || "all"}
-          onChange={(e) => {
-            const selected = companies.find(c => c.id === e.target.value);
-            setActiveCompany(selected || null);
-          }}
-          style={{
-            width: "100%",
-            background: "#1E293B",
-            color: "#F8FAFC",
-            border: "1px solid #334155",
-            borderRadius: 6,
-            padding: "6px 8px",
-            fontSize: 12.5,
-            outline: "none",
-            cursor: "pointer",
-            fontFamily: BODY,
-          }}
-        >
-          <option value="all">🌐 All Client Companies</option>
-          {companies.map(comp => (
-            <option key={comp.id} value={comp.id}>🏢 {comp.name}</option>
-          ))}
-        </select>
+      <div style={{ padding: "0 17px 13px", fontSize: 13, color: C.sub, lineHeight: 1.5 }}>
+        {r.summary}
       </div>
 
-      {/* Nav Menu */}
-      <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "none",
-                background: isActive ? C.sidebarActiveBg : "transparent",
-                color: isActive ? C.sidebarActive : C.sidebarText,
-                fontWeight: isActive ? 700 : 500,
-                fontSize: 13.5,
-                textAlign: "left",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                fontFamily: BODY,
-              }}
-            >
-              <Icon size={18} color={isActive ? C.sidebarActive : C.sidebarText} />
-              <span style={{ flex: 1 }}>{item.label}</span>
-              {item.badge !== undefined && (
-                <span style={{
-                  fontSize: 11,
-                  background: isActive ? C.accent : "#334155",
-                  color: "#FFFFFF",
-                  padding: "2px 7px",
-                  borderRadius: 10,
-                  fontWeight: 700,
-                }}>
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Theme Switcher Footer */}
-      <div style={{ paddingTop: 16, borderTop: `1px solid ${C.lineDark}`, display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Appearance Theme
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {Object.keys(THEMES).map((tKey) => (
-            <button
-              key={tKey}
-              onClick={() => setTheme(tKey)}
-              style={{
-                padding: "6px 8px",
-                borderRadius: 6,
-                fontSize: 11,
-                border: currentTheme === tKey ? `1.5px solid ${C.accent}` : "1px solid #334155",
-                background: currentTheme === tKey ? "#1E293B" : "transparent",
-                color: currentTheme === tKey ? "#F8FAFC" : "#94A3B8",
-                cursor: "pointer",
-                textAlign: "center",
-                fontFamily: BODY,
-              }}
-            >
-              {THEMES[tKey].name.split(" ")[0]}
-            </button>
-          ))}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-/* ============================== WELCOME & AGENCY DASHBOARD ============================== */
-function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, C }) {
-  const filteredJobs = useMemo(() => {
-    if (!activeCompany) return jobs;
-    return jobs.filter(j => j.companyId === activeCompany.id);
-  }, [jobs, activeCompany]);
-
-  const totalCandidates = useMemo(() => {
-    return filteredJobs.reduce((acc, j) => acc + (j.candidates ? j.candidates.length : 0), 0);
-  }, [filteredJobs]);
-
-  const totalShortlisted = useMemo(() => {
-    return filteredJobs.reduce((acc, j) => {
-      const shortlisted = (j.candidates || []).filter(c => c.status === "done" && c.result && c.result.overallScore >= 70);
-      return acc + shortlisted.length;
-    }, 0);
-  }, [filteredJobs]);
-
-  const recentShortlist = useMemo(() => {
-    const list = [];
-    filteredJobs.forEach(j => {
-      (j.candidates || []).forEach(c => {
-        if (c.status === "done" && c.result) {
-          list.push({ candidate: c, job: j });
-        }
-      });
-    });
-    return list.sort((a, b) => (b.candidate.result.overallScore || 0) - (a.candidate.result.overallScore || 0)).slice(0, 5);
-  }, [filteredJobs]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Welcome Hero Banner */}
-      <div style={{
-        background: `linear-gradient(135deg, ${C.accentDeep} 0%, ${C.accent} 100%)`,
-        borderRadius: 16,
-        padding: "28px 32px",
-        color: "#FFFFFF",
-        boxShadow: "0 10px 25px -5px rgba(3, 77, 161, 0.3)",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 20
-      }}>
-        <div style={{ maxWidth: 560 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
-            <Sparkles size={14} /> Agency AI Shortlisting Hub
-          </div>
-          <h2 style={{ fontSize: 26, fontWeight: 800, margin: 0, fontFamily: DISPLAY, lineHeight: 1.2 }}>
-            Candidate Screening &amp; Client Recommendation Portal
-          </h2>
-          <p style={{ fontSize: 14, margin: "10px 0 0", opacity: 0.9, lineHeight: 1.5 }}>
-            Screen candidate resumes against client company requirements, score fit, conduct AI interviews, and export formal recommendation reports back to client companies.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <button
-            onClick={onCreateCompany}
-            style={{
-              padding: "10px 18px",
-              background: "#FFFFFF",
-              color: C.accentDeep,
-              border: "none",
-              borderRadius: 8,
-              fontWeight: 700,
-              fontSize: 13.5,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontFamily: BODY,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-            }}
-          >
-            <Building2 size={16} /> Add Client Company
-          </button>
-          <button
-            onClick={onCreateJob}
-            style={{
-              padding: "10px 18px",
-              background: "rgba(255,255,255,0.2)",
-              color: "#FFFFFF",
-              border: "1px solid rgba(255,255,255,0.4)",
-              borderRadius: 8,
-              fontWeight: 700,
-              fontSize: 13.5,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontFamily: BODY,
-            }}
-          >
-            <Plus size={16} /> Post Opening Job
-          </button>
-        </div>
-      </div>
-
-      {/* Metrics Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-        <Panel C={C}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Building2 size={22} color={C.accent} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Client Companies</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{companies.length}</div>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel C={C}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Briefcase size={22} color={C.accent} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Active Opening Jobs</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{filteredJobs.length}</div>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel C={C}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Users size={22} color={C.accent} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Total Resumes Screened</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{totalCandidates}</div>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel C={C}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Star size={22} color="#16A34A" />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Shortlisted Candidates</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#16A34A", fontFamily: DISPLAY }}>{totalShortlisted}</div>
-            </div>
-          </div>
-        </Panel>
-      </div>
-
-      {/* Minimal Dashboard Section */}
-      <Panel title="Top Client Candidate Recommendations" sub="Highest scoring candidates ready to recommend to client companies" C={C}>
-        {recentShortlist.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px 0", color: C.faint, fontSize: 13 }}>
-            No scored candidates yet. Go to <strong style={{ color: C.accent }}>Job Openings &amp; Screening</strong> tab to screen resumes and generate recommendations.
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
-            {recentShortlist.map(({ candidate, job }) => (
-              <div key={candidate.id} style={{ padding: 14, borderRadius: 10, border: `1px solid ${C.line}`, background: C.bg, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{candidate.result.candidateName || candidate.label}</div>
-                  <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>🏢 {job.companyName} — {job.title}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: gradeColor(candidate.result.overallScore) }}>
-                    {candidate.result.overallScore}%
-                  </span>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: REC[candidate.result.recommendation]?.dot || C.sub, marginTop: 2 }}>
-                    {candidate.result.recommendation}
-                  </div>
+      {open && (
+        <div style={{ borderTop: `1px solid ${C.lineSoft}`, padding: "16px 17px", background: C.paper, display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 20 }}>
+          <div>
+            <SubHead C={C}>Strengths</SubHead>
+            <List items={r.strengths} color={REC["Strong Match"].dot} icon={<Check size={13} />} C={C} />
+            <SubHead style={{ marginTop: 14 }} C={C}>Gaps &amp; risks</SubHead>
+            <List items={r.gaps} color={REC["Possible Match"].dot} icon={<AlertCircle size={13} />} C={C} />
+            {r.missingMustHaves?.length > 0 && (
+              <div style={{ marginTop: 12, background: REC["Weak Match"].bg, borderRadius: 8, padding: "9px 11px" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: REC["Weak Match"].fg, letterSpacing: ".04em" }}>MISSING MUST-HAVES</div>
+                <div style={{ fontSize: 12.5, color: REC["Weak Match"].fg, marginTop: 3 }}>
+                  {r.missingMustHaves.join(", ")}
                 </div>
               </div>
-            ))}
+            )}
+            <SubHead style={{ marginTop: 14 }} C={C}>
+              <Lightbulb size={13} style={{ verticalAlign: -2 }} /> Suggested interview questions
+            </SubHead>
+            <ol style={{ margin: "4px 0 0", paddingLeft: 18, color: C.ink, fontSize: 12.8, lineHeight: 1.6 }}>
+               {(r.interviewQuestions || []).map((q, i) => <li key={i} style={{ marginBottom: 3 }}>{q}</li>)}
+            </ol>
           </div>
-        )}
-      </Panel>
+
+          <div>
+            <SubHead C={C}>Fit breakdown</SubHead>
+            <div style={{ marginTop: 6 }}>
+              <MiniBar label="Skills" value={r.subScores?.skills ?? 0} C={C} />
+              <MiniBar label="Experience" value={r.subScores?.experience ?? 0} C={C} />
+              <MiniBar label="Education" value={r.subScores?.education ?? 0} C={C} />
+              <MiniBar label="Domain fit" value={r.subScores?.domain ?? 0} C={C} />
+            </div>
+            <div style={{ height: 160, marginTop: 6 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radar} outerRadius={55}>
+                  <PolarGrid stroke={C.line} />
+                  <PolarAngleAxis dataKey="dim" tick={{ fontSize: 10.5, fill: C.sub }} />
+                  <Radar dataKey="v" stroke={m.dot} fill={m.dot} fillOpacity={0.28} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ============================== CLIENT COMPANIES MANAGEMENT ============================== */
-function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onSelectCompanyJobs, C }) {
-  const [searchTerm, setSearchTerm] = useState("");
+function Results({ candidates, job, onReRun, onRestart, onStartInterview, C }) {
+  const [threshold, setThreshold] = useState(70);
+  const [sortKey, setSortKey] = useState("score");
 
-  const filtered = useMemo(() => {
-    return companies.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.industry.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [companies, searchTerm]);
+  const valid = candidates.filter((c) => c.status === "done" && c.result);
+  const failed = candidates.filter((c) => c.status === "error" || (c.status === "done" && !c.result));
+  
+  const sorted = useMemo(() => {
+    const arr = [...valid];
+    if (sortKey === "score") arr.sort((a, b) => b.result.overallScore - a.result.overallScore);
+    if (sortKey === "exp") arr.sort((a, b) => b.result.yearsExperience - a.result.yearsExperience);
+    return arr;
+  }, [valid, sortKey]);
+
+  const shortlistedCount = sorted.filter((c) => c.result.overallScore >= threshold).length;
+  const avgScore = valid.length ? Math.round(valid.reduce((s, c) => s + c.result.overallScore, 0) / valid.length) : 0;
+
+  const handleExportCSV = () => {
+    const rows = sorted.map((c, i) => ({
+      Rank: i + 1,
+      ClientCompany: job.companyName || "Client",
+      CandidateName: c.result.candidateName || c.label,
+      OverallScore: c.result.overallScore,
+      Recommendation: c.result.recommendation,
+      Shortlisted: c.result.overallScore >= threshold ? "YES" : "NO",
+      Email: c.result.email || "N/A",
+      CurrentTitle: c.result.currentTitle,
+      YearsExperience: c.result.yearsExperience,
+      Education: c.result.education,
+      Summary: c.result.summary,
+    }));
+    downloadCSV(rows, `${(job.title || "shortlist").replace(/\s+/g, "_")}_recommendations.csv`);
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-        <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>Client Companies Management</h2>
-          <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Manage client organizations that send job openings and receive candidate recommendations</p>
+    <div>
+      <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 150, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Candidates Screened</div>
+          <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: C.ink, marginTop: 4 }}>{valid.length}</div>
         </div>
-        <button
-          onClick={onCreateCompany}
-          style={{
-            padding: "10px 18px",
-            background: C.accent,
-            color: "#FFFFFF",
-            border: "none",
-            borderRadius: 8,
-            fontWeight: 700,
-            fontSize: 13.5,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontFamily: BODY,
-          }}
-        >
-          <Plus size={16} /> Add New Client Company
-        </button>
+        <div style={{ flex: 1, minWidth: 150, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Shortlisted (≥{threshold}%)</div>
+          <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: "#16A34A", marginTop: 4 }}>{shortlistedCount}</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 150, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Average Fit Score</div>
+          <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: gradeColor(avgScore), marginTop: 4 }}>{avgScore}%</div>
+        </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 14px" }}>
-        <Search size={18} color={C.sub} />
-        <input
-          type="text"
-          placeholder="Search companies by name or industry..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ border: "none", outline: "none", background: "transparent", width: "100%", color: C.ink, fontSize: 13.5, fontFamily: BODY }}
-        />
+      <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>Shortlist Cutoff Score:</span>
+          <input type="range" min={30} max={90} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} style={{ width: 140 }} />
+          <span style={{ fontSize: 14, fontWeight: 800, color: C.accent }}>{threshold}%</span>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={btn("soft", C)} onClick={handleExportCSV}>
+            <Download size={15} /> Export Recommendation CSV
+          </button>
+          <button style={btn("ghost", C)} onClick={onReRun}>
+            <RotateCcw size={15} /> Re-screen All
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-        {filtered.map((comp) => {
-          const compJobs = jobs.filter(j => j.companyId === comp.id);
-          const totalScreened = compJobs.reduce((acc, j) => acc + (j.candidates ? j.candidates.length : 0), 0);
-          return (
-            <Panel key={comp.id} C={C} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Building2 size={20} color={C.accent} />
-                  </div>
-                  <Trash2 size={16} color={C.faint} style={{ cursor: "pointer" }} onClick={() => onDeleteCompany(comp.id)} />
-                </div>
-                <h3 style={{ fontSize: 17, fontWeight: 700, color: C.ink, margin: "12px 0 4px", fontFamily: DISPLAY }}>{comp.name}</h3>
-                <div style={{ fontSize: 12, color: C.sub }}>Industry: {comp.industry}</div>
-                {comp.contactEmail && <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>✉ {comp.contactEmail}</div>}
-                {comp.notes && <p style={{ fontSize: 12, color: C.sub, marginTop: 8, lineHeight: 1.4 }}>{comp.notes}</p>}
-              </div>
-
-              <div style={{ marginTop: 20, paddingTop: 14, borderTop: `1px solid ${C.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{compJobs.length} Openings</div>
-                  <div style={{ fontSize: 11, color: C.sub }}>{totalScreened} Candidates</div>
-                </div>
-                <button
-                  onClick={() => onSelectCompanyJobs(comp)}
-                  style={{
-                    padding: "6px 12px",
-                    background: C.accentSoft,
-                    color: C.accent,
-                    border: `1px solid ${C.accent}`,
-                    borderRadius: 6,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: BODY,
-                  }}
-                >
-                  View Openings →
-                </button>
-              </div>
-            </Panel>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ============================== ACTIVITY LOGS VIEW ============================== */
-function ActivityLogsView({ logs, C }) {
-  const [search, setSearch] = useState("");
-
-  const filteredLogs = useMemo(() => {
-    return logs.filter(l => (l.message || "").toLowerCase().includes(search.toLowerCase()) || (l.companyName || "").toLowerCase().includes(search.toLowerCase()) || (l.type || "").toLowerCase().includes(search.toLowerCase()));
-  }, [logs, search]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>System &amp; Activity Audit Logs</h2>
-        <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Track all candidate screening events, company updates, and AI interview evaluations</p>
+        {sorted.map((c, i) => (
+          <CandidateCard key={c.id} rank={i + 1} c={c} threshold={threshold} jobTitle={job.title} onStartInterview={onStartInterview} C={C} />
+        ))}
       </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 14px" }}>
-        <Search size={18} color={C.sub} />
-        <input
-          type="text"
-          placeholder="Filter audit logs by keyword, company name, or action..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ border: "none", outline: "none", background: "transparent", width: "100%", color: C.ink, fontSize: 13.5, fontFamily: BODY }}
-        />
-      </div>
-
-      <Panel C={C}>
-        {filteredLogs.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px 0", color: C.faint, fontSize: 13 }}>
-            No activity logs found.
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {filteredLogs.map(log => (
-              <div key={log.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 8, background: C.bg, border: `1px solid ${C.line}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 4, background: C.accentSoft, color: C.accent, textTransform: "uppercase" }}>
-                    {log.type}
-                  </span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>{log.message}</div>
-                    {log.details && <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>{log.details}</div>}
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", fontSize: 11, color: C.faint }}>
-                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
     </div>
   );
 }
 
-/* ============================== SETTINGS & API KEYS VIEW ============================== */
+/* ============================== SETTINGS VIEW ============================== */
 function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, C }) {
   const [anthropicKey, setAnthropicKey] = useState(localStorage.getItem("ANTHROPIC_API_KEY") || "");
   const [geminiKey, setGeminiKey] = useState(localStorage.getItem("GEMINI_API_KEY") || "");
@@ -797,9 +966,12 @@ export default function App() {
   const [activeCompany, setActiveCompany] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [activeJobId, setActiveJobId] = useState(null);
+  const [step, setStep] = useState(1);
+  const [maxReached, setMaxReached] = useState(1);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [llmProvider, setLlmProvider] = useState("groq");
+  const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
 
   const C = THEMES[themeKey] || THEMES.light;
@@ -840,6 +1012,16 @@ export default function App() {
     fetchData();
   }, []);
 
+  const saveJobsToServer = async (jobsList) => {
+    try {
+      await fetch("/api/save-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobs: jobsList })
+      });
+    } catch (e) {}
+  };
+
   const saveCompaniesToServer = async (compList) => {
     try {
       await fetch("/api/save-companies", {
@@ -862,16 +1044,6 @@ export default function App() {
     saveCompaniesToServer(updated);
   };
 
-  const saveJobsToServer = async (jobsList) => {
-    try {
-      await fetch("/api/save-jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobs: jobsList })
-      });
-    } catch (e) {}
-  };
-
   const handleCreateJobForCompany = () => {
     const targetComp = activeCompany || companies[0] || SAMPLE_COMPANIES[0];
     const newId = `job_${Date.now()}`;
@@ -879,13 +1051,13 @@ export default function App() {
       id: newId,
       companyId: targetComp.id,
       companyName: targetComp.name,
-      title: "Senior Software Engineer",
+      title: "",
       seniority: "Senior",
       minYears: 3,
-      location: "Bangalore / Remote",
-      description: "Looking for an experienced engineer to build high-performance distributed systems.",
-      mustHave: ["React", "Node.js", "System Design"],
-      niceToHave: ["AWS", "Docker"],
+      location: "Chennai / Hybrid",
+      description: "",
+      mustHave: [],
+      niceToHave: [],
       candidates: [],
       screening: "idle"
     };
@@ -893,6 +1065,8 @@ export default function App() {
     setJobs(updated);
     saveJobsToServer(updated);
     setActiveJobId(newId);
+    setStep(1);
+    setMaxReached(1);
     setActiveTab("jobs");
   };
 
@@ -906,6 +1080,96 @@ export default function App() {
   };
 
   const activeJob = useMemo(() => jobs.find((j) => j.id === activeJobId), [jobs, activeJobId]);
+
+  const updateActiveJob = (updater) => {
+    setJobs((prevJobs) => {
+      const updated = prevJobs.map((j) => {
+        if (j.id === activeJobId) return updater(j);
+        return j;
+      });
+      saveJobsToServer(updated);
+      return updated;
+    });
+  };
+
+  const handleUpdateJobDetails = (updatedJobDetails) => {
+    updateActiveJob((j) => ({ ...j, ...updatedJobDetails }));
+  };
+
+  const handleUpdateCandidates = (updatedCandidates) => {
+    updateActiveJob((j) => ({
+      ...j,
+      candidates: typeof updatedCandidates === "function" ? updatedCandidates(j.candidates || []) : updatedCandidates
+    }));
+  };
+
+  const goto = (n) => { setStep(n); setMaxReached((m) => Math.max(m, n)); };
+
+  const runScreening = async (forceAll = false) => {
+    if (!activeJob) return;
+
+    const candidatesToScreen = forceAll
+      ? activeJob.candidates
+      : activeJob.candidates.filter((c) => c.status !== "done" || !c.result);
+
+    if (candidatesToScreen.length === 0) {
+      updateActiveJob((j) => ({ ...j, screening: "done" }));
+      goto(3);
+      return;
+    }
+
+    updateActiveJob((j) => ({
+      ...j,
+      screening: "running",
+      candidates: j.candidates.map((c) => {
+        const shouldScreen = forceAll || c.status !== "done" || !c.result;
+        return shouldScreen ? { ...c, status: "queued", result: null, error: null } : c;
+      }),
+    }));
+
+    goto(3);
+
+    try {
+      await runPool(candidatesToScreen, 1, async (cand) => {
+        updateActiveJob((j) => ({
+          ...j,
+          candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "analyzing" } : c)),
+        }));
+
+        const delayMs = llmProvider === "groq" ? 25000 : 2000;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+        let resume;
+        if (cand.kind === "file") {
+          resume = cand.base64
+            ? { type: "file", filename: cand.filename, base64: cand.base64 }
+            : { type: "db", candidateId: cand.id };
+        } else {
+          resume = { type: "text", text: cand.text || "" };
+        }
+
+        const { candidates: _, ...jobCriteria } = activeJob;
+
+        try {
+          const result = await analyzeCandidate(jobCriteria, resume, llmProvider);
+          updateActiveJob((j) => ({
+            ...j,
+            candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "done", result, base64: null } : c)),
+          }));
+        } catch (e) {
+          updateActiveJob((j) => ({
+            ...j,
+            candidates: j.candidates.map((c) =>
+              (c.id === cand.id ? { ...c, status: "error", error: String(e.message || e) } : c)),
+          }));
+        }
+      });
+    } catch (e) {
+      console.error("Screening failed:", e);
+    }
+
+    updateActiveJob((j) => ({ ...j, screening: "done" }));
+  };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg, color: C.ink, fontFamily: BODY }}>
@@ -937,7 +1201,7 @@ export default function App() {
                 setActiveCompany={setActiveCompany}
                 onCreateCompany={() => setShowAddCompanyModal(true)}
                 onCreateJob={handleCreateJobForCompany}
-                onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); }}
+                onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); setStep(3); }}
                 C={C}
               />
             )}
@@ -992,6 +1256,7 @@ export default function App() {
                   </Panel>
                 ) : (
                   <div>
+                    {/* Job Selection Tabs */}
                     <div style={{ display: "flex", gap: 10, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
                       {jobs.map(j => (
                         <div
@@ -1010,9 +1275,9 @@ export default function App() {
                             cursor: "pointer",
                             fontFamily: BODY,
                           }}
-                          onClick={() => setActiveJobId(j.id)}
+                          onClick={() => { setActiveJobId(j.id); setStep(1); }}
                         >
-                          <span>🏢 {j.companyName} — {j.title}</span>
+                          <span>🏢 {j.companyName} — {j.title || "Untitled Opening"}</span>
                           <Trash2
                             size={14}
                             color={C.faint}
@@ -1028,9 +1293,10 @@ export default function App() {
                     </div>
 
                     {activeJob && (
-                      <Panel
-                        C={C}
-                        action={
+                      <div style={{ marginBottom: 20 }}>
+                        {/* Stepper Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                          <Stepper step={step} maxReached={maxReached} go={goto} C={C} />
                           <button
                             onClick={() => handleDeleteJob(activeJob.id)}
                             style={{
@@ -1050,18 +1316,46 @@ export default function App() {
                           >
                             <Trash2 size={14} /> Delete Job Opening
                           </button>
-                        }
-                      >
-                        <div style={{ fontSize: 18, fontWeight: 700, color: C.ink, fontFamily: DISPLAY }}>
-                          {activeJob.title} <span style={{ fontSize: 13, color: C.sub, fontWeight: 400 }}>(Client: {activeJob.companyName})</span>
                         </div>
-                        <div style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>
-                          {activeJob.seniority} • {activeJob.minYears}+ Yrs Exp • {activeJob.location}
-                        </div>
-                        <p style={{ fontSize: 13, color: C.ink, marginTop: 10, lineHeight: 1.5 }}>
-                          {activeJob.description}
-                        </p>
-                      </Panel>
+
+                        {/* Step Views */}
+                        {step === 1 && (
+                          <RoleStep
+                            job={activeJob}
+                            setJob={handleUpdateJobDetails}
+                            companies={companies}
+                            onNext={() => goto(2)}
+                            C={C}
+                          />
+                        )}
+
+                        {step === 2 && (
+                          <CandidateStep
+                            candidates={activeJob.candidates || []}
+                            setCandidates={handleUpdateCandidates}
+                            onBack={() => goto(1)}
+                            onRun={(force) => runScreening(force)}
+                            onGotoResults={() => goto(3)}
+                            llmProvider={llmProvider}
+                            C={C}
+                          />
+                        )}
+
+                        {step === 3 && activeJob.screening === "running" && (
+                          <Analyzing candidates={activeJob.candidates || []} C={C} />
+                        )}
+
+                        {step === 3 && activeJob.screening === "done" && (
+                          <Results
+                            candidates={activeJob.candidates || []}
+                            job={activeJob}
+                            onReRun={() => runScreening(true)}
+                            onRestart={() => goto(1)}
+                            onStartInterview={(cand) => setActiveInterviewCandidate(cand)}
+                            C={C}
+                          />
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
