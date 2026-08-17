@@ -9,7 +9,7 @@ import {
   Plus, Download, RotateCcw, ArrowRight, ArrowLeft, AlertCircle, Users, Star,
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
   Mail, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
-  ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu
+  ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
 
@@ -379,7 +379,7 @@ const List = ({ items, color, icon, C }) => (
 );
 
 /* ============================== STEP 1: ROLE DEFINITION ============================== */
-function RoleStep({ job, setJob, companies, onNext, C }) {
+function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, C }) {
   const ready = (job.title || "").trim() && (job.description || "").trim();
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.05fr .95fr", gap: 22 }}>
@@ -452,6 +452,19 @@ function RoleStep({ job, setJob, companies, onNext, C }) {
         <div style={{ display: "flex", gap: 10, marginTop: 16, alignItems: "center" }}>
           <button style={btn("ghost", C)} onClick={() => setJob({ ...job, ...SAMPLE_JOB })}>
             <Sparkles size={15} /> Load sample role details
+          </button>
+          <button
+            style={{
+              ...btn("soft", C),
+              background: savedNotice ? "#DCFCE7" : C.accentSoft,
+              color: savedNotice ? "#15803D" : C.accent,
+              border: `1px solid ${savedNotice ? "#86EFAC" : C.accent}`,
+              transition: "all 0.2s ease"
+            }}
+            onClick={onSave}
+          >
+            {savedNotice ? <Check size={15} /> : <Save size={15} />}
+            {savedNotice ? "Saved!" : "Save Job Opening"}
           </button>
           <button
             style={{ ...btn("primary", C), opacity: ready ? 1 : 0.45, cursor: ready ? "pointer" : "not-allowed", marginLeft: "auto" }}
@@ -1446,6 +1459,13 @@ export default function App() {
   const [llmProvider, setLlmProvider] = useState("claude");
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
+  const [savedJobNotice, setSavedJobNotice] = useState(false);
+
+  const handleSaveJobExplicitly = () => {
+    saveJobsToServer(jobs);
+    setSavedJobNotice(true);
+    setTimeout(() => setSavedJobNotice(false), 2500);
+  };
 
   const C = THEMES[themeKey] || THEMES.light;
 
@@ -1786,25 +1806,49 @@ export default function App() {
                         {/* Stepper Header */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                           <Stepper step={step} maxReached={maxReached} go={goto} C={C} />
-                          <button
-                            onClick={() => handleDeleteJob(activeJob.id)}
-                            style={{
-                              padding: "6px 12px",
-                              background: "#FEE2E2",
-                              color: "#DC2626",
-                              border: "1px solid #FCA5A5",
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              fontFamily: BODY,
-                            }}
-                          >
-                            <Trash2 size={14} /> Delete Job Opening
-                          </button>
+                          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                            <button
+                              onClick={handleSaveJobExplicitly}
+                              style={{
+                                padding: "6px 14px",
+                                background: savedJobNotice ? "#DCFCE7" : C.accentSoft,
+                                color: savedJobNotice ? "#15803D" : C.accent,
+                                border: `1px solid ${savedJobNotice ? "#86EFAC" : C.accent}`,
+                                borderRadius: 6,
+                                fontSize: 12.5,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontFamily: BODY,
+                                transition: "all 0.2s ease"
+                              }}
+                            >
+                              {savedJobNotice ? <Check size={14} /> : <Save size={14} />}
+                              {savedJobNotice ? "Saved!" : "Save Job Opening"}
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteJob(activeJob.id)}
+                              style={{
+                                padding: "6px 12px",
+                                background: "#FEE2E2",
+                                color: "#DC2626",
+                                border: "1px solid #FCA5A5",
+                                borderRadius: 6,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontFamily: BODY,
+                              }}
+                            >
+                              <Trash2 size={14} /> Delete Job Opening
+                            </button>
+                          </div>
                         </div>
 
                         {/* Step Views */}
@@ -1814,6 +1858,8 @@ export default function App() {
                             setJob={handleUpdateJobDetails}
                             companies={companies}
                             onNext={() => goto(2)}
+                            onSave={handleSaveJobExplicitly}
+                            savedNotice={savedJobNotice}
                             C={C}
                           />
                         )}
