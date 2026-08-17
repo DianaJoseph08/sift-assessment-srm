@@ -44,6 +44,15 @@ try {
   db.exec("ALTER TABLE jobs ADD COLUMN company_name TEXT");
 } catch (e) {}
 
+// Reassign academic faculty positions to SRM Group / IST
+try {
+  db.exec(`
+    UPDATE jobs 
+    SET company_id = 'comp_srmtech', company_name = 'SRM Group / IST' 
+    WHERE title LIKE '%Professor%' OR title LIKE '%Faculty%' OR title LIKE '%Mathematics%' OR title LIKE '%Biomedical%';
+  `);
+} catch (e) {}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS candidates (
     id TEXT PRIMARY KEY,
@@ -160,7 +169,11 @@ export function getJobs() {
     
     let resolvedCompId = job.company_id;
     let resolvedCompName = job.company_name;
-    if (!resolvedCompId || resolvedCompId === "comp_default") {
+    const titleLower = (job.title || "").toLowerCase();
+    if (titleLower.includes("professor") || titleLower.includes("faculty") || titleLower.includes("mathematics") || titleLower.includes("biomedical")) {
+      resolvedCompId = "comp_srmtech";
+      resolvedCompName = "SRM Group / IST";
+    } else if (!resolvedCompId || resolvedCompId === "comp_default") {
       resolvedCompId = "comp_motherson";
       resolvedCompName = "Motherson Group";
     }

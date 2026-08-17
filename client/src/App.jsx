@@ -138,7 +138,7 @@ const SrmLogo = ({ collapsed = false, theme = "light" }) => (
 
 const SAMPLE_COMPANIES = [
   { id: "comp_motherson", name: "Motherson Group", industry: "Automotive & Manufacturing", contactEmail: "hr@motherson.com", notes: "Key OEM partner for CAE simulation & mechanical roles", createdAt: new Date().toISOString() },
-  { id: "comp_srmtech", name: "SRM Tech Solutions", industry: "Software & AI Services", contactEmail: "careers@srmtech.com", notes: "Campus recruitment & IT consulting partner", createdAt: new Date().toISOString() },
+  { id: "comp_srmtech", name: "SRM Group / IST", industry: "Academic & R&D Institute", contactEmail: "careers@srmist.edu.in", notes: "Faculty recruitment & campus research hiring", createdAt: new Date().toISOString() },
   { id: "comp_bosch", name: "Bosch India", industry: "Automotive Engineering", contactEmail: "ta@bosch.in", notes: "R&D hiring for Embedded & Mechatronics roles", createdAt: new Date().toISOString() }
 ];
 
@@ -1032,6 +1032,11 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
 
 const isMatchForComp = (j, comp) => {
   if (!comp) return true;
+  const titleLower = (j.title || "").toLowerCase();
+  const isAcademic = titleLower.includes("professor") || titleLower.includes("faculty") || titleLower.includes("mathematics") || titleLower.includes("biomedical");
+  if (isAcademic) {
+    return comp.id === "comp_srmtech" || comp.name.toLowerCase().includes("srm");
+  }
   if (j.companyId === comp.id) return true;
   if (j.companyName && comp.name && j.companyName.toLowerCase().trim() === comp.name.toLowerCase().trim()) return true;
   if ((!j.companyId || j.companyId === "comp_default") && (comp.id === "comp_motherson" || comp.name.toLowerCase().includes("motherson"))) return true;
