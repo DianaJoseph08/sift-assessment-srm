@@ -249,19 +249,40 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
 
 async function analyzeWithClaude(content, model = "claude-3-5-sonnet-20241022", apiKey) {
   const client = getClaudeClient(apiKey);
-  const message = await client.messages.create({
-    model: "claude-3-5-sonnet-20241022",
-    max_tokens: 2048,
-    system: SYSTEM,
-    messages: [{ role: "user", content }],
-  });
+  try {
+    const message = await client.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2048,
+      system: SYSTEM,
+      messages: [{ role: "user", content }],
+    });
 
-  const text = (message.content || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+    const text = (message.content || [])
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("");
 
-  return extractJSON(text);
+    return extractJSON(text);
+  } catch (err) {
+    console.warn("[Claude Sonnet Warning]:", err.message);
+    try {
+      const message = await client.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 2048,
+        system: SYSTEM,
+        messages: [{ role: "user", content }],
+      });
+
+      const text = (message.content || [])
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+
+      return extractJSON(text);
+    } catch (haikuErr) {
+      throw new Error(`Anthropic Claude Error: ${err.message}`);
+    }
+  }
 }
 
 async function analyzeWithOllama(content, model = MODEL) {
