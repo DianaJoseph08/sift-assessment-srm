@@ -4,7 +4,7 @@ import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
 const GEMINI_MODEL = "gemini-1.5-flash-002";
-const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-4-6")));
+const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-3-5-sonnet-20241022")));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
 /**
@@ -191,7 +191,7 @@ async function buildContent(job, resume, rawText, extractedEmails) {
 /**
  * Screen a single resume against a job. Returns the structured evaluation.
  */
-export async function analyzeResume(job, resume, overrideProvider) {
+export async function analyzeResume(job, resume, overrideProvider, apiKey) {
   // 1. Get raw text of the resume
   let rawText = "";
   if (resume.type === "text") {
@@ -227,17 +227,17 @@ export async function analyzeResume(job, resume, overrideProvider) {
   if (activeProvider === "ollama") activeModel = "llama3.1";
   else if (activeProvider === "gemini") activeModel = GEMINI_MODEL;
   else if (activeProvider === "groq") activeModel = "llama-3.1-8b-instant";
-  else activeModel = "claude-sonnet-4-6";
+  else activeModel = "claude-3-5-sonnet-20241022";
 
   let result;
   if (activeProvider === "ollama") {
     result = await analyzeWithOllama(content, activeModel);
   } else if (activeProvider === "gemini") {
-    result = await analyzeWithGemini(content, activeModel);
+    result = await analyzeWithGemini(content, activeModel, apiKey);
   } else if (activeProvider === "groq") {
-    result = await analyzeWithGroq(content, activeModel);
+    result = await analyzeWithGroq(content, activeModel, apiKey);
   } else {
-    result = await analyzeWithClaude(content, activeModel);
+    result = await analyzeWithClaude(content, activeModel, apiKey);
   }
 
   // 4. Post-process email extraction to enforce correctness and prevent hallucinations
@@ -618,8 +618,8 @@ async function analyzeWithGroq(content, model = MODEL, apiKey) {
     response_format: { type: "json_object" }
   });
 
-  // Retry up to 3 times on 429 rate limit, waiting for retry-after seconds
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // Retry up to 2 times on 429 rate limit, waiting max 4 seconds
+  for (let attempt = 0; attempt < 2; attempt++) {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
@@ -627,13 +627,12 @@ async function analyzeWithGroq(content, model = MODEL, apiKey) {
     });
 
     if (response.status === 429) {
-      const errData = await response.json().catch(() => ({}));
-      // Groq returns retry-after in error body or headers
-      const retryAfter = response.headers.get("retry-after") || 30;
-      const waitMs = (parseFloat(retryAfter) + 2) * 1000;
-      console.warn(`[Groq] Rate limited. Waiting ${waitMs / 1000}s before retry ${attempt + 1}/3...`);
-      await new Promise(r => setTimeout(r, waitMs));
-      continue;
+      if (attempt === 0) {
+        console.warn(`[Groq] Rate limited. Waiting 4s before single retry...`);
+        await new Promise(r => setTimeout(r, 4000));
+        continue;
+      }
+      throw new Error("Groq API rate limit reached (30 requests/min). Please try again in 15 seconds or select Anthropic Claude.");
     }
 
     if (!response.ok) {
@@ -645,7 +644,7 @@ async function analyzeWithGroq(content, model = MODEL, apiKey) {
     const text = data.choices?.[0]?.message?.content || "";
     return extractJSON(text);
   }
-  throw new Error("Groq rate limit exceeded after 3 retries. Please wait a minute and try again.");
+  throw new Error("Groq API rate limit reached. Please wait a minute and try again.");
 }
 
 

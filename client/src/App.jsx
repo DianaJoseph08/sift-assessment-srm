@@ -1443,7 +1443,7 @@ export default function App() {
   const [maxReached, setMaxReached] = useState(1);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [llmProvider, setLlmProvider] = useState("groq");
+  const [llmProvider, setLlmProvider] = useState("claude");
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
 
@@ -1609,7 +1609,7 @@ export default function App() {
           candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "analyzing" } : c)),
         }));
 
-        const delayMs = llmProvider === "groq" ? 25000 : 2000;
+        const delayMs = 1000;
         await new Promise((resolve) => setTimeout(resolve, delayMs));
 
         let resume;

@@ -7,10 +7,15 @@
  *   { type: "file", filename: string, base64: string }
  */
 export async function analyzeCandidate(job, resume, provider) {
+  let apiKey = undefined;
+  if (provider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
+  else if (provider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
+  else if (provider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+
   const res = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job, resume, provider }),
+    body: JSON.stringify({ job, resume, provider, apiKey }),
   });
 
   if (!res.ok) {
