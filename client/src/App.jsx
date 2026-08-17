@@ -877,6 +877,146 @@ function Results({ candidates, job, onReRun, onRestart, onStartInterview, C }) {
   );
 }
 
+/* ============================== SIDEBAR NAVIGATION ============================== */
+function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, activeCompany, setActiveCompany, C }) {
+  const navItems = [
+    { id: "dashboard", label: "Dashboard", icon: Home },
+    { id: "companies", label: "Client Companies", icon: Building2, badge: companies.length },
+    { id: "jobs", label: "Job Openings & Screening", icon: Briefcase },
+    { id: "logs", label: "Activity & Audit Logs", icon: Activity },
+    { id: "settings", label: "Settings & AI Keys", icon: Settings },
+  ];
+
+  return (
+    <aside style={{
+      width: 260,
+      background: C.sidebar,
+      color: C.sidebarText,
+      display: "flex",
+      flexDirection: "column",
+      flexShrink: 0,
+      minHeight: "100vh",
+      borderRight: `1px solid ${C.line}`,
+      padding: "20px 16px",
+      boxSizing: "border-box",
+      position: "sticky",
+      top: 0,
+    }}>
+      {/* Brand Header */}
+      <div style={{ padding: "0 4px 20px", borderBottom: `1px solid ${C.lineDark}` }}>
+        <SrmLogo theme="dark" />
+        <div style={{ marginTop: 10, fontSize: 11, color: "#64748B", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          Agency Shortlist Engine
+        </div>
+      </div>
+
+      {/* Client Company Quick Selector */}
+      <div style={{ margin: "18px 0", padding: "12px 10px", background: "rgba(255,255,255,0.04)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{ fontSize: 10.5, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+          Target Client Company
+        </div>
+        <select
+          value={activeCompany?.id || "all"}
+          onChange={(e) => {
+            const selected = companies.find(c => c.id === e.target.value);
+            setActiveCompany(selected || null);
+          }}
+          style={{
+            width: "100%",
+            background: "#1E293B",
+            color: "#F8FAFC",
+            border: "1px solid #334155",
+            borderRadius: 6,
+            padding: "6px 8px",
+            fontSize: 12.5,
+            outline: "none",
+            cursor: "pointer",
+            fontFamily: BODY,
+          }}
+        >
+          <option value="all">🌐 All Client Companies</option>
+          {companies.map(comp => (
+            <option key={comp.id} value={comp.id}>🏢 {comp.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Nav Menu */}
+      <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "none",
+                background: isActive ? C.sidebarActiveBg : "transparent",
+                color: isActive ? C.sidebarActive : C.sidebarText,
+                fontWeight: isActive ? 700 : 500,
+                fontSize: 13.5,
+                textAlign: "left",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                fontFamily: BODY,
+              }}
+            >
+              <Icon size={18} color={isActive ? C.sidebarActive : C.sidebarText} />
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {item.badge !== undefined && (
+                <span style={{
+                  fontSize: 11,
+                  background: isActive ? C.accent : "#334155",
+                  color: "#FFFFFF",
+                  padding: "2px 7px",
+                  borderRadius: 10,
+                  fontWeight: 700,
+                }}>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Theme Switcher Footer */}
+      <div style={{ paddingTop: 16, borderTop: `1px solid ${C.lineDark}`, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Appearance Theme
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {Object.keys(THEMES).map((tKey) => (
+            <button
+              key={tKey}
+              onClick={() => setTheme(tKey)}
+              style={{
+                padding: "6px 8px",
+                borderRadius: 6,
+                fontSize: 11,
+                border: currentTheme === tKey ? `1.5px solid ${C.accent}` : "1px solid #334155",
+                background: currentTheme === tKey ? "#1E293B" : "transparent",
+                color: currentTheme === tKey ? "#F8FAFC" : "#94A3B8",
+                cursor: "pointer",
+                textAlign: "center",
+                fontFamily: BODY,
+              }}
+            >
+              {THEMES[tKey].name.split(" ")[0]}
+            </button>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 /* ============================== SETTINGS VIEW ============================== */
 function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, C }) {
   const [anthropicKey, setAnthropicKey] = useState(localStorage.getItem("ANTHROPIC_API_KEY") || "");
