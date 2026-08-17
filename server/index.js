@@ -71,8 +71,8 @@ app.post("/api/log", (req, res) => {
 
 // Screen one resume against one job
 app.post("/api/analyze", async (req, res) => {
+  const { job, resume, provider, apiKey } = req.body || {};
   try {
-    const { job, resume, provider, apiKey } = req.body || {};
     if (!job || !job.title || !job.description) {
       return res.status(400).json({ error: "Missing or incomplete job definition" });
     }

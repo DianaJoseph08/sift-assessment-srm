@@ -247,27 +247,22 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
   return result;
 }
 
-async function analyzeWithClaude(content, model = "claude-3-5-sonnet-20241022", apiKey) {
+async function analyzeWithClaude(content, model = "claude-3-5-haiku-20241022", apiKey) {
   const client = getClaudeClient(apiKey);
-  try {
-    const message = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 2048,
-      system: SYSTEM,
-      messages: [{ role: "user", content }],
-    });
+  
+  const modelsToTry = [
+    "claude-3-5-haiku-20241022",
+    "claude-3-haiku-20240307",
+    "claude-3-5-sonnet-latest",
+    "claude-3-sonnet-20240229"
+  ];
 
-    const text = (message.content || [])
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-
-    return extractJSON(text);
-  } catch (err) {
-    console.warn("[Claude Sonnet Warning]:", err.message);
+  let lastError;
+  for (const m of modelsToTry) {
     try {
+      console.log(`[Claude] Requesting model: ${m}...`);
       const message = await client.messages.create({
-        model: "claude-3-haiku-20240307",
+        model: m,
         max_tokens: 2048,
         system: SYSTEM,
         messages: [{ role: "user", content }],
@@ -279,10 +274,18 @@ async function analyzeWithClaude(content, model = "claude-3-5-sonnet-20241022", 
         .join("");
 
       return extractJSON(text);
-    } catch (haikuErr) {
-      throw new Error(`Anthropic Claude Error: ${err.message}`);
+    } catch (err) {
+      console.warn(`[Claude Warning] Model ${m} failed: ${err.message}`);
+      lastError = err;
+      // If 404 not found error, try next valid model
+      if (err.status === 404 || (err.message && err.message.includes("not_found_error"))) {
+        continue;
+      }
+      throw err;
     }
   }
+
+  throw new Error(`Anthropic Claude Error: ${lastError ? lastError.message : "All Claude models failed"}`);
 }
 
 async function analyzeWithOllama(content, model = MODEL) {
