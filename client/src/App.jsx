@@ -862,6 +862,16 @@ export default function App() {
     saveCompaniesToServer(updated);
   };
 
+  const saveJobsToServer = async (jobsList) => {
+    try {
+      await fetch("/api/save-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobs: jobsList })
+      });
+    } catch (e) {}
+  };
+
   const handleCreateJobForCompany = () => {
     const targetComp = activeCompany || companies[0] || SAMPLE_COMPANIES[0];
     const newId = `job_${Date.now()}`;
@@ -879,9 +889,20 @@ export default function App() {
       candidates: [],
       screening: "idle"
     };
-    setJobs(prev => [newJob, ...prev]);
+    const updated = [newJob, ...jobs];
+    setJobs(updated);
+    saveJobsToServer(updated);
     setActiveJobId(newId);
     setActiveTab("jobs");
+  };
+
+  const handleDeleteJob = (jobId) => {
+    const updated = jobs.filter(j => j.id !== jobId);
+    setJobs(updated);
+    saveJobsToServer(updated);
+    if (activeJobId === jobId) {
+      setActiveJobId(updated.length > 0 ? updated[0].id : null);
+    }
   };
 
   const activeJob = useMemo(() => jobs.find((j) => j.id === activeJobId), [jobs, activeJobId]);
@@ -971,13 +992,15 @@ export default function App() {
                   </Panel>
                 ) : (
                   <div>
-                    <div style={{ display: "flex", gap: 10, marginBottom: 16, overflowX: "auto" }}>
+                    <div style={{ display: "flex", gap: 10, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
                       {jobs.map(j => (
-                        <button
+                        <div
                           key={j.id}
-                          onClick={() => setActiveJobId(j.id)}
                           style={{
-                            padding: "8px 14px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "6px 12px",
                             borderRadius: 8,
                             border: `1px solid ${activeJobId === j.id ? C.accent : C.line}`,
                             background: activeJobId === j.id ? C.accentSoft : C.paper,
@@ -987,14 +1010,48 @@ export default function App() {
                             cursor: "pointer",
                             fontFamily: BODY,
                           }}
+                          onClick={() => setActiveJobId(j.id)}
                         >
-                          🏢 {j.companyName} — {j.title}
-                        </button>
+                          <span>🏢 {j.companyName} — {j.title}</span>
+                          <Trash2
+                            size={14}
+                            color={C.faint}
+                            style={{ cursor: "pointer", opacity: 0.7 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteJob(j.id);
+                            }}
+                            title="Delete this job opening"
+                          />
+                        </div>
                       ))}
                     </div>
 
                     {activeJob && (
-                      <Panel C={C}>
+                      <Panel
+                        C={C}
+                        action={
+                          <button
+                            onClick={() => handleDeleteJob(activeJob.id)}
+                            style={{
+                              padding: "6px 12px",
+                              background: "#FEE2E2",
+                              color: "#DC2626",
+                              border: "1px solid #FCA5A5",
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              fontFamily: BODY,
+                            }}
+                          >
+                            <Trash2 size={14} /> Delete Job Opening
+                          </button>
+                        }
+                      >
                         <div style={{ fontSize: 18, fontWeight: 700, color: C.ink, fontFamily: DISPLAY }}>
                           {activeJob.title} <span style={{ fontSize: 13, color: C.sub, fontWeight: 400 }}>(Client: {activeJob.companyName})</span>
                         </div>
