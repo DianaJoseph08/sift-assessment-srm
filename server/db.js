@@ -158,10 +158,17 @@ export function getJobs() {
       error: c.error || null,
     }));
     
+    let resolvedCompId = job.company_id;
+    let resolvedCompName = job.company_name;
+    if (!resolvedCompId || resolvedCompId === "comp_default") {
+      resolvedCompId = "comp_motherson";
+      resolvedCompName = "Motherson Group";
+    }
+
     return {
       id: job.id,
-      companyId: job.company_id || "comp_default",
-      companyName: job.company_name || "General Client",
+      companyId: resolvedCompId,
+      companyName: resolvedCompName,
       title: job.title || "",
       seniority: job.seniority || "Senior",
       minYears: Number(job.minYears || 0),

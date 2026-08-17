@@ -1030,11 +1030,19 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
   );
 }
 
+const isMatchForComp = (j, comp) => {
+  if (!comp) return true;
+  if (j.companyId === comp.id) return true;
+  if (j.companyName && comp.name && j.companyName.toLowerCase().trim() === comp.name.toLowerCase().trim()) return true;
+  if ((!j.companyId || j.companyId === "comp_default") && (comp.id === "comp_motherson" || comp.name.toLowerCase().includes("motherson"))) return true;
+  return false;
+};
+
 /* ============================== WELCOME & AGENCY DASHBOARD ============================== */
 function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, C }) {
   const filteredJobs = useMemo(() => {
     if (!activeCompany) return jobs;
-    return jobs.filter(j => j.companyId === activeCompany.id);
+    return jobs.filter(j => isMatchForComp(j, activeCompany));
   }, [jobs, activeCompany]);
 
   const totalCandidates = useMemo(() => {
@@ -1260,7 +1268,7 @@ function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onS
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
         {filtered.map((comp) => {
-          const compJobs = jobs.filter(j => j.companyId === comp.id || (j.companyName && j.companyName.toLowerCase() === comp.name.toLowerCase()));
+          const compJobs = jobs.filter(j => isMatchForComp(j, comp));
           const totalScreened = compJobs.reduce((acc, j) => acc + (j.candidates ? j.candidates.length : 0), 0);
           return (
             <Panel key={comp.id} C={C} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
@@ -1666,7 +1674,7 @@ export default function App() {
 
   const displayedJobs = useMemo(() => {
     if (!activeCompany) return jobs;
-    return jobs.filter(j => j.companyId === activeCompany.id || (j.companyName && j.companyName.toLowerCase() === activeCompany.name.toLowerCase()));
+    return jobs.filter(j => isMatchForComp(j, activeCompany));
   }, [jobs, activeCompany]);
 
   useEffect(() => {
