@@ -153,34 +153,11 @@ async function buildContent(job, resume, rawText, extractedEmails) {
   }
 
   if (resume.type === "file") {
-    const name = (resume.filename || "").toLowerCase();
-
-    if (name.endsWith(".pdf")) {
-      if (PROVIDER === "claude") {
-        return [
-          {
-            type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: resume.base64,
-            },
-          },
-          {
-            type: "text",
-            text: `${jd}\n\n---\nThe attached PDF is the candidate's resume.\n\n${schema}`,
-          },
-        ];
-      } else {
-        const text = rawText;
-        if (!text || !text.trim()) throw new Error("Could not extract text from PDF");
-        return `${jd}\n\n---\nCANDIDATE RESUME:\n${text.trim()}\n\n---\n${schema}`;
-      }
+    const text = (rawText || "").trim();
+    if (!text) {
+      throw new Error(`Could not extract text content from file "${resume.filename || 'uploaded file'}". Please ensure it is a un-corrupted PDF, DOCX, or TXT file.`);
     }
-
-    let text = rawText;
-    if (!text || !text.trim()) throw new Error("Could not extract text from file");
-    return `${jd}\n\n---\nCANDIDATE RESUME:\n${text.trim()}\n\n---\n${schema}`;
+    return `${jd}\n\n---\nCANDIDATE RESUME (${resume.filename || "Uploaded File"}):\n${text}\n\n---\n${schema}`;
   }
 
   throw new Error("Unknown resume payload type");

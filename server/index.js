@@ -72,7 +72,7 @@ app.post("/api/log", (req, res) => {
 // Screen one resume against one job
 app.post("/api/analyze", async (req, res) => {
   try {
-    const { job, resume, provider } = req.body || {};
+    const { job, resume, provider, apiKey } = req.body || {};
     if (!job || !job.title || !job.description) {
       return res.status(400).json({ error: "Missing or incomplete job definition" });
     }
@@ -87,16 +87,19 @@ app.post("/api/analyze", async (req, res) => {
         return res.status(404).json({ error: "Candidate not found in database" });
       }
       if (cand.kind === "file") {
-        if (!cand.base64) {
-          return res.status(400).json({ error: "Resume file content is missing in database" });
+        if (cand.base64) {
+          finalResume = { type: "file", filename: cand.filename, base64: cand.base64 };
+        } else if (cand.text) {
+          finalResume = { type: "text", text: cand.text };
+        } else {
+          return res.status(400).json({ error: `Resume content for ${cand.label || 'candidate'} is missing` });
         }
-        finalResume = { type: "file", filename: cand.filename, base64: cand.base64 };
       } else {
         finalResume = { type: "text", text: cand.text || "" };
       }
     }
 
-    const result = await analyzeResume(job, finalResume, provider);
+    const result = await analyzeResume(job, finalResume, provider, apiKey);
     addLog("SCREENING", `Screened resume for candidate ${result.candidateName || 'Candidate'} (${result.recommendation || 'Score: ' + result.overallScore})`, job.companyName || "", `Job: ${job.title} | Score: ${result.overallScore}`);
     res.json(result);
   } catch (err) {
