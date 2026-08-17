@@ -107,8 +107,8 @@ const recMeta = (r) => REC[r] || REC["Possible Match"];
 const gradeColor = (v) =>
   v >= 75 ? "#16A34A" : v >= 55 ? "#0284C7" : v >= 40 ? "#D97706" : "#DC2626";
 
-const DISPLAY = "'Cambria Math', 'Cambria', Georgia, serif";
-const BODY = "'Cambria Math', 'Cambria', Georgia, serif";
+const DISPLAY = "'Outfit', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+const BODY = "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 const SrmLogo = ({ collapsed = false, theme = "light" }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1247,7 +1247,7 @@ function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onS
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
         {filtered.map((comp) => {
-          const compJobs = jobs.filter(j => j.companyId === comp.id);
+          const compJobs = jobs.filter(j => j.companyId === comp.id || (j.companyName && j.companyName.toLowerCase() === comp.name.toLowerCase()));
           const totalScreened = compJobs.reduce((acc, j) => acc + (j.candidates ? j.candidates.length : 0), 0);
           return (
             <Panel key={comp.id} C={C} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
@@ -1644,6 +1644,19 @@ export default function App() {
     updateActiveJob((j) => ({ ...j, screening: "done" }));
   };
 
+  const displayedJobs = useMemo(() => {
+    if (!activeCompany) return jobs;
+    return jobs.filter(j => j.companyId === activeCompany.id || (j.companyName && j.companyName.toLowerCase() === activeCompany.name.toLowerCase()));
+  }, [jobs, activeCompany]);
+
+  useEffect(() => {
+    if (activeTab === "jobs" && displayedJobs.length > 0) {
+      if (!displayedJobs.some(j => j.id === activeJobId)) {
+        setActiveJobId(displayedJobs[0].id);
+      }
+    }
+  }, [activeTab, displayedJobs, activeJobId]);
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg, color: C.ink, fontFamily: BODY }}>
       {/* Persistent Sidebar */}
@@ -1721,17 +1734,20 @@ export default function App() {
                   </button>
                 </div>
 
-                {jobs.length === 0 ? (
+                {displayedJobs.length === 0 ? (
                   <Panel C={C}>
                     <div style={{ textAlign: "center", padding: "40px 0", color: C.sub }}>
-                      No openings posted yet. Click "+ Post New Opening Job" to start.
+                      <div>No job openings posted for <strong>{activeCompany ? activeCompany.name : "this client company"}</strong> yet.</div>
+                      <button onClick={handleCreateJobForCompany} style={{ ...btn("primary", C), marginTop: 14 }}>
+                        + Post New Opening Job for {activeCompany ? activeCompany.name : "Company"}
+                      </button>
                     </div>
                   </Panel>
                 ) : (
                   <div>
                     {/* Job Selection Tabs */}
                     <div style={{ display: "flex", gap: 10, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-                      {jobs.map(j => (
+                      {displayedJobs.map(j => (
                         <div
                           key={j.id}
                           style={{
