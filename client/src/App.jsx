@@ -1017,6 +1017,339 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
   );
 }
 
+/* ============================== WELCOME & AGENCY DASHBOARD ============================== */
+function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, C }) {
+  const filteredJobs = useMemo(() => {
+    if (!activeCompany) return jobs;
+    return jobs.filter(j => j.companyId === activeCompany.id);
+  }, [jobs, activeCompany]);
+
+  const totalCandidates = useMemo(() => {
+    return filteredJobs.reduce((acc, j) => acc + (j.candidates ? j.candidates.length : 0), 0);
+  }, [filteredJobs]);
+
+  const totalShortlisted = useMemo(() => {
+    return filteredJobs.reduce((acc, j) => {
+      const shortlisted = (j.candidates || []).filter(c => c.status === "done" && c.result && c.result.overallScore >= 70);
+      return acc + shortlisted.length;
+    }, 0);
+  }, [filteredJobs]);
+
+  const recentShortlist = useMemo(() => {
+    const list = [];
+    filteredJobs.forEach(j => {
+      (j.candidates || []).forEach(c => {
+        if (c.status === "done" && c.result) {
+          list.push({ candidate: c, job: j });
+        }
+      });
+    });
+    return list.sort((a, b) => (b.candidate.result.overallScore || 0) - (a.candidate.result.overallScore || 0)).slice(0, 5);
+  }, [filteredJobs]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Welcome Hero Banner */}
+      <div style={{
+        background: `linear-gradient(135deg, ${C.accentDeep} 0%, ${C.accent} 100%)`,
+        borderRadius: 16,
+        padding: "28px 32px",
+        color: "#FFFFFF",
+        boxShadow: "0 10px 25px -5px rgba(3, 77, 161, 0.3)",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 20
+      }}>
+        <div style={{ maxWidth: 560 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
+            <Sparkles size={14} /> Agency AI Shortlisting Hub
+          </div>
+          <h2 style={{ fontSize: 26, fontWeight: 800, margin: 0, fontFamily: DISPLAY, lineHeight: 1.2 }}>
+            Candidate Screening &amp; Client Recommendation Portal
+          </h2>
+          <p style={{ fontSize: 14, margin: "10px 0 0", opacity: 0.9, lineHeight: 1.5 }}>
+            Screen candidate resumes against client company requirements, score fit, conduct AI interviews, and export formal recommendation reports back to client companies.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button
+            onClick={onCreateCompany}
+            style={{
+              padding: "10px 18px",
+              background: "#FFFFFF",
+              color: C.accentDeep,
+              border: "none",
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 13.5,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontFamily: BODY,
+              boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+            }}
+          >
+            <Building2 size={16} /> Add Client Company
+          </button>
+          <button
+            onClick={onCreateJob}
+            style={{
+              padding: "10px 18px",
+              background: "rgba(255,255,255,0.2)",
+              color: "#FFFFFF",
+              border: "1px solid rgba(255,255,255,0.4)",
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 13.5,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontFamily: BODY,
+            }}
+          >
+            <Plus size={16} /> Post Opening Job
+          </button>
+        </div>
+      </div>
+
+      {/* Metrics Row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <Panel C={C}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Building2 size={22} color={C.accent} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Client Companies</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{companies.length}</div>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel C={C}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Briefcase size={22} color={C.accent} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Active Opening Jobs</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{filteredJobs.length}</div>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel C={C}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Users size={22} color={C.accent} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Total Resumes Screened</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{totalCandidates}</div>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel C={C}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Star size={22} color="#16A34A" />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Shortlisted Candidates</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "#16A34A", fontFamily: DISPLAY }}>{totalShortlisted}</div>
+            </div>
+          </div>
+        </Panel>
+      </div>
+
+      {/* Minimal Dashboard Section */}
+      <Panel title="Top Client Candidate Recommendations" sub="Highest scoring candidates ready to recommend to client companies" C={C}>
+        {recentShortlist.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "30px 0", color: C.faint, fontSize: 13 }}>
+            No scored candidates yet. Go to <strong style={{ color: C.accent }}>Job Openings &amp; Screening</strong> tab to screen resumes and generate recommendations.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+            {recentShortlist.map(({ candidate, job }) => (
+              <div key={candidate.id} style={{ padding: 14, borderRadius: 10, border: `1px solid ${C.line}`, background: C.bg, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{candidate.result.candidateName || candidate.label}</div>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>🏢 {job.companyName} — {job.title}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: gradeColor(candidate.result.overallScore) }}>
+                    {candidate.result.overallScore}%
+                  </span>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: REC[candidate.result.recommendation]?.dot || C.sub, marginTop: 2 }}>
+                    {candidate.result.recommendation}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+/* ============================== CLIENT COMPANIES MANAGEMENT ============================== */
+function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onSelectCompanyJobs, C }) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filtered = useMemo(() => {
+    return companies.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.industry.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [companies, searchTerm]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>Client Companies Management</h2>
+          <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Manage client organizations that send job openings and receive candidate recommendations</p>
+        </div>
+        <button
+          onClick={onCreateCompany}
+          style={{
+            padding: "10px 18px",
+            background: C.accent,
+            color: "#FFFFFF",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: 700,
+            fontSize: 13.5,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontFamily: BODY,
+          }}
+        >
+          <Plus size={16} /> Add New Client Company
+        </button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 14px" }}>
+        <Search size={18} color={C.sub} />
+        <input
+          type="text"
+          placeholder="Search companies by name or industry..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ border: "none", outline: "none", background: "transparent", width: "100%", color: C.ink, fontSize: 13.5, fontFamily: BODY }}
+        />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        {filtered.map((comp) => {
+          const compJobs = jobs.filter(j => j.companyId === comp.id);
+          const totalScreened = compJobs.reduce((acc, j) => acc + (j.candidates ? j.candidates.length : 0), 0);
+          return (
+            <Panel key={comp.id} C={C} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Building2 size={20} color={C.accent} />
+                  </div>
+                  <Trash2 size={16} color={C.faint} style={{ cursor: "pointer" }} onClick={() => onDeleteCompany(comp.id)} />
+                </div>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: C.ink, margin: "12px 0 4px", fontFamily: DISPLAY }}>{comp.name}</h3>
+                <div style={{ fontSize: 12, color: C.sub }}>Industry: {comp.industry}</div>
+                {comp.contactEmail && <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>✉ {comp.contactEmail}</div>}
+                {comp.notes && <p style={{ fontSize: 12, color: C.sub, marginTop: 8, lineHeight: 1.4 }}>{comp.notes}</p>}
+              </div>
+
+              <div style={{ marginTop: 20, paddingTop: 14, borderTop: `1px solid ${C.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{compJobs.length} Openings</div>
+                  <div style={{ fontSize: 11, color: C.sub }}>{totalScreened} Candidates</div>
+                </div>
+                <button
+                  onClick={() => onSelectCompanyJobs(comp)}
+                  style={{
+                    padding: "6px 12px",
+                    background: C.accentSoft,
+                    color: C.accent,
+                    border: `1px solid ${C.accent}`,
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: BODY,
+                  }}
+                >
+                  View Openings →
+                </button>
+              </div>
+            </Panel>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ============================== ACTIVITY LOGS VIEW ============================== */
+function ActivityLogsView({ logs, C }) {
+  const [search, setSearch] = useState("");
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter(l => (l.message || "").toLowerCase().includes(search.toLowerCase()) || (l.companyName || "").toLowerCase().includes(search.toLowerCase()) || (l.type || "").toLowerCase().includes(search.toLowerCase()));
+  }, [logs, search]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div>
+        <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>System &amp; Activity Audit Logs</h2>
+        <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Track all candidate screening events, company updates, and AI interview evaluations</p>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 14px" }}>
+        <Search size={18} color={C.sub} />
+        <input
+          type="text"
+          placeholder="Filter audit logs by keyword, company name, or action..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ border: "none", outline: "none", background: "transparent", width: "100%", color: C.ink, fontSize: 13.5, fontFamily: BODY }}
+        />
+      </div>
+
+      <Panel C={C}>
+        {filteredLogs.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "30px 0", color: C.faint, fontSize: 13 }}>
+            No activity logs found.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {filteredLogs.map(log => (
+              <div key={log.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 8, background: C.bg, border: `1px solid ${C.line}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 4, background: C.accentSoft, color: C.accent, textTransform: "uppercase" }}>
+                    {log.type}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>{log.message}</div>
+                    {log.details && <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>{log.details}</div>}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", fontSize: 11, color: C.faint }}>
+                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
 /* ============================== SETTINGS VIEW ============================== */
 function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, C }) {
   const [anthropicKey, setAnthropicKey] = useState(localStorage.getItem("ANTHROPIC_API_KEY") || "");
