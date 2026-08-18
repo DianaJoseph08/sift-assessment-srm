@@ -629,21 +629,12 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults
             </button>
           )}
 
-          {unscreenedCount > 0 ? (
-            <button
-              style={{ ...btn("primary", C), opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
-              onClick={() => candidates.length && onRun(false)}
-            >
-              <Sparkles size={16} /> Screen {unscreenedCount} New Resume{unscreenedCount > 1 ? "s" : ""}
-            </button>
-          ) : (
-            <button
-              style={{ ...btn("primary", C), opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
-              onClick={onGotoResults}
-            >
-              <ArrowRight size={16} /> View Results
-            </button>
-          )}
+          <button
+            style={{ ...btn("primary", C), opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
+            onClick={() => candidates.length && onRun(true)}
+          >
+            <Sparkles size={16} /> Screen {candidates.length} Candidate Resume{candidates.length !== 1 ? "s" : ""} with AI <ArrowRight size={16} />
+          </button>
         </div>
       </div>
     </div>
