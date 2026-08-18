@@ -661,6 +661,9 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults
           >
             <Sparkles size={16} /> Screen {candidates.length} Candidate Resume{candidates.length !== 1 ? "s" : ""} with AI <ArrowRight size={16} />
           </button>
+        </div>
+      </div>
+
       {/* Duplicate Resume Warning Modal */}
       {duplicateModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
