@@ -150,11 +150,18 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
   const startWebcam = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      streamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+      streamRef.current = stream; // just store it — don't touch videoRef yet (it doesn't exist)
       return true;
     } catch { return false; }
   }, []);
+
+  // Attach stream to video element once interview phase renders it
+  useEffect(() => {
+    if (phase === "interview" && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [phase]);
 
   // ── Speech Recognition ────────────────────────────────────────────────────
   const startListening = useCallback(() => {
