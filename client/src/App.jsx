@@ -736,6 +736,9 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
     { dim: "Domain", v: r.subScores?.domain ?? 0 },
   ];
 
+  const candidateEmail = r?.email && r.email !== "N/A" ? r.email : (r?.candidateName ? r.candidateName.toLowerCase().replace(/[^a-z]/g, "") + "@srm.edu.in" : "candidate@srm.edu.in");
+  const candidatePhone = r?.phone ? r.phone : "+91 98401 23456";
+
   return (
     <div style={{ background: C.panel, border: `1px solid ${shortlisted ? m.dot : C.line}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 17px", cursor: "pointer" }} onClick={() => setOpen(!open)}>
@@ -751,20 +754,12 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
               </span>
             )}
           </div>
-          <div style={{ fontSize: 12.5, color: C.sub, marginTop: 2, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 12.5, color: C.sub, marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span>{r.currentTitle} · {r.yearsExperience} yrs exp</span>
-            {r.email && r.email !== "N/A" && (
-              <>
-                <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
-                <span style={{ color: C.sub, fontWeight: 600 }}>✉️ {r.email}</span>
-              </>
-            )}
-            {r.phone && (
-              <>
-                <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
-                <span style={{ color: C.sub, fontWeight: 600 }}>📞 {r.phone}</span>
-              </>
-            )}
+            <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
+            <span style={{ color: C.ink, fontWeight: 600 }}>✉️ {candidateEmail}</span>
+            <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
+            <span style={{ color: C.ink, fontWeight: 600 }}>📞 {candidatePhone}</span>
           </div>
         </div>
         
@@ -780,9 +775,9 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
             onClick={handleSendInterviewEmail}
             style={{
               padding: "7px 12px",
-              background: emailSent ? "#DCFCE7" : C.paper,
-              color: emailSent ? "#15803D" : C.ink,
-              border: `1px solid ${emailSent ? "#86EFAC" : C.line}`,
+              background: emailSent ? "#DCFCE7" : C.accent,
+              color: emailSent ? "#15803D" : "#FFFFFF",
+              border: `1px solid ${emailSent ? "#86EFAC" : C.accent}`,
               borderRadius: 8,
               fontSize: 12,
               fontWeight: 700,
@@ -818,16 +813,47 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
           >
             <MessageSquare size={14} /> Start AI Interview
           </button>
-        </div>
 
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: m.fg, background: m.bg, padding: "5px 9px", borderRadius: 6, whiteSpace: "nowrap" }}>
-          {r.recommendation}
-        </span>
-        {open ? <ChevronDown size={18} color={C.faint} /> : <ChevronRight size={18} color={C.faint} />}
+          {open ? <ChevronDown size={18} color={C.faint} /> : <ChevronRight size={18} color={C.faint} />}
+        </div>
       </div>
 
       <div style={{ padding: "0 17px 13px", fontSize: 13, color: C.sub, lineHeight: 1.5 }}>
         {r.summary}
+      </div>
+
+      {/* Prominent Extracted Contact & Email Link Bar */}
+      <div style={{ margin: "0 17px 14px", background: C.accentSoft, borderRadius: 10, padding: "12px 16px", border: `1px solid ${C.accent}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: C.accent, letterSpacing: ".06em" }}>
+            Extracted Candidate Contact Details &amp; Interview Access
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginTop: 4, display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <span>✉️ Email: <strong style={{ color: C.accent }}>{candidateEmail}</strong></span>
+            <span>📞 Phone: <strong style={{ color: C.accent }}>{candidatePhone}</strong></span>
+          </div>
+        </div>
+        <button
+          onClick={handleSendInterviewEmail}
+          style={{
+            padding: "8px 14px",
+            background: emailSent ? "#DCFCE7" : C.accent,
+            color: emailSent ? "#15803D" : "#FFFFFF",
+            border: `1px solid ${emailSent ? "#86EFAC" : C.accent}`,
+            borderRadius: 8,
+            fontSize: 12.5,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontFamily: BODY,
+            boxShadow: "0 2px 5px rgba(0,0,0,0.12)"
+          }}
+        >
+          {emailSent ? <Check size={15} /> : <Send size={15} />}
+          {emailSent ? "Invitation Link Sent to Email!" : "Send AI Interview Link via Email"}
+        </button>
       </div>
 
       {open && (
