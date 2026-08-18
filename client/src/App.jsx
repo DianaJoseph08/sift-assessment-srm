@@ -1460,7 +1460,7 @@ export default function App() {
   const [maxReached, setMaxReached] = useState(1);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [llmProvider, setLlmProvider] = useState("claude");
+  const [llmProvider, setLlmProvider] = useState("ollama");
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
   const [savedJobNotice, setSavedJobNotice] = useState(false);
