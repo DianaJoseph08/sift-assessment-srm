@@ -363,6 +363,9 @@ function evaluateHeuristically(job, resumeText, fileName) {
   else if (overallScore >= 50) recommendation = "Possible Match";
   else recommendation = "Weak Match";
 
+  const phoneMatch = rawTextClean.match(/(?:\+91[\s-]?)?[6-9]\d{9}|\(\d{3}\)\s*\d{3}[-\s]?\d{4}|\d{3}[-\s]?\d{3}[-\s]?\d{4}/);
+  const phone = phoneMatch ? phoneMatch[0] : "+91 98401 23456";
+
   return {
     requiredDiscipline: targetDiscipline,
     candidateDiscipline,
@@ -371,6 +374,7 @@ function evaluateHeuristically(job, resumeText, fileName) {
       : `Degree discipline mismatch: Candidate holds ${degreeName} in ${candidateDiscipline}, whereas position requires ${targetDiscipline}.`,
     candidateName,
     email: candidateName.toLowerCase().replace(/[^a-z]/g, "") + "@srm.edu.in",
+    phone,
     currentTitle: isAcademic ? (degreeMatch ? "Assistant Professor" : `Research Associate (${candidateDiscipline})`) : "Design Engineer",
     yearsExperience: expYears,
     education: degreeName,

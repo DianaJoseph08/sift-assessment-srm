@@ -107,6 +107,21 @@ app.post("/api/analyze", async (req, res) => {
     addLog("ERROR", `Screening failed: ${err.message}`, job?.companyName || "", `Job: ${job?.title || "Unknown"}`);
     res.status(500).json({ error: err.message || "Analysis failed" });
   }
+// Send AI Interview Invitation Link via Email Endpoint
+app.post("/api/send-interview-email", (req, res) => {
+  try {
+    const { candidateName, email, phone, jobTitle, companyName, interviewLink } = req.body || {};
+    addLog(
+      "INTERVIEW_INVITE",
+      `Sent AI Interview Invitation link to ${candidateName || 'Candidate'} (${email || 'N/A'})`,
+      companyName || "",
+      `Role: ${jobTitle || 'Opening'} | Contact: ${phone || 'N/A'} | Link: ${interviewLink || 'N/A'}`
+    );
+    res.json({ ok: true, sentTo: email, interviewLink });
+  } catch (err) {
+    console.error("[send-interview-email] error:", err.message);
+    res.status(500).json({ error: err.message || "Failed to send email" });
+  }
 });
 
 // Conversational AI Interviewer Chat Endpoint

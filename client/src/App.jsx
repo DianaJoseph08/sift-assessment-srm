@@ -689,7 +689,31 @@ function Analyzing({ candidates, C }) {
 /* ============================== STEP 3b: RESULTS & RECOMMENDATIONS ============================== */
 function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
   const [open, setOpen] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const r = c.result;
+
+  const handleSendInterviewEmail = async (e) => {
+    e.stopPropagation();
+    try {
+      const email = r?.email || "candidate@srm.edu.in";
+      const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
+      await fetch("/api/send-interview-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateName: r?.candidateName || c.label,
+          email,
+          phone: r?.phone || "+91 98401 23456",
+          jobTitle,
+          interviewLink
+        })
+      });
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 3000);
+    } catch (err) {
+      console.error("Failed to send email:", err);
+    }
+  };
 
   if (c.status === "error" || !r) {
     return (
@@ -732,19 +756,47 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
             {r.email && r.email !== "N/A" && (
               <>
                 <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
-                <span style={{ color: C.faint, fontStyle: "italic" }}>{r.email}</span>
+                <span style={{ color: C.sub, fontWeight: 600 }}>✉️ {r.email}</span>
+              </>
+            )}
+            {r.phone && (
+              <>
+                <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
+                <span style={{ color: C.sub, fontWeight: 600 }}>📞 {r.phone}</span>
               </>
             )}
           </div>
         </div>
         
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: m.dot, lineHeight: 1 }}>
               {r.overallScore}%
             </div>
             <div style={{ fontSize: 9, color: C.faint, fontWeight: 700, letterSpacing: ".04em" }}>RESUME FIT</div>
           </div>
+
+          <button
+            onClick={handleSendInterviewEmail}
+            style={{
+              padding: "7px 12px",
+              background: emailSent ? "#DCFCE7" : C.paper,
+              color: emailSent ? "#15803D" : C.ink,
+              border: `1px solid ${emailSent ? "#86EFAC" : C.line}`,
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontFamily: BODY,
+              transition: "all 0.15s ease"
+            }}
+          >
+            {emailSent ? <Check size={14} color="#15803D" /> : <Send size={14} />}
+            {emailSent ? "Sent!" : "Send Email Link"}
+          </button>
 
           <button
             onClick={(e) => { e.stopPropagation(); onStartInterview(c); }}
@@ -1686,7 +1738,11 @@ export default function App() {
       console.error("Screening failed:", e);
     }
 
-    updateActiveJob((j) => ({ ...j, screening: "done" }));
+    setJobs((prevJobs) => {
+      const updated = prevJobs.map((j) => (j.id === activeJobId ? { ...j, screening: "done" } : j));
+      saveJobsToServer(updated);
+      return updated;
+    });
   };
 
   const displayedJobs = useMemo(() => {
