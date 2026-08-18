@@ -1967,6 +1967,8 @@ export default function App() {
             </form>
           </div>
         </div>
+      )}
+
       {/* AI Interview Modal */}
       {activeInterviewCandidate && (
         <InterviewModal
