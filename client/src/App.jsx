@@ -748,36 +748,42 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
   const [emailSent, setEmailSent] = useState(false);
   const r = c.result;
 
-  const handleSendInterviewEmail = async (e) => {
+  const [actionNotice, setActionNotice] = useState("");
+
+  const getInterviewBody = (targetEmail, interviewLink) => {
+    const subject = encodeURIComponent(`AI Technical Interview Invitation — ${jobTitle}`);
+    const body = encodeURIComponent(`Dear ${r?.candidateName || 'Candidate'},\n\nYou have been shortlisted for the position of ${jobTitle}.\n\nPlease click the link below to complete your automated AI Technical Interview:\n\n👉 Interview Link: ${interviewLink}\n\nBest regards,\nRecruitment Team`);
+    return { subject, body };
+  };
+
+  const handleOpenWebGmail = (e) => {
     e.stopPropagation();
     const targetEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "";
     const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
-    
+    const { subject, body } = getInterviewBody(targetEmail, interviewLink);
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${targetEmail}&su=${subject}&body=${body}`, "_blank");
+    setActionNotice("gmail");
+    setTimeout(() => setActionNotice(""), 3500);
+  };
+
+  const handleCopyLink = async (e) => {
+    e.stopPropagation();
+    const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
     try {
       await navigator.clipboard.writeText(interviewLink);
     } catch (err) {}
+    setActionNotice("copy");
+    setTimeout(() => setActionNotice(""), 3500);
+  };
 
-    if (targetEmail) {
-      const subject = encodeURIComponent(`AI Technical Interview Invitation — ${jobTitle}`);
-      const body = encodeURIComponent(`Dear ${r?.candidateName || 'Candidate'},\n\nYou have been shortlisted for the position of ${jobTitle}.\n\nPlease click the link below to complete your automated AI Technical Interview:\n\n👉 Interview Link: ${interviewLink}\n\nBest regards,\nRecruitment Team`);
-      window.open(`mailto:${targetEmail}?subject=${subject}&body=${body}`, "_self");
-    }
-
-    try {
-      await fetch("/api/send-interview-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          candidateName: r?.candidateName || c.label,
-          email: targetEmail || "N/A",
-          jobTitle,
-          interviewLink
-        })
-      });
-    } catch (err) {}
-
-    setEmailSent(true);
-    setTimeout(() => setEmailSent(false), 3500);
+  const handleOpenDesktopMail = (e) => {
+    e.stopPropagation();
+    const targetEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "";
+    const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
+    const { subject, body } = getInterviewBody(targetEmail, interviewLink);
+    window.open(`mailto:${targetEmail}?subject=${subject}&body=${body}`, "_self");
+    setActionNotice("mailto");
+    setTimeout(() => setActionNotice(""), 3500);
   };
 
   if (c.status === "error" || !r) {
@@ -825,8 +831,8 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
           </div>
         </div>
         
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ textAlign: "right" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ textAlign: "right", marginRight: 4 }}>
             <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: m.dot, lineHeight: 1 }}>
               {r.overallScore}%
             </div>
@@ -834,13 +840,13 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
           </div>
 
           <button
-            onClick={handleSendInterviewEmail}
-            title="Opens your email client with pre-filled interview link and copies link to clipboard"
+            onClick={handleOpenWebGmail}
+            title="Opens Google Web Gmail in browser tab with pre-filled candidate email, subject and interview link"
             style={{
               padding: "7px 12px",
-              background: emailSent ? "#DCFCE7" : C.accent,
-              color: emailSent ? "#15803D" : "#FFFFFF",
-              border: `1px solid ${emailSent ? "#86EFAC" : C.accent}`,
+              background: actionNotice === "gmail" ? "#DCFCE7" : C.accent,
+              color: actionNotice === "gmail" ? "#15803D" : "#FFFFFF",
+              border: `1px solid ${actionNotice === "gmail" ? "#86EFAC" : C.accent}`,
               borderRadius: 8,
               fontSize: 12,
               fontWeight: 700,
@@ -852,8 +858,31 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
               transition: "all 0.15s ease"
             }}
           >
-            {emailSent ? <Check size={14} color="#15803D" /> : <Mail size={14} />}
-            {emailSent ? "Email Opened & Link Copied!" : "Send Email Link"}
+            {actionNotice === "gmail" ? <Check size={14} color="#15803D" /> : <Mail size={14} />}
+            {actionNotice === "gmail" ? "Web Gmail Opened!" : "🌐 Web Gmail"}
+          </button>
+
+          <button
+            onClick={handleCopyLink}
+            title="Copies candidate interview link to clipboard for WhatsApp/Teams/Email"
+            style={{
+              padding: "7px 12px",
+              background: actionNotice === "copy" ? "#DCFCE7" : C.paper,
+              color: actionNotice === "copy" ? "#15803D" : C.ink,
+              border: `1px solid ${actionNotice === "copy" ? "#86EFAC" : C.line}`,
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontFamily: BODY,
+              transition: "all 0.15s ease"
+            }}
+          >
+            {actionNotice === "copy" ? <Check size={14} color="#15803D" /> : <Copy size={14} />}
+            {actionNotice === "copy" ? "Link Copied!" : "📋 Copy Link"}
           </button>
 
           <button
@@ -895,28 +924,52 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
             <span>✉️ Extracted Candidate Email: <strong style={{ color: C.accent }}>{candidateEmail}</strong></span>
           </div>
         </div>
-        <button
-          onClick={handleSendInterviewEmail}
-          title="Launches pre-filled email draft to candidate and copies interview link"
-          style={{
-            padding: "8px 14px",
-            background: emailSent ? "#DCFCE7" : C.accent,
-            color: emailSent ? "#15803D" : "#FFFFFF",
-            border: `1px solid ${emailSent ? "#86EFAC" : C.accent}`,
-            borderRadius: 8,
-            fontSize: 12.5,
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontFamily: BODY,
-            boxShadow: "0 2px 5px rgba(0,0,0,0.12)"
-          }}
-        >
-          {emailSent ? <Check size={15} color="#15803D" /> : <Mail size={15} />}
-          {emailSent ? "Email Draft Opened & Link Copied!" : "Send AI Interview Link via Email"}
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={handleOpenWebGmail}
+            title="Launches Google Web Gmail in browser with pre-filled candidate email, subject and interview link"
+            style={{
+              padding: "8px 14px",
+              background: actionNotice === "gmail" ? "#DCFCE7" : C.accent,
+              color: actionNotice === "gmail" ? "#15803D" : "#FFFFFF",
+              border: `1px solid ${actionNotice === "gmail" ? "#86EFAC" : C.accent}`,
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontFamily: BODY,
+              boxShadow: "0 2px 5px rgba(0,0,0,0.12)"
+            }}
+          >
+            {actionNotice === "gmail" ? <Check size={15} color="#15803D" /> : <Mail size={15} />}
+            {actionNotice === "gmail" ? "Web Gmail Opened!" : "🌐 Open Web Gmail"}
+          </button>
+
+          <button
+            onClick={handleCopyLink}
+            title="Copies candidate interview link to clipboard"
+            style={{
+              padding: "8px 14px",
+              background: actionNotice === "copy" ? "#DCFCE7" : C.paper,
+              color: actionNotice === "copy" ? "#15803D" : C.ink,
+              border: `1px solid ${actionNotice === "copy" ? "#86EFAC" : C.line}`,
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontFamily: BODY
+            }}
+          >
+            {actionNotice === "copy" ? <Check size={15} color="#15803D" /> : <Copy size={15} />}
+            {actionNotice === "copy" ? "Link Copied!" : "📋 Copy Link"}
+          </button>
+        </div>
       </div>
 
       {open && (
