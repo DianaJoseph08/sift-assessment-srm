@@ -12,6 +12,8 @@ import {
   ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
+import GeminiInterview from "./GeminiInterview.jsx";
+
 
 /* ============================== THEME SYSTEM ============================== */
 const THEMES = {
@@ -1937,35 +1939,13 @@ export default function App() {
 
   if (standaloneInterviewMode && activeInterviewCandidate) {
     return (
-      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", fontFamily: BODY }}>
-        <header style={{ padding: "16px 28px", background: C.sidebar, color: "#FFFFFF", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.line}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: C.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <MessageSquare size={20} color="#FFFFFF" />
-            </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: DISPLAY }}>SRM AI Technical Assessment Platform</div>
-              <div style={{ fontSize: 12, opacity: 0.85 }}>Interactive Candidate Assessment Portal</div>
-            </div>
-          </div>
-          <button
-            onClick={() => { window.location.href = "/"; }}
-            style={{ padding: "8px 14px", background: "rgba(255,255,255,0.15)", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: BODY }}
-          >
-            Agency Portal →
-          </button>
-        </header>
-
-        <div style={{ flex: 1, padding: "28px 20px", maxWidth: 760, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-          <InterviewModal
-            candidate={activeInterviewCandidate}
-            job={activeJob || { title: "Position", companyName: "Client Company" }}
-            onClose={() => { window.location.href = "/"; }}
-            isStandalone={true}
-            C={C}
-          />
-        </div>
-      </div>
+      <GeminiInterview
+        candidate={activeInterviewCandidate}
+        job={activeJob || { title: "Position", companyName: "Client Company" }}
+        onComplete={(report) => {
+          console.log("Interview completed:", report);
+        }}
+      />
     );
   }
 
