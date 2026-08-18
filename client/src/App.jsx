@@ -1930,38 +1930,57 @@ export default function App() {
                   <div>
                     {/* Job Selection Tabs */}
                     <div style={{ display: "flex", gap: 10, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-                      {displayedJobs.map(j => (
-                        <div
-                          key={j.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            padding: "6px 12px",
-                            borderRadius: 8,
-                            border: `1px solid ${activeJobId === j.id ? C.accent : C.line}`,
-                            background: activeJobId === j.id ? C.accentSoft : C.paper,
-                            color: activeJobId === j.id ? C.accent : C.ink,
-                            fontWeight: 700,
-                            fontSize: 13,
-                            cursor: "pointer",
-                            fontFamily: BODY,
-                          }}
-                          onClick={() => { setActiveJobId(j.id); setStep(1); }}
-                        >
-                          <span>🏢 {j.companyName} — {j.title || "Untitled Opening"}</span>
-                          <Trash2
-                            size={14}
-                            color={C.faint}
-                            style={{ cursor: "pointer", opacity: 0.7 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteJob(j.id);
+                      {displayedJobs.map(j => {
+                        const screenedCands = (j.candidates || []).filter(c => c.status === "done" && c.result);
+                        const hasScreened = screenedCands.length > 0 || j.screening === "done";
+                        return (
+                          <div
+                            key={j.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "7px 14px",
+                              borderRadius: 8,
+                              border: `1px solid ${activeJobId === j.id ? C.accent : C.line}`,
+                              background: activeJobId === j.id ? C.accentSoft : C.paper,
+                              color: activeJobId === j.id ? C.accent : C.ink,
+                              fontWeight: 700,
+                              fontSize: 13,
+                              cursor: "pointer",
+                              fontFamily: BODY,
+                              transition: "all 0.15s ease"
                             }}
-                            title="Delete this job opening"
-                          />
-                        </div>
-                      ))}
+                            onClick={() => {
+                              setActiveJobId(j.id);
+                              if (hasScreened) {
+                                setStep(3);
+                                setMaxReached(3);
+                              } else {
+                                setStep(1);
+                                setMaxReached(1);
+                              }
+                            }}
+                          >
+                            <span>🏢 {j.companyName ? `${j.companyName} — ` : ""}{j.title || "Untitled Opening"}</span>
+                            {hasScreened && (
+                              <span style={{ fontSize: 10.5, fontWeight: 800, color: "#16A34A", background: "#DCFCE7", padding: "2px 6px", borderRadius: 4 }}>
+                                ✓ {screenedCands.length} Screened
+                              </span>
+                            )}
+                            <Trash2
+                              size={14}
+                              color={C.faint}
+                              style={{ cursor: "pointer", opacity: 0.7, marginLeft: 4 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteJob(j.id);
+                              }}
+                              title="Delete this job opening"
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {activeJob && (
