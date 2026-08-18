@@ -143,27 +143,35 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
             if (lm && lm.length > 473) {
               const gazeOffset = Math.abs((lm[468].x + lm[473].x) / 2 - lm[1].x);
               
+              // Detect if user is on a mobile device
+              const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+              
               // Detect looking down (head pitch) by comparing upper and lower face proportions
               const upperFace = Math.abs(lm[1].y - lm[10].y);
               const lowerFace = Math.abs(lm[152].y - lm[1].y);
               const pitchRatio = lowerFace / (upperFace || 1);
               
-              let isLookingAway = gazeOffset > 0.08 || pitchRatio < 0.85;
+              // Only enforce strict looking-down rules if on desktop
+              let isLookingAway = gazeOffset > 0.08;
               
-              // Also check blendshapes if available
-              const blendshapes = results.faceBlendshapes?.[0]?.categories;
-              if (blendshapes) {
-                const lookDownScore = Math.max(
-                  blendshapes.find(c => c.categoryName === "eyeLookDownLeft")?.score || 0,
-                  blendshapes.find(c => c.categoryName === "eyeLookDownRight")?.score || 0
-                );
-                // Lower threshold to catch slight downward glances
-                if (lookDownScore > 0.35) isLookingAway = true;
+              if (!isMobile) {
+                if (pitchRatio < 0.85) isLookingAway = true;
+                
+                // Also check blendshapes if available
+                const blendshapes = results.faceBlendshapes?.[0]?.categories;
+                if (blendshapes) {
+                  const lookDownScore = Math.max(
+                    blendshapes.find(c => c.categoryName === "eyeLookDownLeft")?.score || 0,
+                    blendshapes.find(c => c.categoryName === "eyeLookDownRight")?.score || 0
+                  );
+                  // Lower threshold to catch slight downward glances on desktop
+                  if (lookDownScore > 0.35) isLookingAway = true;
+                }
               }
 
               if (isLookingAway) {
-                // Reduced from 4 to 2 frames (approx 1.6s) to catch quick glances at phones
-                if (++awayFrames >= 2) { logMalpractice("Eyes looking away or down at device", "lookingAway"); awayFrames = 0; }
+                // Reduced from 4 to 2 frames (approx 1.6s) to catch quick glances
+                if (++awayFrames >= 2) { logMalpractice(isMobile ? "Eyes looking away from screen" : "Eyes looking away or down at device", "lookingAway"); awayFrames = 0; }
               } else { awayFrames = Math.max(0, awayFrames - 1); }
             }
           }
