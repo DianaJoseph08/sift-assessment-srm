@@ -1686,9 +1686,11 @@ export default function App() {
     setTimeout(() => setSavedJobNotice(false), 2500);
   };
 
+  const [standaloneInterviewMode, setStandaloneInterviewMode] = useState(false);
+
   const C = THEMES[themeKey] || THEMES.light;
 
-  // Initial Data Fetching
+  // Initial Data Fetching & URL Interview Parameter Detection
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -1698,11 +1700,12 @@ export default function App() {
           fetch("/api/logs")
         ]);
 
+        let loadedJobs = [];
         if (jobsRes.ok) {
-          const jData = await jobsRes.json();
-          if (Array.isArray(jData) && jData.length > 0) {
-            setJobs(jData);
-            if (!activeJobId) setActiveJobId(jData[0].id);
+          loadedJobs = await jobsRes.json();
+          if (Array.isArray(loadedJobs) && loadedJobs.length > 0) {
+            setJobs(loadedJobs);
+            if (!activeJobId) setActiveJobId(loadedJobs[0].id);
           }
         }
 
@@ -1714,6 +1717,38 @@ export default function App() {
         if (logsRes.ok) {
           const lData = await logsRes.json();
           if (Array.isArray(lData)) setLogs(lData);
+        }
+
+        // Detect if opened via candidate interview URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const candIdParam = urlParams.get("cand") || urlParams.get("candidate");
+        if (candIdParam && loadedJobs.length > 0) {
+          let foundCand = null;
+          let foundJob = null;
+          for (const j of loadedJobs) {
+            const match = (j.candidates || []).find(c => c.id === candIdParam);
+            if (match) {
+              foundCand = match;
+              foundJob = j;
+              break;
+            }
+          }
+
+          if (foundCand) {
+            setActiveInterviewCandidate(foundCand);
+            if (foundJob) setActiveJobId(foundJob.id);
+            setStandaloneInterviewMode(true);
+          }
+        } else if (window.location.pathname.includes("/interview") && loadedJobs.length > 0) {
+          for (const j of loadedJobs) {
+            const match = (j.candidates || []).find(c => c.result);
+            if (match) {
+              setActiveInterviewCandidate(match);
+              setActiveJobId(j.id);
+              setStandaloneInterviewMode(true);
+              break;
+            }
+          }
         }
       } catch (e) {
         console.error("Failed to load initial backend state:", e);
@@ -1899,6 +1934,40 @@ export default function App() {
       }
     }
   }, [activeTab, displayedJobs, activeJobId]);
+
+  if (standaloneInterviewMode && activeInterviewCandidate) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", fontFamily: BODY }}>
+        <header style={{ padding: "16px 28px", background: C.sidebar, color: "#FFFFFF", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: C.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <MessageSquare size={20} color="#FFFFFF" />
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: DISPLAY }}>SRM AI Technical Assessment Platform</div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>Interactive Candidate Assessment Portal</div>
+            </div>
+          </div>
+          <button
+            onClick={() => { window.location.href = "/"; }}
+            style={{ padding: "8px 14px", background: "rgba(255,255,255,0.15)", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: BODY }}
+          >
+            Agency Portal →
+          </button>
+        </header>
+
+        <div style={{ flex: 1, padding: "28px 20px", maxWidth: 760, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+          <InterviewModal
+            candidate={activeInterviewCandidate}
+            job={activeJob || { title: "Position", companyName: "Client Company" }}
+            onClose={() => { window.location.href = "/"; }}
+            isStandalone={true}
+            C={C}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg, color: C.ink, fontFamily: BODY }}>
