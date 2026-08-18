@@ -8,7 +8,7 @@ import {
   Upload, FileText, Briefcase, Sparkles, ChevronDown, ChevronRight, X, Check,
   Plus, Download, RotateCcw, ArrowRight, ArrowLeft, AlertCircle, Users, Star,
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
-  Mail, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
+  Mail, Send, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
   ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
