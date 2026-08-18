@@ -142,8 +142,26 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
             const lm = results.faceLandmarks[0];
             if (lm && lm.length > 473) {
               const gazeOffset = Math.abs((lm[468].x + lm[473].x) / 2 - lm[1].x);
-              if (gazeOffset > 0.08) {
-                if (++awayFrames >= 4) { logMalpractice("Eyes looking away from screen", "lookingAway"); awayFrames = 0; }
+              
+              // Detect looking down (head pitch) by comparing upper and lower face proportions
+              const upperFace = Math.abs(lm[1].y - lm[10].y);
+              const lowerFace = Math.abs(lm[152].y - lm[1].y);
+              const pitchRatio = lowerFace / (upperFace || 1);
+              
+              let isLookingAway = gazeOffset > 0.08 || pitchRatio < 0.65;
+              
+              // Also check blendshapes if available
+              const blendshapes = results.faceBlendshapes?.[0]?.categories;
+              if (blendshapes) {
+                const lookDownScore = Math.max(
+                  blendshapes.find(c => c.categoryName === "eyeLookDownLeft")?.score || 0,
+                  blendshapes.find(c => c.categoryName === "eyeLookDownRight")?.score || 0
+                );
+                if (lookDownScore > 0.55) isLookingAway = true;
+              }
+
+              if (isLookingAway) {
+                if (++awayFrames >= 4) { logMalpractice("Eyes looking away or down at device", "lookingAway"); awayFrames = 0; }
               } else { awayFrames = Math.max(0, awayFrames - 1); }
             }
           }
