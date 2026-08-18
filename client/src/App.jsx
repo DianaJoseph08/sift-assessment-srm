@@ -491,19 +491,45 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults
   
   const providerLabel = llmProvider === "claude" ? "Claude API" : llmProvider === "gemini" ? "Gemini API" : llmProvider === "groq" ? "Groq API" : "Local LLM";
 
+  const [duplicateModal, setDuplicateModal] = useState(null);
+
   const addFiles = async (files) => {
     setErr("");
     for (const f of Array.from(files)) {
+      const existing = candidates.find(c => (c.filename && c.filename.toLowerCase() === f.name.toLowerCase()) || (c.label && c.label.toLowerCase() === f.name.toLowerCase()));
       try {
         const base64 = await fileToBase64(f);
-        setCandidates((cs) => [...cs, {
-          id: uid(), kind: "file", filename: f.name, base64,
-          fileSize: f.size, label: f.name, status: "idle", result: null, error: null,
-        }]);
+        if (existing) {
+          setDuplicateModal({
+            file: f,
+            base64,
+            existingCand: existing
+          });
+        } else {
+          setCandidates((cs) => [...cs, {
+            id: uid(), kind: "file", filename: f.name, base64,
+            fileSize: f.size, label: f.name, status: "idle", result: null, error: null,
+          }]);
+        }
       } catch {
         setErr(`Could not read "${f.name}".`);
       }
     }
+  };
+
+  const handleReplaceDuplicate = () => {
+    if (!duplicateModal) return;
+    const { file, base64, existingCand } = duplicateModal;
+    setCandidates((cs) => cs.map((c) => (
+      c.id === existingCand.id
+        ? { ...c, base64, fileSize: file.size, filename: file.name, label: file.name, status: "idle", result: null, error: null }
+        : c
+    )));
+    setDuplicateModal(null);
+  };
+
+  const handleKeepOlderDuplicate = () => {
+    setDuplicateModal(null);
   };
   const addPaste = () => {
     if (!paste.trim()) return;
@@ -635,8 +661,35 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults
           >
             <Sparkles size={16} /> Screen {candidates.length} Candidate Resume{candidates.length !== 1 ? "s" : ""} with AI <ArrowRight size={16} />
           </button>
+      {/* Duplicate Resume Warning Modal */}
+      {duplicateModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+          <div style={{ background: C.paper, borderRadius: 16, width: 480, maxWidth: "95%", padding: 24, border: `1px solid ${C.cardBorder}`, boxShadow: "0 10px 25px rgba(0,0,0,0.3)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 10, background: "#FEF3C7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <FileWarning size={22} color="#D97706" />
+              </div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>Duplicate Resume Detected</div>
+                <div style={{ fontSize: 12.5, color: C.sub }}>"{duplicateModal.file.name}" is already in this candidate pool.</div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, background: C.bg, borderRadius: 10, padding: "12px 14px", margin: "14px 0", border: `1px solid ${C.line}` }}>
+              An older version of this resume file already exists in the candidate pool for this opening. Would you like to keep the older file or replace it with your newly uploaded file?
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+              <button onClick={handleKeepOlderDuplicate} style={btn("ghost", C)}>
+                Keep Older File
+              </button>
+              <button onClick={handleReplaceDuplicate} style={{ ...btn("primary", C), background: "#D97706", borderColor: "#D97706" }}>
+                Replace with New File
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
