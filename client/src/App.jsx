@@ -834,11 +834,29 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
         </div>
         
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ textAlign: "right", marginRight: 4 }}>
-            <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: m.dot, lineHeight: 1 }}>
-              {r.overallScore}%
+          <div style={{ textAlign: "right", marginRight: 4, display: "flex", gap: 16 }}>
+            <div style={{ paddingRight: 16, borderRight: `1px solid ${C.line}` }}>
+              <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: m.dot, lineHeight: 1 }}>
+                {r.overallScore}%
+              </div>
+              <div style={{ fontSize: 9, color: C.faint, fontWeight: 700, letterSpacing: ".04em" }}>RESUME FIT</div>
             </div>
-            <div style={{ fontSize: 9, color: C.faint, fontWeight: 700, letterSpacing: ".04em" }}>RESUME FIT</div>
+            
+            {r.interview?.score !== undefined ? (
+              <div style={{ paddingRight: 8 }}>
+                <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: r.interview.score >= 75 ? "#16A34A" : (r.interview.score >= 50 ? "#EAB308" : "#DC2626"), lineHeight: 1 }}>
+                  {r.interview.score}%
+                </div>
+                <div style={{ fontSize: 9, color: C.faint, fontWeight: 700, letterSpacing: ".04em" }}>AI INTERVIEW</div>
+              </div>
+            ) : (
+              <div style={{ paddingRight: 8, opacity: 0.4 }}>
+                <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: C.faint, lineHeight: 1 }}>
+                  --
+                </div>
+                <div style={{ fontSize: 9, color: C.faint, fontWeight: 700, letterSpacing: ".04em" }}>NO INTERVIEW</div>
+              </div>
+            )}
           </div>
 
           <button

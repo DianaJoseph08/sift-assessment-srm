@@ -63,6 +63,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
   const faceIntervalRef = useRef(null);
   const chatRef = useRef(null);
   const submitFnRef = useRef(null);
+  const lastClickRef = useRef(0); // tracks last click time to suppress false cursor-out events
 
   // ── Malpractice logging ──────────────────────────────────────────────────
   const logMalpractice = useCallback((type, key) => {
@@ -79,9 +80,12 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
     const onVisChange = () => { if (document.hidden) logMalpractice("Tab switched / window minimized", "tabSwitches"); };
     const onBlur = () => logMalpractice("Window focus lost", "tabSwitches");
     const onMouseLeave = (e) => {
+      // Ignore for 600ms after any click — prevents false positive on Submit button
+      if (Date.now() - lastClickRef.current < 600) return;
       if (e.clientY <= 0 || e.clientX <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)
         logMalpractice("Cursor left browser window", "cursorLeaves");
     };
+    const onMouseDown = () => { lastClickRef.current = Date.now(); };
     const onPaste = (e) => { e.preventDefault(); logMalpractice("Paste attempt blocked", "copyPastes"); };
     const onCopy = (e) => { e.preventDefault(); logMalpractice("Copy attempt blocked", "copyPastes"); };
     const onCtxMenu = (e) => { e.preventDefault(); logMalpractice("Right-click menu blocked", "copyPastes"); };
@@ -96,6 +100,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
     document.addEventListener("visibilitychange", onVisChange);
     window.addEventListener("blur", onBlur);
     document.addEventListener("mouseleave", onMouseLeave);
+    document.addEventListener("mousedown", onMouseDown);
     document.addEventListener("paste", onPaste);
     document.addEventListener("copy", onCopy);
     document.addEventListener("contextmenu", onCtxMenu);
@@ -104,6 +109,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
       document.removeEventListener("visibilitychange", onVisChange);
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("mouseleave", onMouseLeave);
+      document.removeEventListener("mousedown", onMouseDown);
       document.removeEventListener("paste", onPaste);
       document.removeEventListener("copy", onCopy);
       document.removeEventListener("contextmenu", onCtxMenu);
@@ -263,10 +269,27 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
               fetchGeminiEvaluation(updated).then(report => {
                 setFinalReport(report);
                 setPhase("completed");
+                
+                // Log proctoring stats
                 fetch("/api/save-proctoring", {
                   method: "POST", headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ candidateId: candidate?.id, malpractice, malpracticeLog, transcript: updated, report })
                 }).catch(() => {});
+                
+                // SAVE THE EVALUATION TO THE DATABASE
+                if (candidate?.id) {
+                  fetch("/api/candidate-interview-submit", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      candidateId: candidate.id,
+                      score: report.technicalScore,
+                      summary: report.summary,
+                      transcript: updated,
+                      proctoring: malpractice
+                    })
+                  }).catch(() => {});
+                }
+
                 streamRef.current?.getTracks().forEach(t => t.stop());
                 clearInterval(faceIntervalRef.current);
                 window.speechSynthesis.cancel();
