@@ -859,7 +859,7 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
             }}
           >
             {actionNotice === "gmail" ? <Check size={14} color="#15803D" /> : <Mail size={14} />}
-            {actionNotice === "gmail" ? "Web Gmail Opened!" : "🌐 Web Gmail"}
+            {actionNotice === "gmail" ? "Web Gmail Opened!" : "🌐 Send via Web Gmail"}
           </button>
 
           <button
