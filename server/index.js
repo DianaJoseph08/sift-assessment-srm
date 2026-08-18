@@ -107,6 +107,8 @@ app.post("/api/analyze", async (req, res) => {
     addLog("ERROR", `Screening failed: ${err.message}`, job?.companyName || "", `Job: ${job?.title || "Unknown"}`);
     res.status(500).json({ error: err.message || "Analysis failed" });
   }
+});
+
 // Send AI Interview Invitation Link via Email Endpoint
 app.post("/api/send-interview-email", (req, res) => {
   try {
