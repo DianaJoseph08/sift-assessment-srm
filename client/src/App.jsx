@@ -750,25 +750,34 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
 
   const handleSendInterviewEmail = async (e) => {
     e.stopPropagation();
+    const targetEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "";
+    const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
+    
     try {
-      const email = r?.email || "candidate@srm.edu.in";
-      const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
+      await navigator.clipboard.writeText(interviewLink);
+    } catch (err) {}
+
+    if (targetEmail) {
+      const subject = encodeURIComponent(`AI Technical Interview Invitation — ${jobTitle}`);
+      const body = encodeURIComponent(`Dear ${r?.candidateName || 'Candidate'},\n\nYou have been shortlisted for the position of ${jobTitle}.\n\nPlease click the link below to complete your automated AI Technical Interview:\n\n👉 Interview Link: ${interviewLink}\n\nBest regards,\nRecruitment Team`);
+      window.open(`mailto:${targetEmail}?subject=${subject}&body=${body}`, "_self");
+    }
+
+    try {
       await fetch("/api/send-interview-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           candidateName: r?.candidateName || c.label,
-          email,
-          phone: r?.phone || "+91 98401 23456",
+          email: targetEmail || "N/A",
           jobTitle,
           interviewLink
         })
       });
-      setEmailSent(true);
-      setTimeout(() => setEmailSent(false), 3000);
-    } catch (err) {
-      console.error("Failed to send email:", err);
-    }
+    } catch (err) {}
+
+    setEmailSent(true);
+    setTimeout(() => setEmailSent(false), 3500);
   };
 
   if (c.status === "error" || !r) {
@@ -792,8 +801,7 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
     { dim: "Domain", v: r.subScores?.domain ?? 0 },
   ];
 
-  const candidateEmail = r?.email && r.email !== "N/A" ? r.email : (r?.candidateName ? r.candidateName.toLowerCase().replace(/[^a-z]/g, "") + "@srm.edu.in" : "candidate@srm.edu.in");
-  const candidatePhone = r?.phone ? r.phone : "+91 98401 23456";
+  const candidateEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "No email listed in resume";
 
   return (
     <div style={{ background: C.panel, border: `1px solid ${shortlisted ? m.dot : C.line}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
@@ -814,8 +822,6 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
             <span>{r.currentTitle} · {r.yearsExperience} yrs exp</span>
             <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
             <span style={{ color: C.ink, fontWeight: 600 }}>✉️ {candidateEmail}</span>
-            <span style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />
-            <span style={{ color: C.ink, fontWeight: 600 }}>📞 {candidatePhone}</span>
           </div>
         </div>
         
@@ -829,6 +835,7 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
 
           <button
             onClick={handleSendInterviewEmail}
+            title="Opens your email client with pre-filled interview link and copies link to clipboard"
             style={{
               padding: "7px 12px",
               background: emailSent ? "#DCFCE7" : C.accent,
@@ -845,8 +852,8 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
               transition: "all 0.15s ease"
             }}
           >
-            {emailSent ? <Check size={14} color="#15803D" /> : <Send size={14} />}
-            {emailSent ? "Sent!" : "Send Email Link"}
+            {emailSent ? <Check size={14} color="#15803D" /> : <Mail size={14} />}
+            {emailSent ? "Email Opened & Link Copied!" : "Send Email Link"}
           </button>
 
           <button
@@ -885,12 +892,12 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
             Extracted Candidate Contact Details &amp; Interview Access
           </div>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginTop: 4, display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <span>✉️ Email: <strong style={{ color: C.accent }}>{candidateEmail}</strong></span>
-            <span>📞 Phone: <strong style={{ color: C.accent }}>{candidatePhone}</strong></span>
+            <span>✉️ Extracted Candidate Email: <strong style={{ color: C.accent }}>{candidateEmail}</strong></span>
           </div>
         </div>
         <button
           onClick={handleSendInterviewEmail}
+          title="Launches pre-filled email draft to candidate and copies interview link"
           style={{
             padding: "8px 14px",
             background: emailSent ? "#DCFCE7" : C.accent,
@@ -907,8 +914,8 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
             boxShadow: "0 2px 5px rgba(0,0,0,0.12)"
           }}
         >
-          {emailSent ? <Check size={15} /> : <Send size={15} />}
-          {emailSent ? "Invitation Link Sent to Email!" : "Send AI Interview Link via Email"}
+          {emailSent ? <Check size={15} color="#15803D" /> : <Mail size={15} />}
+          {emailSent ? "Email Draft Opened & Link Copied!" : "Send AI Interview Link via Email"}
         </button>
       </div>
 

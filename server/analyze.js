@@ -379,8 +379,13 @@ function evaluateHeuristically(job, resumeText, fileName) {
   else if (overallScore >= 50) recommendation = "Possible Match";
   else recommendation = "Weak Match";
 
-  const phoneMatch = rawTextClean.match(/(?:\+91[\s-]?)?[6-9]\d{9}|\(\d{3}\)\s*\d{3}[-\s]?\d{4}|\d{3}[-\s]?\d{3}[-\s]?\d{4}/);
-  const phone = phoneMatch ? phoneMatch[0] : "+91 98401 23456";
+  // Strict Email Extraction from Resume Text
+  const emailMatch = rawTextClean.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+  let email = "No email listed";
+  if (emailMatch && emailMatch.length > 0) {
+    const validEmails = emailMatch.filter(e => !e.includes("example.com") && !e.includes("candidate.edu"));
+    email = validEmails.length > 0 ? validEmails[0].toLowerCase() : emailMatch[0].toLowerCase();
+  }
 
   return {
     requiredDiscipline: targetDiscipline,
@@ -389,8 +394,7 @@ function evaluateHeuristically(job, resumeText, fileName) {
       ? `Candidate degree in ${candidateDiscipline} directly aligns with target role criteria.` 
       : `Degree discipline mismatch: Candidate holds ${degreeName} in ${candidateDiscipline}, whereas position requires ${targetDiscipline}.`,
     candidateName,
-    email: candidateName.toLowerCase().replace(/[^a-z]/g, "") + "@srm.edu.in",
-    phone,
+    email,
     currentTitle: isAcademic ? (degreeMatch ? "Assistant Professor" : `Research Associate (${candidateDiscipline})`) : "Design Engineer",
     yearsExperience: expYears,
     education: degreeName,
