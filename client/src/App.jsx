@@ -584,7 +584,7 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 11.5, color: C.faint }}>
                         {c.kind === "file"
-                          ? (hasScore ? `${c.filename} (${(c.fileSize / 1024).toFixed(1)} KB)` : `${(c.fileSize / 1024).toFixed(1)} KB`)
+                          ? (c.filename ? `${c.filename} ${c.fileSize ? `(${(c.fileSize / 1024).toFixed(1)} KB)` : ""}` : "Uploaded File")
                           : `${(c.text || "").length} chars`}
                       </span>
                       {hasScore && (
@@ -1880,11 +1880,9 @@ export default function App() {
                           />
                         )}
 
-                        {step === 3 && activeJob.screening === "running" && (
+                        {step === 3 && activeJob.screening === "running" ? (
                           <Analyzing candidates={activeJob.candidates || []} C={C} />
-                        )}
-
-                        {step === 3 && activeJob.screening === "done" && (
+                        ) : step === 3 && (
                           <Results
                             candidates={activeJob.candidates || []}
                             job={activeJob}
