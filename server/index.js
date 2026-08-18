@@ -149,21 +149,23 @@ app.post("/api/gemini-interview/questions", async (req, res) => {
     const { job, candidate } = req.body || {};
     const apiKey = process.env.GEMINI_API_KEY;
 
-    const prompt = `You are a technical interviewer at a top university hiring for the role of "${job?.title || "the applied position"}".
-Generate exactly 5 tailored technical interview questions for this candidate.
+    const prompt = `You are a strict technical interviewer hiring for the role of "${job?.title || "the applied position"}".
+Your goal is to VERIFY if the candidate actually possesses the skills they claimed on their resume, and test if they are truly eligible for this job.
+Generate exactly 5 highly specific, tailored technical interview questions for this candidate.
+
 Candidate Name: ${candidate?.name || "Candidate"}
-Education: ${candidate?.education || "Not specified"}
-Key Skills: ${(candidate?.skills || []).join(", ") || "Not specified"}
-Summary: ${candidate?.summary || ""}
+Candidate Claimed Skills: ${(candidate?.skills || []).join(", ") || "Not specified"}
+Candidate Summary: ${candidate?.summary || ""}
 Job Must-Have Skills: ${(job?.mustHave || []).join(", ") || "Not specified"}
 
-Rules:
-- Q1: An ice-breaker/introduction about their background and relevance to this role
-- Q2-Q4: Deep technical questions testing the must-have skills and experience
-- Q5: A situational or behavioural question about their work ethic or teamwork
+Rules for the 5 questions:
+- DO NOT ask generic questions (e.g. avoid "Tell me about yourself" or "Describe a challenging project").
+- Every question MUST be a direct, deep technical test of a specific skill claimed by the candidate that is relevant to the Job Must-Have Skills.
+- Ask them to explain how a specific technology works under the hood, or how they would solve a complex technical problem using their claimed skills.
+- The goal is to catch candidates who might be exaggerating on their resume. Make the questions challenging enough that only someone with real, practical experience can answer them.
 
 Return ONLY a valid JSON array of 5 strings, no markdown, no commentary.
-Example: ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"]`;
+Example: ["How exactly does the event loop handle promises in Node.js compared to setTimeout?", "Describe the architecture you would use to scale a MongoDB database to handle 10k writes per second."]`;
 
     if (apiKey) {
       try {

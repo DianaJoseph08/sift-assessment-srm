@@ -2272,9 +2272,9 @@ function InterviewModal({ candidate, job, onClose, C }) {
   const questions = r.interviewQuestions && r.interviewQuestions.length > 0
     ? r.interviewQuestions
     : [
-        "Can you walk us through your core technical experience and key achievements?",
-        "How do you approach complex problem-solving and process optimization in your work?",
-        "Why are you interested in joining this target client role?"
+        `Looking at your resume, you listed several technical skills. Can you explain a complex technical problem you solved using one of those skills and how it works under the hood?`,
+        `The role of ${job?.title || 'this position'} requires specific must-have skills. Can you give a highly detailed, technical example of how you've applied these in a production environment?`,
+        `What is the most challenging technical system you have designed or optimized using your claimed skills, and what were the measurable outcomes?`
       ];
 
   const [currentQIndex, setCurrentQIndex] = useState(0);

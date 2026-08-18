@@ -64,7 +64,7 @@ function schemaBlock(job, extractedEmails = []) {
  "strengths": string[] (2-4 items),
  "gaps": string[] (1-4 items; list the degree mismatch explicitly if it is an ACADEMIC role),
  "missingMustHaves": string[] (missing must-have skills; [] if none),
- "interviewQuestions": string[] (exactly 3, tailored),
+ "interviewQuestions": string[] (exactly 3 highly specific, deep technical questions that test whether the candidate ACTUALLY possesses the skills they claim on their resume that are required for this job. Do not ask generic behavioral questions like "walk us through your experience". Ask targeted, skill-verification questions (e.g. "How would you optimize an index on a PostgreSQL table with 10M rows?" instead of "Do you know SQL?")),
  "interviewFocus": string
 }
 Ensure the overallScore and subScores strictly respect the discipline matching criteria evaluated above. Be an honest, tough recruiter.`;
