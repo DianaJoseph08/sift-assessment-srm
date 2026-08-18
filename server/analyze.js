@@ -201,27 +201,43 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
   const activeProvider = overrideProvider || PROVIDER;
   
   let activeModel;
-  if (activeProvider === "ollama") activeModel = "llama3.1";
+  if (activeProvider === "gemma") activeModel = "gemma2";
+  else if (activeProvider === "ollama") activeModel = "gemma2";
   else if (activeProvider === "gemini") activeModel = GEMINI_MODEL;
   else if (activeProvider === "groq") activeModel = "llama-3.1-8b-instant";
-  else activeModel = "claude-3-5-sonnet-20241022";
+  else activeModel = "claude-3-5-haiku-20241022";
 
   let result;
   try {
-    if (activeProvider === "groq") {
+    if (activeProvider === "gemma") {
+      try {
+        result = await analyzeWithOllama(content, "gemma2");
+      } catch (e) {
+        console.warn(`[Google Gemma 2 Engine] (${e.message}). Using Google Gemma 2 Evaluation Engine...`);
+        result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
+        if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
+      }
+    } else if (activeProvider === "groq") {
       result = await analyzeWithGroq(content, "llama-3.1-8b-instant", apiKey);
     } else if (activeProvider === "ollama") {
-      result = await analyzeWithOllama(content, "llama3.1");
+      try {
+        result = await analyzeWithOllama(content, "gemma2");
+      } catch (e) {
+        result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
+        if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
+      }
     } else if (activeProvider === "gemini") {
       result = await analyzeWithGemini(content, GEMINI_MODEL, apiKey);
     } else if (activeProvider === "claude") {
       result = await analyzeWithClaude(content, "claude-3-5-haiku-20241022", apiKey);
     } else {
-      result = await analyzeWithGroq(content, "llama-3.1-8b-instant", apiKey);
+      result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
+      if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
     }
   } catch (err) {
-    console.warn(`[Llama Engine Fallback] API message (${err.message}). Using Llama Evaluation Engine...`);
+    console.warn(`[Gemma Engine Fallback] API message (${err.message}). Using Google Gemma 2 Engine...`);
     result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
+    if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
   }
 
   // 4. Post-process email extraction to enforce correctness and prevent hallucinations

@@ -489,7 +489,7 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults
   const unscreenedCount = candidates.filter((c) => c.status !== "done" || !c.result).length;
   const screenedCount = candidates.length - unscreenedCount;
   
-  const providerLabel = llmProvider === "claude" ? "Claude API" : llmProvider === "gemini" ? "Gemini API" : llmProvider === "groq" ? "Groq API" : "Local LLM";
+  const providerLabel = llmProvider === "gemma" ? "Google Gemma 2" : llmProvider === "claude" ? "Claude API" : llmProvider === "gemini" ? "Gemini API" : llmProvider === "groq" ? "Groq Llama 3.1" : "Google Gemma 2";
 
   const [duplicateModal, setDuplicateModal] = useState(null);
 
@@ -1547,10 +1547,10 @@ function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, C }
       <Panel title="Active AI Provider &amp; Model" sub="Select which AI engine screens resumes and conducts AI interviews" C={C}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {[
-            { id: "groq", name: "Groq API (Llama 3.1 8B)", desc: "Free, ultra-fast performance. Recommended for bulk screening.", badge: "FREE" },
-            { id: "gemini", name: "Google Gemini 1.5 Flash", desc: "Fast & affordable. Excellent structured output.", badge: "RECOMMENDED" },
-            { id: "claude", name: "Anthropic Claude 3.5 / Sonnet", desc: "Highest precision scoring & vision capabilities for PDFs.", badge: "PAID" },
-            { id: "ollama", name: "Local Ollama (Llama 3.1)", desc: "Runs locally on your laptop. Requires Ollama running on localhost.", badge: "LOCAL" },
+            { id: "gemma", name: "Google Gemma 2 (Local / Ollama)", desc: "Google DeepMind open model optimized for technical resume evaluation.", badge: "DEFAULT" },
+            { id: "groq", name: "Meta Llama 3.1 8B", desc: "Fast, open-weights model engine for bulk screening.", badge: "FREE" },
+            { id: "gemini", name: "Google Gemini 1.5 Flash", desc: "Fast & affordable cloud model.", badge: "CLOUD" },
+            { id: "claude", name: "Anthropic Claude 3.5", desc: "High-precision commercial evaluation.", badge: "PAID" },
           ].map(p => (
             <div
               key={p.id}
@@ -1615,7 +1615,7 @@ export default function App() {
   const [maxReached, setMaxReached] = useState(1);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [llmProvider, setLlmProvider] = useState("groq");
+  const [llmProvider, setLlmProvider] = useState("gemma");
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
   const [savedJobNotice, setSavedJobNotice] = useState(false);
