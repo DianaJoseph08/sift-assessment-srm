@@ -207,19 +207,21 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
   else activeModel = "claude-3-5-sonnet-20241022";
 
   let result;
-  if (activeProvider === "ollama" || activeProvider === "local") {
-    try {
-      result = await analyzeWithOllama(content, activeModel);
-    } catch (ollamaErr) {
-      console.warn(`[Local LLM] Ollama host (${OLLAMA_HOST}) unreachable (${ollamaErr.message}). Using Local AI Engine...`);
-      result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
+  try {
+    if (activeProvider === "groq") {
+      result = await analyzeWithGroq(content, "llama-3.1-8b-instant", apiKey);
+    } else if (activeProvider === "ollama") {
+      result = await analyzeWithOllama(content, "llama3.1");
+    } else if (activeProvider === "gemini") {
+      result = await analyzeWithGemini(content, GEMINI_MODEL, apiKey);
+    } else if (activeProvider === "claude") {
+      result = await analyzeWithClaude(content, "claude-3-5-haiku-20241022", apiKey);
+    } else {
+      result = await analyzeWithGroq(content, "llama-3.1-8b-instant", apiKey);
     }
-  } else if (activeProvider === "gemini") {
-    result = await analyzeWithGemini(content, activeModel, apiKey);
-  } else if (activeProvider === "groq") {
-    result = await analyzeWithGroq(content, activeModel, apiKey);
-  } else {
-    result = await analyzeWithClaude(content, activeModel, apiKey);
+  } catch (err) {
+    console.warn(`[Llama Engine Fallback] API message (${err.message}). Using Llama Evaluation Engine...`);
+    result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
   }
 
   // 4. Post-process email extraction to enforce correctness and prevent hallucinations
