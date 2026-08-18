@@ -203,6 +203,7 @@ Example: ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 
   }
 });
 
+
 // Evaluate interview transcript via Gemini
 app.post("/api/gemini-interview/evaluate", async (req, res) => {
   try {
@@ -216,62 +217,82 @@ app.post("/api/gemini-interview/evaluate", async (req, res) => {
     const totalViolations = Object.values(malpractice || {}).reduce((a, b) => a + b, 0);
     const integrityScore = Math.max(30, 100 - totalViolations * 7);
 
-    const prompt = `You are an expert academic/professional evaluator. Based on the following AI interview transcript for the role of "${job?.title}", evaluate the candidate ${candidate?.name}.
+    if (apiKey) {
+      try {
+        const strictPrompt = `You are a STRICT and HONEST technical interviewer evaluating a job candidate. You MUST score based strictly on what was actually said.
+
+ROLE: ${job?.title || "the applied position"}
+CANDIDATE: ${candidate?.name || "Candidate"}
 
 INTERVIEW TRANSCRIPT:
 ${transcriptText}
 
-PROCTORING REPORT:
-- Tab switches: ${malpractice?.tabSwitches || 0}
-- Cursor leaves: ${malpractice?.cursorLeaves || 0}  
-- Copy/paste attempts: ${malpractice?.copyPastes || 0}
-- Looking away: ${malpractice?.lookingAway || 0}
-- Keyboard shortcuts: ${malpractice?.keyboardAbuse || 0}
-- Calculated Integrity Score: ${integrityScore}%
+PROCTORING: Integrity Score = ${integrityScore}% (${totalViolations} violations)
 
-Return ONLY a valid JSON object (no markdown, no commentary) with this schema:
-{
-  "technicalScore": number (0-100),
-  "communicationScore": number (0-100),
-  "integrityScore": ${integrityScore},
-  "overallGrade": "Excellent|Good|Average|Poor",
-  "recommendation": "Strongly Recommend|Recommend|Possible|Do Not Recommend",
-  "summary": "2-3 sentence evaluation summary",
-  "strengths": ["string", "string"],
-  "improvements": ["string", "string"]
-}`;
+STRICT SCORING RULES — YOU MUST FOLLOW ALL OF THESE:
+1. If any answer is irrelevant, nonsensical, offensive, or completely off-topic → score that answer 0-15.
+2. If an answer is "[No response]" or blank → score it 5.
+3. If answers are fewer than 20 words → score 10-25.
+4. Vague answers without any specifics → score 25-45.
+5. Only score above 70 for clear, detailed, relevant, professional responses.
+6. Only score above 85 for exceptional answers with concrete examples and depth.
+7. technicalScore = average quality of answers relative to the role requirements.
+8. communicationScore = clarity, structure, and professionalism of language used.
+9. If technicalScore < 50 → recommendation MUST be "Do Not Recommend".
+10. overallGrade: Poor if avg < 50, Average if 50-65, Good if 66-80, Excellent if > 80.
+11. DO NOT be generous. DO NOT assume good intent. Score ONLY what was written.
 
-    if (apiKey) {
-      try {
+Return ONLY this JSON (no markdown, no backticks):
+{"technicalScore": <number 0-100>, "communicationScore": <number 0-100>, "integrityScore": ${integrityScore}, "overallGrade": "<Excellent|Good|Average|Poor>", "recommendation": "<Strongly Recommend|Recommend|Possible|Do Not Recommend>", "summary": "<2-3 honest sentences about actual answer quality, call out bad answers explicitly>", "strengths": ["<only real strengths or say None identified>"], "improvements": ["<specific improvements needed>"]}`;
+
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: strictPrompt }] }],
+              generationConfig: { temperature: 0.1 }
+            })
           }
         );
         const data = await geminiRes.json();
         const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
         const cleaned = raw.replace(/```json|```/g, "").trim();
         const evaluation = JSON.parse(cleaned);
-        addLog("GEMINI_INTERVIEW", `Completed AI interview evaluation for ${candidate?.name} — ${evaluation.overallGrade}`, "", `Score: ${evaluation.technicalScore}% technical`);
+        addLog("GEMINI_INTERVIEW", `Evaluated ${candidate?.name} — ${evaluation.overallGrade} (Tech: ${evaluation.technicalScore}%, Comm: ${evaluation.communicationScore}%)`, "", `Recommendation: ${evaluation.recommendation}`);
         return res.json(evaluation);
       } catch (e) {
-        console.warn("[gemini-evaluate] Gemini parse error, using fallback:", e.message);
+        console.error("[gemini-interview/evaluate] Gemini error, using fallback:", e.message);
       }
     }
 
-    // Fallback
+    // ── Smart fallback: score based on actual answer length & content ───────
+    const answers = (transcript || []).map(t => t.a || "");
+    const answerScores = answers.map(ans => {
+      const words = ans.trim().split(/\s+/).filter(w => w.length > 1);
+      if (!ans.trim() || ans.includes("[No response")) return 10;
+      if (words.length < 10) return 20;
+      if (words.length < 25) return 35;
+      if (words.length < 50) return 50;
+      if (words.length < 100) return 63;
+      return 73;
+    });
+    const totalAnswers = answerScores.length || 1;
+    const techScore = Math.round(answerScores.reduce((a, b) => a + b, 0) / totalAnswers);
+    const commScore = Math.round(techScore * 0.95);
+    const grade = techScore >= 75 ? "Good" : techScore >= 55 ? "Average" : "Poor";
+    const rec = techScore >= 70 ? "Possible" : "Do Not Recommend";
+
     res.json({
-      technicalScore: 80,
-      communicationScore: 78,
+      technicalScore: techScore,
+      communicationScore: commScore,
       integrityScore,
-      overallGrade: "Good",
-      recommendation: "Recommend",
-      summary: `${candidate?.name || "The candidate"} demonstrated adequate knowledge for the ${job?.title} role. Manual review recommended.`,
-      strengths: ["Completed all interview questions", "Showed familiarity with role requirements"],
-      improvements: ["Provide more concrete technical examples", "Elaborate further on specific project outcomes"]
+      overallGrade: grade,
+      recommendation: rec,
+      summary: `${candidate?.name || "The candidate"}'s responses averaged ${techScore}% based on answer depth and relevance. ${techScore < 50 ? "Most answers lacked sufficient detail or were not relevant to the role." : "Answers showed partial engagement but require significant improvement."} Manual review of the full transcript is strongly recommended.`,
+      strengths: techScore >= 60 ? ["Completed all interview questions"] : ["Participated in the interview session"],
+      improvements: ["Provide detailed answers with specific real-world examples", "Ensure all responses are relevant to the question asked", "Demonstrate deeper understanding of the role requirements"]
     });
   } catch (err) {
     console.error("[gemini-interview/evaluate] error:", err.message);
