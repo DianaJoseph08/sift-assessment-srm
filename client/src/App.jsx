@@ -9,7 +9,7 @@ import {
   Plus, Download, RotateCcw, ArrowRight, ArrowLeft, AlertCircle, Users, Star,
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
   Mail, Send, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
-  ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save
+  ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
 import GeminiInterview from "./GeminiInterview.jsx";
@@ -1124,6 +1124,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
     { id: "jobs", label: "Job Openings & Screening", icon: Briefcase },
     { id: "logs", label: "Activity & Audit Logs", icon: Activity },
     { id: "settings", label: "Settings & AI Keys", icon: Settings },
+    { id: "study_material", label: "Demo Study Guide", icon: BookOpen, isExternal: true },
   ];
 
   return (
@@ -1188,7 +1189,13 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                if (item.isExternal) {
+                  window.open("/study_material.html", "_blank");
+                } else {
+                  setActiveTab(item.id);
+                }
+              }}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -1196,9 +1203,9 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
                 padding: "10px 12px",
                 borderRadius: 8,
                 border: "none",
-                background: isActive ? C.sidebarActiveBg : "transparent",
-                color: isActive ? C.sidebarActive : C.sidebarText,
-                fontWeight: isActive ? 700 : 500,
+                background: isActive && !item.isExternal ? C.sidebarActiveBg : "transparent",
+                color: isActive && !item.isExternal ? C.sidebarActive : C.sidebarText,
+                fontWeight: isActive && !item.isExternal ? 700 : 500,
                 fontSize: 13.5,
                 textAlign: "left",
                 cursor: "pointer",
@@ -1206,7 +1213,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
                 fontFamily: BODY,
               }}
             >
-              <Icon size={18} color={isActive ? C.sidebarActive : C.sidebarText} />
+              <Icon size={18} color={isActive && !item.isExternal ? C.sidebarActive : C.sidebarText} />
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.badge !== undefined && (
                 <span style={{
@@ -1695,7 +1702,7 @@ export default function App() {
   const [maxReached, setMaxReached] = useState(1);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [llmProvider, setLlmProvider] = useState("gemma");
+  const [llmProvider, setLlmProvider] = useState("claude");
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
   const [savedJobNotice, setSavedJobNotice] = useState(false);
