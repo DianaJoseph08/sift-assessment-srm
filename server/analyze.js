@@ -235,9 +235,15 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
       if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
     }
   } catch (err) {
-    console.warn(`[Gemma Engine Fallback] API message (${err.message}). Using Google Gemma 2 Engine...`);
-    result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
-    if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
+    if (activeProvider === "gemma" || activeProvider === "ollama") {
+      console.warn(`[Gemma Engine Fallback] API message (${err.message}). Using Google Gemma 2 Engine...`);
+      result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
+      if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
+    } else {
+      // If the user specifically requested Claude, Gemini, or Groq, throw the error so they see it
+      // rather than silently faking a Gemma fallback.
+      throw err;
+    }
   }
 
   // 4. Post-process email extraction to enforce correctness and prevent hallucinations
