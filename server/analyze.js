@@ -205,7 +205,7 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
   else if (activeProvider === "ollama") activeModel = "gemma2";
   else if (activeProvider === "gemini") activeModel = GEMINI_MODEL;
   else if (activeProvider === "groq") activeModel = "llama-3.1-8b-instant";
-  else activeModel = "claude-3-5-haiku-20241022";
+  else activeModel = "claude-3-5-sonnet-20241022";
 
   let result;
   try {
@@ -229,7 +229,7 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
     } else if (activeProvider === "gemini") {
       result = await analyzeWithGemini(content, GEMINI_MODEL, apiKey);
     } else if (activeProvider === "claude") {
-      result = await analyzeWithClaude(content, "claude-3-5-haiku-20241022", apiKey);
+      result = await analyzeWithClaude(content, "claude-3-5-sonnet-20241022", apiKey);
     } else {
       result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
       if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
@@ -430,12 +430,12 @@ function evaluateHeuristically(job, resumeText, fileName) {
   };
 }
 
-async function analyzeWithClaude(content, model = "claude-3-5-haiku-20241022", apiKey) {
+async function analyzeWithClaude(content, model = "claude-3-5-sonnet-20241022", apiKey) {
   const client = getClaudeClient(apiKey);
   
   const modelsToTry = [
+    "claude-3-5-sonnet-20241022",
     "claude-3-5-haiku-20241022",
-    "claude-3-haiku-20240307",
     "claude-3-5-sonnet-latest",
     "claude-3-sonnet-20240229"
   ];
@@ -565,7 +565,7 @@ export async function getNextInterviewQuestion(job, candidate, history, override
   const candidateName = candidate.result?.candidateName || candidate.label || "Candidate";
   const skillsList = (candidate.result?.topSkills || []).join(", ") || "the skills on their resume";
 
-  const systemPrompt = `You are a professional, polite, but highly rigorous technical interviewer at SRM Group of Institutions interviewing a candidate for the role: "${job.title}".
+  const systemPrompt = `You are a professional, polite, but highly rigorous technical interviewer at ${job.companyName || "the hiring company"} interviewing a candidate for the role: "${job.title}".
 Candidate Name: ${candidateName}
 Resume Skills: ${skillsList}
 
@@ -912,4 +912,125 @@ function enforceProctoringOverride(evaluation, proctoring) {
   }
 
   return evaluation;
+}
+
+export async function generateInterviewQuestions(job, candidate = {}, overrideProvider, apiKey) {
+  const candidateName = candidate?.result?.candidateName || candidate?.name || candidate?.label || "Candidate";
+  const skillsList = (candidate.result?.topSkills || candidate.skills || []).join(", ") || "Not specified";
+  const summary = candidate.result?.summary || candidate.summary || "";
+  const mustHave = (job.mustHave || []).join(", ") || "Not specified";
+
+  const systemPrompt = `You are an expert technical interviewer hiring for the role of "${job.title}".
+Your goal is to VERIFY if the candidate actually possesses the skills they claimed on their resume, and test if they are truly eligible for this job.
+Generate exactly 5 highly specific, tailored technical interview questions for this candidate.
+
+Candidate Name: ${candidateName}
+Candidate Claimed Skills: ${skillsList}
+Candidate Summary: ${summary}
+Job Must-Have Skills: ${mustHave}
+
+Rules for the 5 questions:
+- DO NOT ask generic questions (e.g. avoid "Tell me about yourself" or "Describe a challenging project").
+- Every question MUST be a direct, deep technical test of a specific skill claimed by the candidate that is relevant to the Job Must-Have Skills.
+- Ask them to explain how a specific technology works under the hood, or how they would solve a complex technical problem using their claimed skills.
+- The goal is to catch candidates who might be exaggerating on their resume. Make the questions challenging enough that only someone with real, practical experience can answer them.
+
+Return ONLY a valid JSON array of 5 strings, no markdown, no commentary.`;
+
+  const messages = [
+    { role: "user", content: "Please generate the 5 interview questions now." }
+  ];
+
+  const activeProvider = overrideProvider || process.env.LLM_PROVIDER || "claude";
+  
+  let resultText = "";
+  if (activeProvider === "gemini") {
+    resultText = await chatWithGemini(systemPrompt, messages);
+  } else if (activeProvider === "groq") {
+    resultText = await chatWithGroq(systemPrompt, messages);
+  } else if (activeProvider === "ollama") {
+    resultText = await chatWithOllama(systemPrompt, messages);
+  } else {
+    // Claude
+    const client = getClaudeClient(apiKey);
+    const response = await client.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: messages,
+    });
+    resultText = (response.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+  }
+  
+  return extractJSON(resultText);
+}
+
+export async function evaluateVideoInterviewTranscript(job, candidate, transcript, proctoring, overrideProvider, apiKey) {
+  const candidateName = candidate.result?.candidateName || candidate.name || candidate.label || "Candidate";
+  const transcriptText = transcript.map(h => `Interviewer: ${h.q}\nCandidate: ${h.a}`).join("\n\n");
+
+  const systemPrompt = `You are a strict, highly analytical technical assessor who evaluates video interview transcripts critically and outputs a structured feedback report in JSON.`;
+
+  const proctoringInfo = proctoring
+    ? `\nPROCTORING METRICS DURING INTERVIEW:
+- Window focus losses / tab switches: ${proctoring.tabSwitches || 0}
+- Copy-paste actions in input box: ${proctoring.pasteCount || 0}
+- Face Not Visible Count: ${proctoring.faceNotVisibleCount || 0}
+- Looking Away Count: ${proctoring.lookingAwayCount || 0}
+- Multiple People Count: ${proctoring.multipleFacesCount || 0}`
+    : "";
+
+  const prompt = `Evaluate the following interview transcript for the role of "${job.title}".
+Candidate Name: ${candidateName}
+Resume Skills: ${(candidate.result?.topSkills || []).join(", ")}${proctoringInfo}
+
+Interview Transcript:
+${transcriptText}
+
+Output a JSON object ONLY with this schema:
+{
+  "technicalScore": number (0-100),
+  "communicationScore": number (0-100),
+  "integrityScore": number (0-100, calculate this based entirely on the PROCTORING METRICS. Deduct heavily for tab switches, missing faces, or multiple people.),
+  "summary": "string (a concise paragraph summarizing their performance)",
+  "recommendation": "string (e.g. Proceed to HR Round, Reject, etc)"
+}
+Return ONLY valid JSON.`;
+
+  const activeProvider = overrideProvider || process.env.LLM_PROVIDER || "claude";
+  
+  let resultText = "";
+  if (activeProvider === "gemini") {
+    resultText = await evaluateWithGemini(prompt, systemPrompt);
+  } else if (activeProvider === "groq") {
+    resultText = await evaluateWithGroq(prompt, systemPrompt);
+  } else if (activeProvider === "ollama") {
+    const response = await fetch((process.env.OLLAMA_HOST || "http://127.0.0.1:11434") + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama3.1",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt }
+        ],
+        stream: false,
+        format: "json",
+        options: { temperature: 0 }
+      }),
+    });
+    const data = await response.json();
+    resultText = data.message?.content || "";
+  } else {
+    const client = getClaudeClient(apiKey);
+    const message = await client.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 800,
+      system: systemPrompt,
+      messages: [{ role: "user", content: prompt }],
+    });
+    resultText = (message.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+  }
+
+  return extractJSON(resultText);
 }

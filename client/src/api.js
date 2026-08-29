@@ -43,10 +43,15 @@ export function fileToBase64(file) {
 
 /** Ask the interviewer chatbot for the next question. */
 export async function sendInterviewChat(job, candidate, history, provider) {
+  let apiKey = undefined;
+  if (provider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
+  else if (provider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
+  else if (provider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+
   const res = await fetch("/api/interview/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job, candidate, history, provider }),
+    body: JSON.stringify({ job, candidate, history, provider, apiKey }),
   });
 
   if (!res.ok) {
@@ -63,10 +68,15 @@ export async function sendInterviewChat(job, candidate, history, provider) {
 
 /** Submit the interview transcript to generate the confidence score. */
 export async function evaluateInterview(job, candidate, history, proctoring, provider) {
+  let apiKey = undefined;
+  if (provider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
+  else if (provider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
+  else if (provider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+
   const res = await fetch("/api/interview/evaluate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job, candidate, history, proctoring, provider }),
+    body: JSON.stringify({ job, candidate, history, proctoring, provider, apiKey }),
   });
 
   if (!res.ok) {

@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, "sift.db");
+const dbPath = path.join(__dirname, "..", "sift.db");
 
 // Initialize database
 const db = new DatabaseSync(dbPath);
@@ -44,14 +44,14 @@ try {
   db.exec("ALTER TABLE jobs ADD COLUMN company_name TEXT");
 } catch (e) {}
 
-// Reassign academic faculty positions to SRM Group / IST
+// ONE-TIME FIX: Restore orphaned jobs to their correct UI companies
 try {
   db.exec(`
-    UPDATE jobs 
-    SET company_id = 'comp_srmtech', company_name = 'SRM Group / IST' 
-    WHERE title LIKE '%Professor%' OR title LIKE '%Faculty%' OR title LIKE '%Mathematics%' OR title LIKE '%Biomedical%';
+    UPDATE jobs SET company_id = 'comp_1787736442089', company_name = 'SRM Group of Institutions' WHERE company_id = 'comp_srmtech';
+    UPDATE jobs SET company_id = 'comp_1787762242113', company_name = 'Motherson' WHERE company_id = 'comp_motherson';
   `);
 } catch (e) {}
+
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS candidates (
@@ -169,14 +169,6 @@ export function getJobs() {
     
     let resolvedCompId = job.company_id;
     let resolvedCompName = job.company_name;
-    const titleLower = (job.title || "").toLowerCase();
-    if (titleLower.includes("professor") || titleLower.includes("faculty") || titleLower.includes("mathematics") || titleLower.includes("biomedical")) {
-      resolvedCompId = "comp_srmtech";
-      resolvedCompName = "SRM Group / IST";
-    } else if (!resolvedCompId || resolvedCompId === "comp_default") {
-      resolvedCompId = "comp_motherson";
-      resolvedCompName = "Motherson Group";
-    }
 
     return {
       id: job.id,

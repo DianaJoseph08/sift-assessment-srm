@@ -5,3 +5,8 @@ dist/
 *.log
 .DS_Store
 .vite/
+*.db
+sift.db
+server/sift.db
+scratch/
+fix_*.*

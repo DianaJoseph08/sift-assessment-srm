@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
 /* ============================================================
-   SRM GEMINI VIDEO AI INTERVIEW PLATFORM
-   - Powered by Google Gemini 2.0 Flash
+   SRM AI VIDEO INTERVIEW PLATFORM
+   - Powered by AI
    - Video feed + Voice input + Text fallback
    - Full malpractice detection
    - 3-minute countdown per question (auto-advance at 0:00)
@@ -32,7 +32,7 @@ function MalpracticeBadge({ count, label, color }) {
   );
 }
 
-export default function GeminiInterview({ candidate, job, onComplete }) {
+export default function VideoInterview({ candidate, job, llmProvider, onComplete }) {
   const r = candidate?.result || {};
   const candidateName = r.candidateName || candidate?.label || "Candidate";
 
@@ -44,6 +44,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
   const [userText, setUserText] = useState("");
   const [listening, setListening] = useState(false);
   const [aiSpeaking, setAiSpeaking] = useState(false);
+  const [faceMissing, setFaceMissing] = useState(false);
   const [timeLeft, setTimeLeft] = useState(MAX_SECONDS);
   const [finalReport, setFinalReport] = useState(null);
 
@@ -109,7 +110,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
       document.removeEventListener("visibilitychange", onVisChange);
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("mouseleave", onMouseLeave);
-      document.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mousedown", onMouseDown);
       document.removeEventListener("paste", onPaste);
       document.removeEventListener("copy", onCopy);
       document.removeEventListener("contextmenu", onCtxMenu);
@@ -137,8 +138,21 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
           const results = faceLandmarkerRef.current.detectForVideo(videoRef.current, performance.now());
           const nFaces = results?.faceLandmarks?.length || 0;
           if (nFaces === 0) {
-            if (++awayFrames >= 3) { logMalpractice("No face detected / looking away", "lookingAway"); awayFrames = 0; }
+            setFaceMissing(true);
+            // Instantly clear their current answer progress so they can't cheat by reading and returning
+            if (awayFrames === 0) {
+                setUserText(""); 
+                stopListening();
+            }
+            
+            if (++awayFrames >= 3) {
+              logMalpractice("Left camera frame - Question Auto-Skipped", "lookingAway");
+              if (submitFnRef.current) submitFnRef.current(true);
+              awayFrames = 0;
+            }
           } else {
+            setFaceMissing(false);
+            awayFrames = 0;
             const lm = results.faceLandmarks[0];
             if (lm && lm.length > 473) {
               const gazeOffset = Math.abs((lm[468].x + lm[473].x) / 2 - lm[1].x);
@@ -234,50 +248,64 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
     window.speechSynthesis.speak(utter);
   }), []);
 
-  // ── Gemini Questions ──────────────────────────────────────────────────────
-  const fetchGeminiQuestions = useCallback(async () => {
+  // ── AI Questions ──────────────────────────────────────────────────────
+  const fetchQuestions = useCallback(async () => {
     try {
-      const res = await fetch("/api/gemini-interview/questions", {
+      let apiKey = undefined;
+      if (llmProvider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
+      else if (llmProvider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
+      else if (llmProvider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+
+      const res = await fetch("/api/interview/video-questions", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           job: { title: job?.title, description: job?.description, mustHave: job?.mustHave },
-          candidate: { name: candidateName, skills: r.topSkills, education: r.education, summary: r.summary }
+          candidate: { name: candidateName, skills: r.topSkills, education: r.education, summary: r.summary },
+          provider: llmProvider,
+          apiKey
         })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch AI questions");
       if (data.questions?.length > 0) return data.questions;
-    } catch (_) {}
-    return [
-      `Welcome, ${candidateName}! Could you introduce yourself and walk us through your experience relevant to this ${job?.title} role?`,
-      `Describe a technically challenging project you led. What was your approach and what was the outcome?`,
-      `What specific skills from the job requirements do you feel you excel at, and can you give a concrete example?`,
-      `How do you stay updated with the latest developments in your field?`,
-      `Do you have any questions for us about this role or the team?`
-    ];
-  }, [candidateName, job, r]);
+    } catch (err) {
+      alert("Error initializing AI Interview: " + err.message + "\n\nPlease ensure your API key is correct and you have an active internet connection.");
+      window.close(); // Close the interview window on critical failure
+    }
+    return [];
+  }, [candidateName, job, r, llmProvider]);
 
-  // ── Gemini Evaluation ─────────────────────────────────────────────────────
-  const fetchGeminiEvaluation = useCallback(async (transcriptData) => {
+  const fetchEvaluation = useCallback(async (transcriptData) => {
     try {
-      const res = await fetch("/api/gemini-interview/evaluate", {
+      let apiKey = undefined;
+      if (llmProvider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
+      else if (llmProvider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
+      else if (llmProvider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+
+      const res = await fetch("/api/interview/video-evaluate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           job: { title: job?.title, description: job?.description },
           candidate: { name: candidateName },
-          transcript: transcriptData, malpractice
+          transcript: transcriptData, malpractice,
+          provider: llmProvider,
+          apiKey
         })
       });
-      return await res.json();
-    } catch (_) {}
-    const total = Object.values(malpractice).reduce((a, b) => a + b, 0);
-    return {
-      communicationScore: 85, technicalScore: 82,
-      integrityScore: Math.max(30, 100 - total * 8),
-      overallGrade: "Good",
-      summary: "Candidate demonstrated adequate knowledge. Please review the proctoring report.",
-      recommendation: "Proceed to HR Round"
-    };
-  }, [job, candidateName, malpractice]);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to evaluate interview");
+      return data;
+    } catch (err) {
+      alert("Error generating evaluation: " + err.message);
+      return {
+        communicationScore: 0, technicalScore: 0,
+        integrityScore: 0,
+        overallGrade: "Error",
+        summary: "Assessment failed due to server error: " + err.message,
+        recommendation: "Manual Review Required"
+      };
+    }
+  }, [job, candidateName, malpractice, llmProvider]);
 
   // ── Submit Answer ─────────────────────────────────────────────────────────
   const handleSubmitAnswer = useCallback((autoAdvanced = false) => {
@@ -285,7 +313,12 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
     clearInterval(timerRef.current);
 
     setUserText(currentText => {
-      const answer = currentText.trim() || (autoAdvanced ? "[No response — time expired]" : "[No response provided]");
+      let answer = currentText.trim();
+      if (!answer && autoAdvanced) {
+         answer = faceMissing ? "[No response — question auto-skipped because candidate left camera frame]" : "[No response — time expired]";
+      } else if (!answer) {
+         answer = "[No response provided]";
+      }
       setQuestions(currentQs => {
         setQIndex(currentIdx => {
           const currentQ = currentQs[currentIdx];
@@ -294,7 +327,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
             const nextIndex = currentIdx + 1;
             if (nextIndex >= currentQs.length) {
               setPhase("evaluating");
-              fetchGeminiEvaluation(updated).then(report => {
+              fetchEvaluation(updated).then(report => {
                 setFinalReport(report);
                 setPhase("completed");
                 
@@ -339,7 +372,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
       });
       return "";
     });
-  }, [stopListening, startListening, speak, fetchGeminiEvaluation, malpractice, malpracticeLog, candidate, onComplete]);
+  }, [stopListening, startListening, speak, fetchEvaluation, malpractice, malpracticeLog, candidate, onComplete]);
 
   useEffect(() => { submitFnRef.current = handleSubmitAnswer; }, [handleSubmitAnswer]);
 
@@ -365,7 +398,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
     setPhase("permission");
     const ok = await startWebcam();
     if (!ok) { alert("Camera & microphone access is required. Please allow and reload."); return; }
-    const qs = await fetchGeminiQuestions();
+    const qs = await fetchQuestions();
     setQuestions(qs);
     setPhase("interview");
     setTimeout(initFaceLandmarker, 2000);
@@ -394,8 +427,8 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
             <div style={{ width: 72, height: 72, borderRadius: 20, background: "linear-gradient(135deg, #3B82F6, #8B5CF6)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <span style={{ fontSize: 32 }}>🤖</span>
             </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#F8FAFC", margin: "0 0 8px" }}>SRM AI Technical Assessment</h1>
-            <p style={{ fontSize: 14, color: "#94A3B8", margin: 0 }}>Powered by Google Gemini 2.0 Flash</p>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#F8FAFC", margin: "0 0 8px" }}>{job?.companyName || "AI"} Technical Assessment</h1>
+            <p style={{ fontSize: 14, color: "#94A3B8", margin: 0 }}>Powered by {llmProvider === "claude" ? "Anthropic Claude" : llmProvider === "groq" ? "Groq (Llama 3)" : "Google Gemini"}</p>
           </div>
 
           <div style={{ background: "#0F172A", borderRadius: 12, padding: 20, marginBottom: 20, border: "1px solid #334155" }}>
@@ -461,7 +494,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
       <div style={{ minHeight: "100vh", background: "#0F172A", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}>
         <div style={{ textAlign: "center", color: "#F8FAFC" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🧠</div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>Gemini is evaluating your responses…</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>AI is evaluating your responses...</div>
           <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 8 }}>Generating your technical assessment report</div>
           <div style={{ width: 240, height: 4, background: "#1E293B", borderRadius: 4, overflow: "hidden", margin: "20px auto 0" }}>
             <div style={{ height: "100%", background: "linear-gradient(90deg, #3B82F6, #8B5CF6)", animation: "slideBar 1.5s infinite", borderRadius: 4 }} />
@@ -486,8 +519,8 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 24 }}>
             {[
-              { label: "Technical Score", value: `${finalReport.technicalScore || 85}%`, color: "#3B82F6" },
-              { label: "Communication", value: `${finalReport.communicationScore || 82}%`, color: "#8B5CF6" },
+              { label: "Technical Score", value: `${finalReport.technicalScore ?? 85}%`, color: "#3B82F6" },
+              { label: "Communication", value: `${finalReport.communicationScore ?? 82}%`, color: "#8B5CF6" },
               { label: "Integrity Score", value: `${integrityPct}%`, color: integrityColor },
             ].map(({ label, value, color }) => (
               <div key={label} style={{ background: "#0F172A", borderRadius: 12, padding: 16, textAlign: "center", border: `1px solid ${color}44` }}>
@@ -497,7 +530,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
             ))}
           </div>
           <div style={{ background: "#0F172A", borderRadius: 12, padding: 16, marginBottom: 20, border: "1px solid #334155" }}>
-            <div style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Gemini Assessment Summary</div>
+            <div style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>AI Assessment Summary</div>
             <p style={{ color: "#CBD5E1", fontSize: 13.5, lineHeight: 1.7, margin: 0 }}>{finalReport.summary}</p>
           </div>
           <div style={{ background: totalMalpractice === 0 ? "#052E16" : "#1C1917", borderRadius: 12, padding: 16, border: `1px solid ${totalMalpractice === 0 ? "#166534" : "#92400E"}`, marginBottom: 24 }}>
@@ -531,8 +564,8 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #3B82F6, #8B5CF6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🤖</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#F8FAFC" }}>SRM AI Technical Assessment</div>
-            <div style={{ fontSize: 10, color: "#64748B" }}>Powered by Google Gemini</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#F8FAFC" }}>{job?.companyName || "AI"} Technical Assessment</div>
+            <div style={{ fontSize: 10, color: "#64748B" }}>Powered by {llmProvider === "claude" ? "Claude" : llmProvider === "groq" ? "Groq" : "Gemini"}</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -563,10 +596,19 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
         <div style={{ background: "#0F172A", borderRight: "1px solid #1E293B", display: "flex", flexDirection: "column", padding: 16, gap: 12, overflowY: "auto" }}>
           <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", background: "#000", border: "2px solid #334155" }}>
             <video ref={videoRef} autoPlay muted playsInline style={{ width: "100%", display: "block", transform: "scaleX(-1)" }} />
-            <div style={{ position: "absolute", top: 8, left: 8, display: "flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.75)", padding: "3px 8px", borderRadius: 5 }}>
+            <div style={{ position: "absolute", top: 8, left: 8, display: "flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.75)", padding: "3px 8px", borderRadius: 5, zIndex: 10 }}>
               <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#EF4444", animation: "pulse 1.5s infinite" }} />
               <span style={{ fontSize: 10, fontWeight: 700, color: "#FFF" }}>LIVE · PROCTORED</span>
             </div>
+            
+            {/* Blocking Overlay when Face is Missing */}
+            {faceMissing && (
+              <div style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "white", padding: 12, textAlign: "center", backdropFilter: "blur(6px)", zIndex: 20 }}>
+                <span style={{ fontSize: 36, marginBottom: 12 }}>⚠️</span>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#F8FAFC", textTransform: "uppercase", letterSpacing: "0.05em" }}>Face Not Detected</div>
+                <div style={{ fontSize: 11, marginTop: 6, color: "#94A3B8", fontWeight: 600 }}>Please look at the camera to resume answering</div>
+              </div>
+            )}
           </div>
 
           <div style={{ background: "#1E293B", borderRadius: 10, padding: 12, border: "1px solid #334155" }}>
@@ -624,7 +666,7 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
               {aiSpeaking && <div style={{ position: "absolute", bottom: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: "#22C55E", border: "2px solid #0F172A", animation: "pulse 1s infinite" }} />}
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#F8FAFC" }}>Gemini AI Interviewer</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#F8FAFC" }}>AI Interviewer ({llmProvider || "Auto"})</div>
               <div style={{ fontSize: 11, color: aiSpeaking ? "#22C55E" : "#64748B", fontWeight: 600 }}>
                 {aiSpeaking ? "🔊 Speaking…" : "Ready for your response"}
               </div>
@@ -671,35 +713,40 @@ export default function GeminiInterview({ candidate, job, onComplete }) {
               <textarea
                 value={userText}
                 onChange={(e) => setUserText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmitAnswer(); } }}
-                placeholder="Speak your answer (mic on) or type here… Press Enter or click Submit"
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !faceMissing) { e.preventDefault(); handleSubmitAnswer(); } }}
+                placeholder={faceMissing ? "Camera blocked — please return to frame..." : "Speak your answer (mic on) or type here… Press Enter or click Submit"}
                 rows={3}
+                disabled={faceMissing}
                 style={{
                   flex: 1, padding: "11px 14px", borderRadius: 10, border: "1px solid #334155",
                   background: "#0F172A", color: "#F8FAFC", fontSize: 13.5, fontFamily: "inherit",
-                  resize: "none", outline: "none", lineHeight: 1.6
+                  resize: "none", outline: "none", lineHeight: 1.6, opacity: faceMissing ? 0.4 : 1
                 }}
               />
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <button
+                  disabled={faceMissing}
                   onClick={listening ? stopListening : startListening}
                   style={{
                     padding: "10px 14px", borderRadius: 10,
                     background: listening ? "#FEF3C7" : "#064E3B",
                     color: listening ? "#92400E" : "#22C55E",
                     border: `1px solid ${listening ? "#F59E0B" : "#22C55E"}`,
-                    cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit"
+                    cursor: faceMissing ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit",
+                    opacity: faceMissing ? 0.4 : 1
                   }}
                 >
                   {listening ? "⏹ Stop Mic" : "🎤 Start Mic"}
                 </button>
                 <button
+                  disabled={faceMissing}
                   onClick={() => handleSubmitAnswer()}
                   style={{
                     padding: "10px 14px", borderRadius: 10,
                     background: "linear-gradient(135deg, #3B82F6, #6366F1)",
                     color: "#FFFFFF", border: "none",
-                    cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit"
+                    cursor: faceMissing ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit",
+                    opacity: faceMissing ? 0.4 : 1
                   }}
                 >
                   ✓ Submit

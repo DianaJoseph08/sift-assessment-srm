@@ -12,7 +12,7 @@ import {
   ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
-import GeminiInterview from "./GeminiInterview.jsx";
+import VideoInterview from "./VideoInterview.jsx";
 
 
 /* ============================== THEME SYSTEM ============================== */
@@ -658,10 +658,10 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults
           )}
 
           <button
-            style={{ ...btn("primary", C), opacity: candidates.length ? 1 : 0.45, cursor: candidates.length ? "pointer" : "not-allowed" }}
-            onClick={() => candidates.length && onRun(true)}
+            style={{ ...btn("primary", C), opacity: unscreenedCount > 0 ? 1 : 0.45, cursor: unscreenedCount > 0 ? "pointer" : "not-allowed" }}
+            onClick={() => unscreenedCount > 0 && onRun(false)}
           >
-            <Sparkles size={16} /> Screen {candidates.length} Candidate Resume{candidates.length !== 1 ? "s" : ""} with AI <ArrowRight size={16} />
+            <Sparkles size={16} /> Screen {unscreenedCount} New Resume{unscreenedCount !== 1 ? "s" : ""} <ArrowRight size={16} />
           </button>
         </div>
       </div>
@@ -761,7 +761,7 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
   const handleOpenWebGmail = (e) => {
     e.stopPropagation();
     const targetEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "";
-    const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
+    const interviewLink = `${window.location.origin}/interview?cand=${c.id}`;
     const { subject, body } = getInterviewBody(targetEmail, interviewLink);
     window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${targetEmail}&su=${subject}&body=${body}`, "_blank");
     setActionNotice("gmail");
@@ -770,7 +770,7 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
 
   const handleCopyLink = async (e) => {
     e.stopPropagation();
-    const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
+    const interviewLink = `${window.location.origin}/interview?cand=${c.id}`;
     try {
       await navigator.clipboard.writeText(interviewLink);
     } catch (err) {}
@@ -781,7 +781,7 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
   const handleOpenDesktopMail = (e) => {
     e.stopPropagation();
     const targetEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "";
-    const interviewLink = `https://sift-assessment-srm-1.onrender.com/interview?cand=${c.id}`;
+    const interviewLink = `${window.location.origin}/interview?cand=${c.id}`;
     const { subject, body } = getInterviewBody(targetEmail, interviewLink);
     window.open(`mailto:${targetEmail}?subject=${subject}&body=${body}`, "_self");
     setActionNotice("mailto");
@@ -1035,6 +1035,55 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
           </div>
         </div>
       )}
+      
+      {open && r.interview && (
+        <div style={{ borderTop: `1px solid ${C.lineSoft}`, padding: "16px 17px", background: C.paper }}>
+          <SubHead style={{ marginBottom: 12 }} C={C}>
+            <MessageSquare size={13} style={{ verticalAlign: -2, marginRight: 4 }} />
+            AI Interview Assessment
+          </SubHead>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+            <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, textAlign: "center" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: r.interview.score >= 75 ? "#16A34A" : (r.interview.score >= 50 ? "#EAB308" : "#DC2626") }}>{r.interview.score}%</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Technical Score</div>
+            </div>
+            <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, textAlign: "center" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: Math.max(30, 100 - Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7) >= 85 ? "#16A34A" : (Math.max(30, 100 - Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7) >= 60 ? "#EAB308" : "#DC2626") }}>
+                {Math.max(30, 100 - Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7)}%
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Integrity Score</div>
+            </div>
+            <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, textAlign: "center" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0) === 0 ? "#16A34A" : "#DC2626" }}>
+                {Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0) === 0 ? "Clean ✓" : "Flagged ⚠️"}
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Proctoring</div>
+            </div>
+          </div>
+
+          <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase", marginBottom: 6 }}>AI Assessment Summary</div>
+            <div style={{ fontSize: 13, color: C.ink, lineHeight: 1.6 }}>{r.interview.summary || "No summary provided."}</div>
+          </div>
+
+          {r.interview.transcript && r.interview.transcript.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase", marginBottom: 8 }}>Interview Transcript</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {r.interview.transcript.map((t, idx) => (
+                  <div key={idx} style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "12px 14px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 6 }}>Question {idx+1}: {t.q}</div>
+                    <div style={{ fontSize: 13, color: C.ink, lineHeight: 1.5, paddingLeft: 10, borderLeft: `2px solid ${C.lineSoft}` }}>
+                      {t.a || "[No response provided]"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1265,15 +1314,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
 
 const isMatchForComp = (j, comp) => {
   if (!comp) return true;
-  const titleLower = (j.title || "").toLowerCase();
-  const isAcademic = titleLower.includes("professor") || titleLower.includes("faculty") || titleLower.includes("mathematics") || titleLower.includes("biomedical");
-  if (isAcademic) {
-    return comp.id === "comp_srmtech" || comp.name.toLowerCase().includes("srm");
-  }
-  if (j.companyId === comp.id) return true;
-  if (j.companyName && comp.name && j.companyName.toLowerCase().trim() === comp.name.toLowerCase().trim()) return true;
-  if ((!j.companyId || j.companyId === "comp_default") && (comp.id === "comp_motherson" || comp.name.toLowerCase().includes("motherson"))) return true;
-  return false;
+  return j.companyId === comp.id;
 };
 
 /* ============================== WELCOME & AGENCY DASHBOARD ============================== */
@@ -1964,9 +2005,10 @@ export default function App() {
 
   if (standaloneInterviewMode && activeInterviewCandidate) {
     return (
-      <GeminiInterview
+      <VideoInterview
         candidate={activeInterviewCandidate}
         job={activeJob || { title: "Position", companyName: "Client Company" }}
+        llmProvider={llmProvider}
         onComplete={(report) => {
           console.log("Interview completed:", report);
         }}
@@ -2092,7 +2134,7 @@ export default function App() {
                                 setMaxReached(3);
                               } else {
                                 setStep(1);
-                                setMaxReached(1);
+                                setMaxReached(3); // Unlocked so they can view scores/candidates at any time
                               }
                             }}
                           >

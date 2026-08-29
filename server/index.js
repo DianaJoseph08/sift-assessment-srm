@@ -5,7 +5,7 @@ import cors from "cors";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { analyzeResume, getNextInterviewQuestion, evaluateInterview } from "./analyze.js";
+import { analyzeResume, getNextInterviewQuestion, evaluateInterview, generateInterviewQuestions, evaluateVideoInterviewTranscript } from "./analyze.js";
 import { getJobs, saveJobs, getCandidate, saveCandidateInterview, getCompanies, saveCompanies, getLogs, addLog } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -141,56 +141,20 @@ app.post("/api/interview/chat", async (req, res) => {
   }
 });
 
-// ── GEMINI VIDEO INTERVIEW ENDPOINTS ──────────────────────────────────────
+// ── VIDEO INTERVIEW ENDPOINTS ──────────────────────────────────────
 
-// Generate personalised interview questions via Gemini
-app.post("/api/gemini-interview/questions", async (req, res) => {
+// Generate personalised interview questions dynamically via active LLM Provider
+app.post("/api/interview/video-questions", async (req, res) => {
   try {
-    const { job, candidate } = req.body || {};
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    const prompt = `You are a strict technical interviewer hiring for the role of "${job?.title || "the applied position"}".
-Your goal is to VERIFY if the candidate actually possesses the skills they claimed on their resume, and test if they are truly eligible for this job.
-Generate exactly 5 highly specific, tailored technical interview questions for this candidate.
-
-Candidate Name: ${candidate?.name || "Candidate"}
-Candidate Claimed Skills: ${(candidate?.skills || []).join(", ") || "Not specified"}
-Candidate Summary: ${candidate?.summary || ""}
-Job Must-Have Skills: ${(job?.mustHave || []).join(", ") || "Not specified"}
-
-Rules for the 5 questions:
-- DO NOT ask generic questions (e.g. avoid "Tell me about yourself" or "Describe a challenging project").
-- Every question MUST be a direct, deep technical test of a specific skill claimed by the candidate that is relevant to the Job Must-Have Skills.
-- Ask them to explain how a specific technology works under the hood, or how they would solve a complex technical problem using their claimed skills.
-- The goal is to catch candidates who might be exaggerating on their resume. Make the questions challenging enough that only someone with real, practical experience can answer them.
-
-Return ONLY a valid JSON array of 5 strings, no markdown, no commentary.
-Example: ["How exactly does the event loop handle promises in Node.js compared to setTimeout?", "Describe the architecture you would use to scale a MongoDB database to handle 10k writes per second."]`;
-
-    if (apiKey) {
-      try {
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-          }
-        );
-        const data = await geminiRes.json();
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const cleaned = raw.replace(/```json|```/g, "").trim();
-        const questions = JSON.parse(cleaned);
-        if (Array.isArray(questions) && questions.length > 0) {
-          addLog("GEMINI_INTERVIEW", `Generated ${questions.length} Gemini interview questions for ${candidate?.name}`, "", `Role: ${job?.title}`);
-          return res.json({ questions });
-        }
-      } catch (e) {
-        console.warn("[gemini-questions] Gemini parse error, using fallback:", e.message);
-      }
+    const { job, candidate, provider, apiKey } = req.body || {};
+    const questions = await generateInterviewQuestions(job, candidate, provider, apiKey);
+    
+    if (Array.isArray(questions) && questions.length > 0) {
+      addLog("INTERVIEW", `Generated ${questions.length} interview questions for ${candidate?.name || 'Candidate'} using ${provider || 'claude'}`, "", `Role: ${job?.title}`);
+      return res.json({ questions });
     }
 
-    // Fallback questions
+    // Fallback questions if parsing completely fails
     const fallback = [
       `Hello ${candidate?.name || "Candidate"}! Could you briefly introduce yourself and explain why you're interested in the ${job?.title} role?`,
       `Describe a challenging technical project you led recently. What was your approach and what was the outcome?`,
@@ -200,73 +164,22 @@ Example: ["How exactly does the event loop handle promises in Node.js compared t
     ];
     res.json({ questions: fallback });
   } catch (err) {
-    console.error("[gemini-interview/questions] error:", err.message);
+    console.error("[interview/video-questions] error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 
-// Evaluate interview transcript via Gemini
-app.post("/api/gemini-interview/evaluate", async (req, res) => {
+// Evaluate interview transcript dynamically via active LLM Provider
+app.post("/api/interview/video-evaluate", async (req, res) => {
   try {
-    const { job, candidate, transcript, malpractice } = req.body || {};
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    const transcriptText = (transcript || []).map((item, i) =>
-      `Q${i + 1}: ${item.q}\nAnswer: ${item.a}`
-    ).join("\n\n");
-
-    const totalViolations = Object.values(malpractice || {}).reduce((a, b) => a + b, 0);
-    const integrityScore = Math.max(30, 100 - totalViolations * 7);
-
-    if (apiKey) {
-      try {
-        const strictPrompt = `You are a STRICT and HONEST technical interviewer evaluating a job candidate. You MUST score based strictly on what was actually said.
-
-ROLE: ${job?.title || "the applied position"}
-CANDIDATE: ${candidate?.name || "Candidate"}
-
-INTERVIEW TRANSCRIPT:
-${transcriptText}
-
-PROCTORING: Integrity Score = ${integrityScore}% (${totalViolations} violations)
-
-STRICT SCORING RULES — YOU MUST FOLLOW ALL OF THESE:
-1. If any answer is irrelevant, nonsensical, offensive, or completely off-topic → score that answer 0-15.
-2. If an answer is "[No response]" or blank → score it 5.
-3. If answers are fewer than 20 words → score 10-25.
-4. Vague answers without any specifics → score 25-45.
-5. Only score above 70 for clear, detailed, relevant, professional responses.
-6. Only score above 85 for exceptional answers with concrete examples and depth.
-7. technicalScore = average quality of answers relative to the role requirements.
-8. communicationScore = clarity, structure, and professionalism of language used.
-9. If technicalScore < 50 → recommendation MUST be "Do Not Recommend".
-10. overallGrade: Poor if avg < 50, Average if 50-65, Good if 66-80, Excellent if > 80.
-11. DO NOT be generous. DO NOT assume good intent. Score ONLY what was written.
-
-Return ONLY this JSON (no markdown, no backticks):
-{"technicalScore": <number 0-100>, "communicationScore": <number 0-100>, "integrityScore": ${integrityScore}, "overallGrade": "<Excellent|Good|Average|Poor>", "recommendation": "<Strongly Recommend|Recommend|Possible|Do Not Recommend>", "summary": "<2-3 honest sentences about actual answer quality, call out bad answers explicitly>", "strengths": ["<only real strengths or say None identified>"], "improvements": ["<specific improvements needed>"]}`;
-
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: strictPrompt }] }],
-              generationConfig: { temperature: 0.1 }
-            })
-          }
-        );
-        const data = await geminiRes.json();
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const cleaned = raw.replace(/```json|```/g, "").trim();
-        const evaluation = JSON.parse(cleaned);
-        addLog("GEMINI_INTERVIEW", `Evaluated ${candidate?.name} — ${evaluation.overallGrade} (Tech: ${evaluation.technicalScore}%, Comm: ${evaluation.communicationScore}%)`, "", `Recommendation: ${evaluation.recommendation}`);
-        return res.json(evaluation);
-      } catch (e) {
-        console.error("[gemini-interview/evaluate] Gemini error, using fallback:", e.message);
-      }
+    const { job, candidate, transcript, malpractice, provider, apiKey } = req.body || {};
+    
+    const evaluation = await evaluateVideoInterviewTranscript(job, candidate, transcript, malpractice, provider, apiKey);
+    
+    if (evaluation && typeof evaluation.technicalScore === "number") {
+      addLog("INTERVIEW", `Evaluated ${candidate?.name || 'Candidate'} using ${provider || 'claude'} — ${evaluation.overallGrade || 'N/A'} (Tech: ${evaluation.technicalScore}%, Comm: ${evaluation.communicationScore}%)`, "", `Recommendation: ${evaluation.recommendation || 'N/A'}`);
+      return res.json(evaluation);
     }
 
     // ── Smart fallback: score based on actual answer length & content ───────
@@ -289,15 +202,15 @@ Return ONLY this JSON (no markdown, no backticks):
     res.json({
       technicalScore: techScore,
       communicationScore: commScore,
-      integrityScore,
+      integrityScore: 100, // Approximate fallback
       overallGrade: grade,
       recommendation: rec,
-      summary: `${candidate?.name || "The candidate"}'s responses averaged ${techScore}% based on answer depth and relevance. ${techScore < 50 ? "Most answers lacked sufficient detail or were not relevant to the role." : "Answers showed partial engagement but require significant improvement."} Manual review of the full transcript is strongly recommended.`,
+      summary: `${candidate?.name || "The candidate"}'s responses averaged ${techScore}% based on answer depth and relevance. Manual review recommended.`,
       strengths: techScore >= 60 ? ["Completed all interview questions"] : ["Participated in the interview session"],
-      improvements: ["Provide detailed answers with specific real-world examples", "Ensure all responses are relevant to the question asked", "Demonstrate deeper understanding of the role requirements"]
+      improvements: ["Provide detailed answers with specific real-world examples"]
     });
   } catch (err) {
-    console.error("[gemini-interview/evaluate] error:", err.message);
+    console.error("[interview/video-evaluate] error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -421,8 +334,11 @@ app.listen(PORT, () => {
   console.log(`\n  SRM Multi-Company Agency Portal listening on http://localhost:${PORT}`);
   if (process.env.LLM_PROVIDER === "ollama") {
     console.log(`  LLM Provider: Local Ollama (${process.env.MODEL || "llama3.1"})`);
-  } else if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn("  WARNING: ANTHROPIC_API_KEY is not set — default screening will use configured provider.");
+  } else {
+    console.log(`  LLM Provider: Anthropic Claude`);
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.warn("  WARNING: ANTHROPIC_API_KEY is not set in environment (make sure it's set in the frontend settings!).");
+    }
   }
   console.log("");
 });
