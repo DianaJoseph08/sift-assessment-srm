@@ -4,7 +4,7 @@ import pdfParse from "pdf-parse";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
 const GEMINI_MODEL = "gemini-1.5-flash-002";
-const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-3-5-sonnet-20241022")));
+const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-5")));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
 /**
@@ -95,13 +95,28 @@ Follow this systematic, step-by-step evaluation process for every candidate:
 
 function extractJSON(text) {
   let t = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-  const s = t.indexOf("{");
+  
+  let firstBrace = t.indexOf("{");
+  let firstBracket = t.indexOf("[");
+  let s = -1;
+  let isArray = false;
+  
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    s = Math.min(firstBrace, firstBracket);
+    isArray = s === firstBracket;
+  } else if (firstBrace !== -1) {
+    s = firstBrace;
+  } else if (firstBracket !== -1) {
+    s = firstBracket;
+    isArray = true;
+  }
+  
   if (s === -1) throw new Error("No JSON found in model response");
   
-  // Find the last closing brace
-  let e = t.lastIndexOf("}");
+  // Find the last closing character
+  let e = isArray ? t.lastIndexOf("]") : t.lastIndexOf("}");
   
-  // If no closing brace or JSON appears truncated, try to repair it
+  // If no closing char or JSON appears truncated, try to repair it
   if (e === -1 || e < s) {
     // Attempt to close open JSON by appending closing chars
     let partial = t.slice(s);
@@ -220,16 +235,11 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
     } else if (activeProvider === "groq") {
       result = await analyzeWithGroq(content, "llama-3.1-8b-instant", apiKey);
     } else if (activeProvider === "ollama") {
-      try {
-        result = await analyzeWithOllama(content, "gemma2");
-      } catch (e) {
-        result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
-        if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
-      }
+      result = await analyzeWithOllama(content, activeModel);
     } else if (activeProvider === "gemini") {
       result = await analyzeWithGemini(content, GEMINI_MODEL, apiKey);
     } else if (activeProvider === "claude") {
-      result = await analyzeWithClaude(content, "claude-3-5-sonnet-20241022", apiKey);
+      result = await analyzeWithClaude(content, "claude-sonnet-5", apiKey);
     } else {
       result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
       if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
@@ -430,11 +440,11 @@ function evaluateHeuristically(job, resumeText, fileName) {
   };
 }
 
-async function analyzeWithClaude(content, model = "claude-3-5-sonnet-20241022", apiKey) {
+async function analyzeWithClaude(content, model = "claude-sonnet-5", apiKey) {
   const client = getClaudeClient(apiKey);
   
   const modelsToTry = [
-    "claude-3-5-sonnet-20241022",
+    "claude-sonnet-5",
     "claude-3-5-haiku-20241022",
     "claude-3-5-sonnet-latest",
     "claude-3-sonnet-20240229"
@@ -914,7 +924,7 @@ function enforceProctoringOverride(evaluation, proctoring) {
   return evaluation;
 }
 
-export async function generateInterviewQuestions(job, candidate = {}, overrideProvider, apiKey) {
+export async function generateInterviewQuestions(job = {}, candidate = {}, overrideProvider, apiKey) {
   const candidateName = candidate?.result?.candidateName || candidate?.name || candidate?.label || "Candidate";
   const skillsList = (candidate.result?.topSkills || candidate.skills || []).join(", ") || "Not specified";
   const summary = candidate.result?.summary || candidate.summary || "";
@@ -953,12 +963,24 @@ Return ONLY a valid JSON array of 5 strings, no markdown, no commentary.`;
   } else {
     // Claude
     const client = getClaudeClient(apiKey);
-    const response = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: messages,
-    });
+    let response;
+    try {
+      response = await client.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: messages
+      });
+    } catch (modelErr) {
+      if (modelErr.status === 404) {
+        response = await client.messages.create({
+          model: "claude-opus-5",
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: messages
+        });
+      } else throw modelErr;
+    }
     resultText = (response.content || []).filter(b => b.type === "text").map(b => b.text).join("");
   }
   
@@ -1023,12 +1045,24 @@ Return ONLY valid JSON.`;
     resultText = data.message?.content || "";
   } else {
     const client = getClaudeClient(apiKey);
-    const message = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 800,
-      system: systemPrompt,
-      messages: [{ role: "user", content: prompt }],
-    });
+    let message;
+    try {
+      message = await client.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 800,
+        system: systemPrompt,
+        messages: [{ role: "user", content: prompt }]
+      });
+    } catch (modelErr) {
+      if (modelErr.status === 404) {
+        message = await client.messages.create({
+          model: "claude-opus-5",
+          max_tokens: 800,
+          system: systemPrompt,
+          messages: [{ role: "user", content: prompt }]
+        });
+      } else throw modelErr;
+    }
     resultText = (message.content || []).filter(b => b.type === "text").map(b => b.text).join("");
   }
 
