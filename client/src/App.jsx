@@ -1273,27 +1273,6 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }
             {actionNotice === "copy" ? "Link Copied!" : "📋 Copy Link"}
           </button>
 
-          <button
-            onClick={(e) => { e.stopPropagation(); onStartInterview(c); }}
-            style={{
-              padding: "7px 13px",
-              background: C.accentSoft,
-              color: C.accent,
-              border: `1px solid ${C.accent}`,
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontFamily: BODY,
-              transition: "all 0.15s ease"
-            }}
-          >
-            <MessageSquare size={14} /> Start AI Interview
-          </button>
-
           {open ? <ChevronDown size={18} color={C.faint} /> : <ChevronRight size={18} color={C.faint} />}
         </div>
       </div>
