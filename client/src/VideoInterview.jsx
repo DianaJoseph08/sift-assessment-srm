@@ -73,6 +73,14 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
   const isTypingFocusedRef = useRef(false); // tracks if textarea is currently focused
   const faceMissingRef = useRef(false);
   useEffect(() => { faceMissingRef.current = faceMissing; }, [faceMissing]);
+  const userTextRef = useRef(userText);
+  useEffect(() => { userTextRef.current = userText; }, [userText]);
+  const questionsRef = useRef(questions);
+  useEffect(() => { questionsRef.current = questions; }, [questions]);
+  const qIndexRef = useRef(qIndex);
+  useEffect(() => { qIndexRef.current = qIndex; }, [qIndex]);
+  const transcriptRef = useRef(transcript);
+  useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
   // ── Malpractice logging ──────────────────────────────────────────────────
   const logMalpractice = useCallback((type, key) => {
@@ -388,67 +396,71 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
 
   // ── Submit Answer ─────────────────────────────────────────────────────────
   const handleSubmitAnswer = useCallback((autoAdvanced = false) => {
-    clearInterval(timerRef.current);
+    const rawText = userTextRef.current || "";
+    let answer = rawText.trim();
+    if (!answer && autoAdvanced && (faceMissingRef.current || lastSkippedByAbsence)) {
+      answer = "[No response — candidate was not present at camera]";
+    } else if (!answer && autoAdvanced) {
+      answer = "[No response — time expired]";
+    } else if (!answer) {
+      answer = "[No response provided]";
+    }
 
-    setUserText(currentText => {
-      let answer = currentText.trim();
-      if (!answer && autoAdvanced && (faceMissingRef.current || lastSkippedByAbsence)) {
-        answer = "[No response — candidate was not present at camera]";
-      } else if (!answer && autoAdvanced) {
-        answer = "[No response — time expired]";
-      } else if (!answer) {
-        answer = "[No response provided]";
-      }
-      setLastSkippedByAbsence(false);
-      setQuestions(currentQs => {
-        setQIndex(currentIdx => {
-          const currentQ = currentQs[currentIdx];
-          setTranscript(prev => {
-            const updated = [...prev, { q: currentQ, a: answer }];
-            const nextIndex = currentIdx + 1;
-            if (nextIndex >= currentQs.length) {
-              setPhase("evaluating");
-              fetchEvaluation(updated).then(report => {
-                setFinalReport(report);
-                setPhase("completed");
-                
-                // Log proctoring stats
-                fetch("/api/save-proctoring", {
-                  method: "POST", headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ candidateId: candidate?.id, malpractice, malpracticeLog, transcript: updated, report })
-                }).catch(() => {});
-                
-                // SAVE THE EVALUATION TO THE DATABASE
-                if (candidate?.id) {
-                  fetch("/api/candidate-interview-submit", {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      candidateId: candidate.id,
-                      score: report.technicalScore,
-                      summary: report.summary,
-                      transcript: updated,
-                      proctoring: malpractice
-                    })
-                  }).catch(() => {});
-                }
+    // Reset input box
+    setUserText("");
+    setLastSkippedByAbsence(false);
 
-                streamRef.current?.getTracks().forEach(t => t.stop());
-                clearInterval(faceIntervalRef.current);
-                if (onComplete) onComplete(report);
-              });
-            } else {
-              setQIndex(nextIndex);
-              // Do NOT reset timeLeft: 30 minutes is the global limit for the entire interview
-            }
-            return updated;
-          });
-          return currentIdx;
-        });
-        return currentQs;
+    const currentQs = questionsRef.current || [];
+    const currentIndex = qIndexRef.current;
+    const currentQ = currentQs[currentIndex] || "";
+
+    const updatedTranscript = [...(transcriptRef.current || []), { q: currentQ, a: answer }];
+    setTranscript(updatedTranscript);
+
+    const nextIndex = currentIndex + 1;
+    if (nextIndex >= currentQs.length) {
+      // Completed all questions! Stop timer and evaluate
+      clearInterval(timerRef.current);
+      setPhase("evaluating");
+      fetchEvaluation(updatedTranscript).then(report => {
+        setFinalReport(report);
+        setPhase("completed");
+        
+        // Log proctoring stats
+        fetch("/api/save-proctoring", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidateId: candidate?.id, malpractice, malpracticeLog, transcript: updatedTranscript, report })
+        }).catch(() => {});
+        
+        // SAVE THE EVALUATION TO THE DATABASE
+        if (candidate?.id) {
+          fetch("/api/candidate-interview-submit", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              candidateId: candidate.id,
+              score: report.technicalScore,
+              summary: report.summary,
+              transcript: updatedTranscript,
+              proctoring: malpractice
+            })
+          }).catch(() => {});
+        }
+
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        clearInterval(faceIntervalRef.current);
+        if (onComplete) onComplete(report);
       });
-      return "";
-    });
+    } else {
+      // Correctly advance to next question in state
+      setQIndex(nextIndex);
+    }
   }, [fetchEvaluation, malpractice, malpracticeLog, candidate, onComplete, lastSkippedByAbsence]);
+
+  useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [transcript]);
 
   useEffect(() => { submitFnRef.current = handleSubmitAnswer; }, [handleSubmitAnswer]);
 
