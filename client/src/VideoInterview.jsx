@@ -3,14 +3,14 @@ import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 
 /* ============================================================
    COGNIHIRE — AI VIDEO INTERVIEW & PROCTORING PLATFORM
-   - Powered by AI
-   - Video feed + Voice input + Text fallback
-   - Full malpractice detection
-   - 3-minute countdown per question (auto-advance at 0:00)
-   - Candidate can submit at any time
+   - Powered by Anthropic Claude AI
+   - Video feed + Direct text entry
+   - AI-assisted proctoring telemetry
+   - 30-minute self-paced overall interview timer
+   - Candidates manage their own time across questions
    ============================================================ */
 
-const MAX_SECONDS = 180; // 3 minutes per question, auto-advance at 0
+const TOTAL_INTERVIEW_SECONDS = 30 * 60; // 30 minutes total for the entire interview
 const MEDIAPIPE_WASM = "/wasm";
 const FACE_MODEL_URL = "/face_landmarker.task";
 
@@ -47,7 +47,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
   const [faceDetectorReady, setFaceDetectorReady] = useState(false);
   const [detectorStatus, setDetectorStatus] = useState("initializing"); // "initializing" | "ready" | "error"
   const [lastSkippedByAbsence, setLastSkippedByAbsence] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(MAX_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(TOTAL_INTERVIEW_SECONDS);
   const [finalReport, setFinalReport] = useState(null);
 
   // Malpractice
@@ -438,7 +438,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
               });
             } else {
               setQIndex(nextIndex);
-              setTimeLeft(MAX_SECONDS);
+              // Do NOT reset timeLeft: 30 minutes is the global limit for the entire interview
             }
             return updated;
           });
@@ -452,21 +452,21 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
 
   useEffect(() => { submitFnRef.current = handleSubmitAnswer; }, [handleSubmitAnswer]);
 
-  // ── Timer: countdown from 3:00 per question, auto-submits at 0:00 ──────────
+  // ── Global Interview Timer: 30-minute continuous countdown for the whole interview ───
   useEffect(() => {
     if (phase !== "interview") return;
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current);
-          submitFnRef.current?.(true);
+          submitFnRef.current?.(true); // Auto-submits interview when 30 mins expires
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [phase, qIndex]);
+  }, [phase]);
 
   // ── Start Interview ───────────────────────────────────────────────────────
   const handleStartInterview = async () => {
@@ -477,7 +477,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
     const qs = await fetchQuestions();
     setQuestions(qs);
     setQIndex(0);
-    setTimeLeft(MAX_SECONDS);
+    setTimeLeft(TOTAL_INTERVIEW_SECONDS);
     setPhase("interview");
   };
 
@@ -487,7 +487,8 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
 
   const totalMalpractice = Object.values(malpractice).reduce((a, b) => a + b, 0);
   const integrityPct = Math.max(30, 100 - totalMalpractice * 7);
-  const timerColor = timeLeft <= 30 ? "#EF4444" : timeLeft <= 60 ? "#F59E0B" : "#22C55E";
+  // Warning at 5 minutes, Critical at 3 minutes
+  const timerColor = timeLeft <= 180 ? "#EF4444" : timeLeft <= 300 ? "#F59E0B" : "#22C55E";
   const currentQ = questions[qIndex] || "";
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -510,7 +511,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
             {[
               ["Candidate", candidateName],
               ["Position", job?.title || "Applied Position"],
-              ["Questions", "5 Questions · 3 minutes each"],
+              ["Duration", "30 Minutes Total (Self-Paced) · 5 Questions"],
               ["Input", "⌨️ Direct text response"],
               ["Proctoring", "🔐 Active (Video + AI Eye Gaze)"],
             ].map(([k, v]) => (
@@ -526,10 +527,10 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
             <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#FCD34D", fontSize: 12.5, lineHeight: 2 }}>
               <li>Keep your face <strong>visible and looking directly at the screen</strong> at all times.</li>
               <li style={{ color: "#FCA5A5", fontWeight: 800, fontSize: 13 }}>
-                🚨 <strong>Do NOT move away from the screen</strong>: If you leave the camera frame during a question, that question will be <strong>immediately closed and auto-submitted</strong> as a fraud prevention measure, and you will <strong>NOT be able to answer it again</strong>.
+                🚨 <strong>Do NOT leave the camera frame</strong>: Leaving the camera frame or turning away will be flagged as malpractice in your integrity score.
               </li>
-              <li>👁️ <strong>Do NOT look outside the screen</strong> or down at notes/devices: Looking away or turning your head is actively tracked and flagged as malpractice.</li>
-              <li>⏱️ <strong>Timer starts automatically</strong>: You have 3 minutes per question. The timer begins as soon as you enter.</li>
+              <li>👁️ <strong>Do NOT look outside the screen</strong> or down at notes/devices: Looking away or turning your head is actively tracked and flagged.</li>
+              <li>⏱️ <strong>30-Minute Global Timer</strong>: You have a single 30-minute timer for the entire interview. Questions are self-paced and not individually time-bound.</li>
               <li>🚫 Tab switches, minimizing windows, copy-paste, and keyboard shortcuts are strictly blocked and recorded.</li>
             </ul>
           </div>
@@ -662,6 +663,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
           {/* Countdown Timer */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 14px", background: timerColor + "22", border: `1px solid ${timerColor}`, borderRadius: 8 }}>
             <span style={{ fontSize: 14 }}>⏱</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: timerColor }}>TOTAL:</span>
             <span style={{ fontSize: 16, fontWeight: 800, color: timerColor, fontFamily: "monospace" }}>{formatTime(timeLeft)}</span>
           </div>
           <div style={{ fontSize: 12, color: "#94A3B8", fontWeight: 600 }}>Q{qIndex + 1}/{questions.length}</div>
@@ -711,7 +713,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
                   Face Not Detected
                 </div>
                 <div style={{ fontSize: 11.5, marginTop: 6, color: "#FEE2E2", fontWeight: 600, lineHeight: 1.5, maxWidth: 240 }}>
-                  ⚠️ Do not leave the camera screen! Question will auto-submit in ~2 seconds to prevent cheating.
+                  ⚠️ Please face the camera directly to continue your interview.
                 </div>
               </div>
             )}
@@ -725,17 +727,17 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
           {/* Timer visual */}
           <div style={{ background: "#1E293B", borderRadius: 10, padding: 14, border: `1px solid ${timerColor}44` }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>Time Remaining</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: timerColor, fontFamily: "monospace" }}>{formatTime(timeLeft)}</span>
+              <span style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>Overall Time</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: timerColor, fontFamily: "monospace" }}>{formatTime(timeLeft)} / 30:00</span>
             </div>
             <div style={{ height: 6, background: "#0F172A", borderRadius: 3, overflow: "hidden" }}>
               <div style={{
-                width: `${(timeLeft / MAX_SECONDS) * 100}%`, height: "100%", borderRadius: 3,
+                width: `${(timeLeft / TOTAL_INTERVIEW_SECONDS) * 100}%`, height: "100%", borderRadius: 3,
                 background: timerColor, transition: "width 1s linear, background 0.5s"
               }} />
             </div>
             <div style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>
-              Auto-submits when timer reaches 0:00
+              30 minutes total across all questions (self-paced)
             </div>
           </div>
 
@@ -773,7 +775,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
             <div>
               <div style={{ fontSize: 14, fontWeight: 800, color: "#F8FAFC" }}>AI Interviewer ({llmProvider || "Auto"})</div>
               <div style={{ fontSize: 11, color: faceMissing ? "#EF4444" : "#64748B", fontWeight: 600 }}>
-                {faceMissing ? "🚨 Face not detected — return to camera" : "✅ 3-minute timer running · Type and submit your answer"}
+                {faceMissing ? "🚨 Face not detected — return to camera" : "✅ 30-minute session running · Self-paced answers"}
               </div>
             </div>
             <div style={{ marginLeft: "auto", textAlign: "right" }}>
@@ -866,7 +868,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
               </button>
             </div>
             <div style={{ fontSize: 10.5, color: "#475569", marginTop: 8, textAlign: "center" }}>
-              ⌨️ Type your response · Submit anytime · Auto-submits at 0:00 · Press Enter or click Submit
+              ⌨️ Type your response · Self-paced (30m total) · Press Enter or click Submit
             </div>
           </div>
         </div>
