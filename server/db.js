@@ -168,6 +168,36 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+`);
+
+/**
+ * System Settings Key-Value Store
+ */
+export function getSetting(key) {
+  try {
+    const q = db.prepare("SELECT value FROM system_settings WHERE key = ?");
+    const row = q.get(key);
+    return row ? row.value : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function saveSetting(key, value) {
+  try {
+    const q = db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)");
+    q.run(key, value);
+    syncToPersistentStorage(true);
+  } catch (e) {
+    console.error(`Failed to save setting ${key}:`, e.message);
+  }
+}
+
 /**
  * Companies Management
  */

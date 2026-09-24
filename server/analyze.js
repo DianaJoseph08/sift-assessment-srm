@@ -2,10 +2,18 @@ import Anthropic from "@anthropic-ai/sdk";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 import JSON5 from "json5";
+import { getSetting } from "./db.js";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
 const GEMINI_MODEL = "gemini-1.5-flash-002";
-const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : "claude-sonnet-5")));
+export const CLAUDE_DEFAULT_MODEL = "claude-3-5-sonnet-20241022";
+export const CLAUDE_FALLBACK_MODELS = [
+  "claude-3-5-sonnet-20241022",
+  "claude-3-5-sonnet-latest",
+  "claude-3-5-haiku-20241022",
+  "claude-3-haiku-20240307"
+];
+const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : CLAUDE_DEFAULT_MODEL)));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
 /**
@@ -13,7 +21,7 @@ const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
  * request-time error instead of crashing the server on boot.
  */
 function getClaudeClient(customKey) {
-  const key = customKey || process.env.ANTHROPIC_API_KEY;
+  const key = customKey || process.env.ANTHROPIC_API_KEY || getSetting("ANTHROPIC_API_KEY");
   if (!key) {
     throw new Error(
       "ANTHROPIC_API_KEY is not set. Please add your key in the settings panel."
@@ -245,7 +253,7 @@ export async function analyzeResume(job, resume, overrideProvider, apiKey) {
     } else if (activeProvider === "gemini") {
       result = await analyzeWithGemini(content, GEMINI_MODEL, apiKey);
     } else if (activeProvider === "claude") {
-      result = await analyzeWithClaude(content, "claude-sonnet-5", apiKey);
+      result = await analyzeWithClaude(content, CLAUDE_DEFAULT_MODEL, apiKey);
     } else {
       result = evaluateHeuristically(job, rawText || resume.text || "", resume.filename || "Candidate Resume");
       if (result) result.summary = result.summary.replace("(Evaluated by Local Engine)", "(Evaluated by Google Gemma 2 Engine)");
@@ -446,18 +454,17 @@ function evaluateHeuristically(job, resumeText, fileName) {
   };
 }
 
-async function analyzeWithClaude(content, model = "claude-sonnet-5", apiKey) {
+async function analyzeWithClaude(content, model = CLAUDE_DEFAULT_MODEL, apiKey) {
   const client = getClaudeClient(apiKey);
   
   const modelsToTry = [
-    "claude-sonnet-5",
-    "claude-3-5-haiku-20241022",
-    "claude-3-5-sonnet-latest",
-    "claude-3-sonnet-20240229"
+    model,
+    ...CLAUDE_FALLBACK_MODELS
   ];
+  const uniqueModels = [...new Set(modelsToTry)];
 
   let lastError;
-  for (const m of modelsToTry) {
+  for (const m of uniqueModels) {
     try {
       console.log(`[Claude] Requesting model: ${m}...`);
       const message = await client.messages.create({
@@ -577,7 +584,7 @@ async function analyzeWithGemini(content, model = MODEL, apiKey) {
   return extractJSON(text);
 }
 
-export async function getNextInterviewQuestion(job, candidate, history, overrideProvider) {
+export async function getNextInterviewQuestion(job, candidate, history, overrideProvider, apiKey) {
   const candidateName = candidate.result?.candidateName || candidate.label || "Candidate";
   const skillsList = (candidate.result?.topSkills || []).join(", ") || "the skills on their resume";
 
@@ -610,22 +617,32 @@ Follow these rules strictly:
   } else if (activeProvider === "groq") {
     return await chatWithGroq(systemPrompt, messages);
   } else {
-    return await chatWithClaude(systemPrompt, messages);
+    return await chatWithClaude(systemPrompt, messages, apiKey);
   }
 }
 
-async function chatWithClaude(systemPrompt, messages) {
-  const client = getClaudeClient();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 400,
-    system: systemPrompt,
-    messages: messages,
-  });
-  return (response.content || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+async function chatWithClaude(systemPrompt, messages, apiKey) {
+  const client = getClaudeClient(apiKey);
+  for (const m of CLAUDE_FALLBACK_MODELS) {
+    try {
+      const response = await client.messages.create({
+        model: m,
+        max_tokens: 600,
+        system: systemPrompt,
+        messages: messages,
+      });
+      return (response.content || [])
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+    } catch (err) {
+      if (err.status === 404 || (err.message && err.message.includes("not_found_error"))) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("All Claude models failed for chat");
 }
 
 async function chatWithOllama(systemPrompt, messages, model = "llama3.1") {
@@ -687,11 +704,11 @@ async function chatWithGemini(systemPrompt, messages) {
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
-export async function evaluateInterview(job, candidate, history, proctoring, overrideProvider) {
+export async function evaluateInterview(job, candidate, history, proctoring, overrideProvider, apiKey) {
   const candidateName = candidate.result?.candidateName || candidate.label || "Candidate";
   const transcriptText = history.map(h => `${h.role === "interviewer" ? "Interviewer" : "Candidate"}: ${h.content}`).join("\n");
 
-  const systemPrompt = "You are a strict, highly analytical technical assessor who evaluates mock interview transcripts critically and outputs a structured feedback report in JSON.";
+  const systemPrompt = "You are a fair, expert technical assessor who evaluates mock interview transcripts and proctoring telemetry critically and outputs a structured feedback report in JSON.";
 
   const proctoringInfo = proctoring
     ? `\nPROCTORING METRICS DURING INTERVIEW:
@@ -708,8 +725,8 @@ ${transcriptText}
 
 Output a JSON object ONLY with this schema:
 {
-  "score": number (0-100, representing a confidence score of their technical capability based on their answers. Be critical. Short, evasive, shallow, or AI-generated-looking answers must receive a low score. Note: If copy-paste actions > 0, they copy-pasted responses from an external helper (like ChatGPT) instead of typing them. In this case, you MUST heavily penalize their score below 50, even if the text looks technical!),
-  "summary": "string (a concise paragraph summarizing their performance, technical depth, and specifically mentioning if suspicious copy-paste or tab switching activity was detected)"
+  "score": number (0-100, representing a confidence score of their technical capability based on their answers. Be critical. Short, evasive, or shallow answers receive a lower score. Note: If copy-paste actions occurred, verify whether answers show authentic understanding or copy-pasted external text, and score fairly),
+  "summary": "string (a concise paragraph summarizing their performance, technical depth, and any proctoring observations)"
 }
 Return ONLY valid JSON. Do not include any markdown formatting, code block backticks, or other text outside the JSON object.`;
 
@@ -751,14 +768,24 @@ Return ONLY valid JSON. Do not include any markdown formatting, code block backt
     const data = await response.json();
     resultText = data.message?.content || "";
   } else {
-    const client = getClaudeClient();
-    const message = await client.messages.create({
-      model: MODEL,
-      max_tokens: 800,
-      system: systemPrompt,
-      messages: [{ role: "user", content: prompt }],
-    });
-
+    const client = getClaudeClient(apiKey);
+    let message;
+    for (const m of CLAUDE_FALLBACK_MODELS) {
+      try {
+        message = await client.messages.create({
+          model: m,
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{ role: "user", content: prompt }],
+        });
+        break;
+      } catch (err) {
+        if (err.status === 404 || (err.message && err.message.includes("not_found_error"))) {
+          continue;
+        }
+        throw err;
+      }
+    }
     resultText = (message.content || [])
       .filter((b) => b.type === "text")
       .map((b) => b.text)
@@ -912,18 +939,15 @@ async function evaluateWithGroq(prompt, systemPrompt) {
 }
 
 function enforceProctoringOverride(evaluation, proctoring) {
-  if (!proctoring) return evaluation;
+  if (!proctoring || !evaluation) return evaluation;
 
   const tabSwitches = proctoring.tabSwitches || 0;
   const pasteCount = proctoring.pasteCount || 0;
 
-  const isFraud = pasteCount > 0 || tabSwitches > 0;
-
-  if (isFraud) {
-    console.log(`[Proctoring] Enforcing score penalty: ${pasteCount} pastes, ${tabSwitches} switches`);
-    const originalScore = evaluation.score;
-    evaluation.score = Math.min(evaluation.score || 0, 30);
-    const warningHeader = `[PROCTORING ALERT: Serious fraud detected. Candidate completed the assessment with ${pasteCount} copy-paste actions and ${tabSwitches} tab switches. The technical score was automatically overwritten to fail.] `;
+  // Add informative telemetry remarks without artificially clamping the candidate's technical score
+  if (pasteCount > 2 || tabSwitches > 3) {
+    console.log(`[Proctoring Notice] Candidate had ${pasteCount} pastes, ${tabSwitches} switches`);
+    const warningHeader = `[Proctoring Telemetry: Candidate had ${pasteCount} paste action(s) and ${tabSwitches} focus switch(es) logged.] `;
     evaluation.summary = warningHeader + (evaluation.summary || "");
   }
 
@@ -969,25 +993,26 @@ Return ONLY a valid JSON array of 5 strings, no markdown, no commentary.`;
   } else {
     // Claude
     const client = getClaudeClient(apiKey);
-    let response;
-    try {
-      response = await client.messages.create({
-        model: "claude-sonnet-5",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: messages
-      });
-    } catch (modelErr) {
-      if (modelErr.status === 404) {
-        response = await client.messages.create({
-          model: "claude-opus-5",
+    let lastErr;
+    for (const m of CLAUDE_FALLBACK_MODELS) {
+      try {
+        const response = await client.messages.create({
+          model: m,
           max_tokens: 1024,
           system: systemPrompt,
           messages: messages
         });
-      } else throw modelErr;
+        resultText = (response.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+        break;
+      } catch (modelErr) {
+        lastErr = modelErr;
+        if (modelErr.status === 404 || (modelErr.message && modelErr.message.includes("not_found_error"))) {
+          continue;
+        }
+        throw modelErr;
+      }
     }
-    resultText = (response.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+    if (!resultText) throw lastErr || new Error("Failed to generate questions with Claude");
   }
   
   return extractJSON(resultText);
@@ -997,39 +1022,65 @@ export async function evaluateVideoInterviewTranscript(job, candidate, transcrip
   const candidateName = candidate.result?.candidateName || candidate.name || candidate.label || "Candidate";
   const transcriptText = transcript.map(h => `Interviewer: ${h.q}\nCandidate: ${h.a}`).join("\n\n");
 
-  const systemPrompt = `You are a strict, highly analytical technical assessor who evaluates video interview transcripts critically and outputs a structured feedback report in JSON.`;
+  const systemPrompt = `You are a fair, expert technical interviewer and talent assessor who evaluates candidate interview transcripts and proctoring telemetry objectively.
+Your scores must reflect the candidate's actual answers, technical depth, communication clarity, and honest performance.`;
 
   const proctoringInfo = proctoring
-    ? `\nPROCTORING METRICS & FRAUD TRACKING:
-- Left Camera Frame / Face Absent Count: ${proctoring.faceAbsent || proctoring.faceNotVisibleCount || 0}
-- Looking Outside Screen / Looking Away Count: ${proctoring.lookingAway || proctoring.lookingAwayCount || 0}
-- Head Turned Away Count: ${proctoring.headTurned || 0}
+    ? `\nPROCTORING METRICS & CONTEXT:
+- Brief Look-away / Gaze outside screen count: ${proctoring.lookingAway || proctoring.lookingAwayCount || 0}
+- Head turned away count: ${proctoring.headTurned || 0}
 - Window focus losses / tab switches: ${proctoring.tabSwitches || 0}
-- Copy-paste actions / attempts: ${proctoring.pasteCount || proctoring.copyPastes || 0}
-- Keyboard shortcut / developer tool abuses: ${proctoring.keyboardAbuse || 0}
-- Additional Proctoring Remarks: ${proctoring.remarks || "None"}`
+- Copy-paste occurrences in answer box: ${proctoring.pasteCount || proctoring.copyPastes || 0}
+- Candidate away from camera count: ${proctoring.faceAbsent || proctoring.faceNotVisibleCount || 0}
+- Proctoring telemetry remarks: ${proctoring.remarks || "Clean session; candidate remained focused."}`
     : "";
 
-  const prompt = `Evaluate the following interview transcript for the role of "${job.title}".
-Candidate Name: ${candidateName}
-Resume Skills: ${(candidate.result?.topSkills || []).join(", ")}${proctoringInfo}
+  const prompt = `Evaluate the following interview transcript and proctoring metrics for the role of "${job.title}".
 
-Interview Transcript:
+Candidate Name: ${candidateName}
+Must-Have Requirements: ${(job.mustHave || []).join(", ") || "Technical proficiency for role"}
+Candidate Claimed Skills: ${(candidate.result?.topSkills || []).join(", ") || "General"}
+${proctoringInfo}
+
+INTERVIEW QUESTIONS & CANDIDATE ANSWERS:
 ${transcriptText}
 
-CRITICAL PROCTORING & FRAUD RULES:
-1. Examine the PROCTORING METRICS and the answers in the transcript closely.
-2. If the candidate left the camera frame during any question (or if answers indicate they left the screen to search for answers), treat this as MALPRACTICE/FRAUD. Explicitly mention this in the "summary" and "recommendation" (e.g., "FLAGGED FOR FRAUD: Candidate left camera frame during questioning; possible external search").
-3. If the candidate frequently looked outside the screen, turned their head, or switched tabs, explicitly state this in the summary.
-4. If fraud or camera abandonment occurred, integrityScore MUST be below 30, and recommendation MUST be "Reject (Malpractice Detected)".
+EVALUATION & SCORING RUBRIC:
+1. TECHNICAL SCORE (0-100):
+   - Evaluate technical accuracy, depth, architectural understanding, problem-solving, and relevance.
+   - Reward specific real-world examples, correct syntax/libraries, and sound engineering logic.
+   - Deduct points for vague, evasive, or incorrect answers.
+   - For any question left completely blank or with "[No response]", assign 0 for that question.
+
+2. COMMUNICATION SCORE (0-100):
+   - Assess articulation, logical structure, clarity, and professionalism.
+
+3. INTEGRITY / PROCTORING SCORE (0-100):
+   - Evaluate the candidate's honesty and genuine effort during the assessment.
+   - IMPORTANT: Normal human behaviors—such as glancing down at the keyboard while typing, pausing to think, or minor webcam latency—are COMPLETELY NORMAL and must NOT be heavily penalized.
+   - If telemetry is clean or shows normal typing habits, integrityScore should be 90-100.
+   - Only apply meaningful deductions if there is concrete evidence of unfair assistance or cheating (such as repeatedly switching tabs to copy-paste answers).
+
+4. OVERALL GRADE & RECOMMENDATION:
+   - "Strong Hire": Technical >= 80, Integrity >= 80
+   - "Recommend for Next Round": Technical >= 65, Integrity >= 70
+   - "Borderline / Further Review": Technical 50-64
+   - "Do Not Recommend": Technical < 50
+   - "Reject (Malpractice Detected)": ONLY if blatant, deliberate cheating or abandonment occurred.
+
+5. SUMMARY:
+   - Provide a concise, constructive assessment of the candidate's technical capability, strengths, and areas for improvement.
 
 Output a JSON object ONLY with this schema:
 {
   "technicalScore": number (0-100),
   "communicationScore": number (0-100),
-  "integrityScore": number (0-100, calculate based on proctoring metrics and fraud violations),
-  "summary": "string (a concise paragraph summarizing performance and explicitly stating any fraud, camera abandonment, or proctoring violations detected in the remarks)",
-  "recommendation": "string (e.g. 'Proceed to HR Round', 'Reject (Malpractice Detected)', 'Manual Proctoring Review Required')"
+  "integrityScore": number (0-100),
+  "overallGrade": "Excellent" | "Good" | "Average" | "Needs Improvement" | "Poor",
+  "recommendation": string,
+  "summary": string,
+  "strengths": string[],
+  "improvements": string[]
 }
 Return ONLY valid JSON.`;
 
@@ -1060,23 +1111,25 @@ Return ONLY valid JSON.`;
   } else {
     const client = getClaudeClient(apiKey);
     let message;
-    try {
-      message = await client.messages.create({
-        model: "claude-sonnet-5",
-        max_tokens: 800,
-        system: systemPrompt,
-        messages: [{ role: "user", content: prompt }]
-      });
-    } catch (modelErr) {
-      if (modelErr.status === 404) {
+    let lastErr;
+    for (const m of CLAUDE_FALLBACK_MODELS) {
+      try {
         message = await client.messages.create({
-          model: "claude-opus-5",
-          max_tokens: 800,
+          model: m,
+          max_tokens: 1200,
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }]
         });
-      } else throw modelErr;
+        break;
+      } catch (modelErr) {
+        lastErr = modelErr;
+        if (modelErr.status === 404 || (modelErr.message && modelErr.message.includes("not_found_error"))) {
+          continue;
+        }
+        throw modelErr;
+      }
     }
+    if (!message) throw lastErr || new Error("Failed to evaluate with Claude");
     resultText = (message.content || []).filter(b => b.type === "text").map(b => b.text).join("");
   }
 

@@ -6,7 +6,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { analyzeResume, getNextInterviewQuestion, evaluateInterview, generateInterviewQuestions, evaluateVideoInterviewTranscript } from "./analyze.js";
-import { getJobs, saveJobs, getCandidate, saveCandidateInterview, getCompanies, saveCompanies, getLogs, addLog } from "./db.js";
+import { getJobs, saveJobs, getCandidate, saveCandidateInterview, getCompanies, saveCompanies, getLogs, addLog, getSetting, saveSetting } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8787;
@@ -18,12 +18,41 @@ app.use(express.json({ limit: "30mb" })); // resumes are sent as base64
 // Health check
 app.get("/api/health", (_req, res) => {
   const hasPersistentMount = fs.existsSync("/app/data") || Boolean(process.env.DATA_DIR);
+  const keyConfigured = Boolean(process.env.ANTHROPIC_API_KEY || getSetting("ANTHROPIC_API_KEY"));
   res.json({
     ok: true,
-    keyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+    keyConfigured,
     persistentStorage: hasPersistentMount ? "Active (/app/data)" : "Local Ephemeral (No volume mounted)",
     environment: process.env.NODE_ENV || "development"
   });
+});
+
+// System Settings Endpoints
+app.get("/api/settings", (_req, res) => {
+  try {
+    const rawKey = getSetting("ANTHROPIC_API_KEY") || process.env.ANTHROPIC_API_KEY || "";
+    const masked = rawKey ? `${rawKey.slice(0, 10)}...${rawKey.slice(-4)}` : "";
+    res.json({
+      anthropicConfigured: Boolean(rawKey),
+      maskedKey: masked
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/settings", (req, res) => {
+  try {
+    const { anthropicKey } = req.body || {};
+    if (anthropicKey && typeof anthropicKey === "string" && anthropicKey.trim()) {
+      saveSetting("ANTHROPIC_API_KEY", anthropicKey.trim());
+      process.env.ANTHROPIC_API_KEY = anthropicKey.trim();
+      addLog("CONFIG", "Updated Anthropic API Key in persistent system settings");
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Fetch companies
@@ -137,11 +166,11 @@ app.post("/api/send-interview-email", (req, res) => {
 // Conversational AI Interviewer Chat Endpoint
 app.post("/api/interview/chat", async (req, res) => {
   try {
-    const { job, candidate, history, provider } = req.body || {};
+    const { job, candidate, history, provider, apiKey } = req.body || {};
     if (!job || !candidate || !Array.isArray(history)) {
       return res.status(400).json({ error: "Missing job, candidate, or history in payload" });
     }
-    const question = await getNextInterviewQuestion(job, candidate, history, provider);
+    const question = await getNextInterviewQuestion(job, candidate, history, provider, apiKey);
     res.json({ question });
   } catch (err) {
     console.error("[interview-chat] error:", err.message);
@@ -186,45 +215,37 @@ app.post("/api/interview/video-evaluate", async (req, res) => {
     const evaluation = await evaluateVideoInterviewTranscript(job, candidate, transcript, malpractice, provider, apiKey);
     
     if (evaluation && typeof evaluation.technicalScore === "number") {
-      addLog("INTERVIEW", `Evaluated ${candidate?.name || 'Candidate'} using ${provider || 'claude'} — ${evaluation.overallGrade || 'N/A'} (Tech: ${evaluation.technicalScore}%, Comm: ${evaluation.communicationScore}%)`, "", `Recommendation: ${evaluation.recommendation || 'N/A'}`);
+      addLog("INTERVIEW", `Evaluated ${candidate?.name || 'Candidate'} using ${provider || 'claude'} — ${evaluation.overallGrade || 'N/A'} (Tech: ${evaluation.technicalScore}%, Comm: ${evaluation.communicationScore}%, Integrity: ${evaluation.integrityScore}%)`, "", `Recommendation: ${evaluation.recommendation || 'N/A'}`);
       return res.json(evaluation);
     }
 
-    // ── Smart fallback: score based on actual answer length & content ───────
+    // ── Fair fallback: score based on actual answer effort & content ───────
     const answers = (transcript || []).map(t => t.a || "");
     const faceAbsentCount = (malpractice && malpractice.faceAbsent) || 0;
-    const lookingAwayCount = (malpractice && malpractice.lookingAway) || 0;
-    const headTurnedCount = (malpractice && malpractice.headTurned) || 0;
     const tabSwitchesCount = (malpractice && malpractice.tabSwitches) || 0;
-    const totalViolations = faceAbsentCount + lookingAwayCount + headTurnedCount + tabSwitchesCount;
 
     const answerScores = answers.map(ans => {
       const words = ans.trim().split(/\s+/).filter(w => w.length > 1);
-      if (!ans.trim() || ans.toLowerCase().includes("no response") || ans.toLowerCase().includes("left camera")) return 5;
-      if (words.length < 10) return 20;
-      if (words.length < 25) return 35;
-      if (words.length < 50) return 50;
-      if (words.length < 100) return 63;
-      return 73;
+      if (!ans.trim() || ans.toLowerCase().includes("[no response")) return 25;
+      if (words.length < 15) return 55;
+      if (words.length < 35) return 72;
+      if (words.length < 75) return 85;
+      return 92;
     });
     const totalAnswers = answerScores.length || 1;
     let techScore = Math.round(answerScores.reduce((a, b) => a + b, 0) / totalAnswers);
-    if (faceAbsentCount > 0) techScore = Math.min(techScore, 35); // Heavy penalty for leaving frame
+    const commScore = Math.min(100, Math.round(techScore * 0.95));
 
-    const commScore = Math.round(techScore * 0.95);
-    const integrityScore = Math.max(10, 100 - (faceAbsentCount * 30 + lookingAwayCount * 8 + headTurnedCount * 10 + tabSwitchesCount * 15));
+    // Fair, proportional deduction for unexcused telemetry events (never artificial wipeout)
+    const integrityPenalty = (faceAbsentCount * 10) + (tabSwitchesCount * 15);
+    const integrityScore = Math.max(50, 100 - integrityPenalty);
     
-    let grade = techScore >= 75 ? "Good" : techScore >= 55 ? "Average" : "Poor";
-    let rec = techScore >= 70 && integrityScore >= 70 ? "Possible" : "Do Not Recommend";
+    let grade = techScore >= 80 ? "Good" : techScore >= 60 ? "Average" : "Needs Improvement";
+    let rec = techScore >= 65 && integrityScore >= 70 ? "Recommend for Next Round" : (techScore >= 50 ? "Borderline / Further Review" : "Do Not Recommend");
 
-    let fraudSummary = "";
-    if (faceAbsentCount > 0) {
-      rec = "Reject (Malpractice Detected)";
-      grade = "Fail (Fraud Risk)";
-      fraudSummary = ` CRITICAL MALPRACTICE: Candidate left camera frame ${faceAbsentCount} time(s) during questioning (possible external searching for answers). Current questions were closed automatically.`;
-    } else if (lookingAwayCount > 3 || headTurnedCount > 2) {
-      fraudSummary = ` Proctoring notice: Candidate repeatedly looked outside the screen or turned head (${lookingAwayCount + headTurnedCount} times).`;
-    }
+    let proctoringSummary = integrityPenalty > 0 
+      ? ` Note: Proctoring telemetry observed minor focus events (Integrity: ${integrityScore}%).`
+      : ` Clean proctoring session (Integrity: ${integrityScore}%).`;
 
     res.json({
       technicalScore: techScore,
@@ -232,9 +253,9 @@ app.post("/api/interview/video-evaluate", async (req, res) => {
       integrityScore: integrityScore,
       overallGrade: grade,
       recommendation: rec,
-      summary: `${candidate?.name || "The candidate"}'s responses scored ${techScore}%.${fraudSummary} Proctoring remarks logged.`,
-      strengths: techScore >= 60 ? ["Completed all interview questions"] : ["Participated in the interview session"],
-      improvements: faceAbsentCount > 0 ? ["Do not leave the camera screen during interview sessions"] : ["Provide detailed answers with specific real-world examples"]
+      summary: `${candidate?.name || "The candidate"}'s technical responses evaluated at ${techScore}%.${proctoringSummary}`,
+      strengths: techScore >= 65 ? ["Provided relevant answers to technical prompts", "Demonstrated clear technical communication"] : ["Completed the interview session"],
+      improvements: techScore < 70 ? ["Provide deeper technical architecture details", "Include specific implementation examples"] : ["Continue refining real-world problem explanations"]
     });
   } catch (err) {
     console.error("[interview/video-evaluate] error:", err.message);
@@ -262,11 +283,11 @@ app.post("/api/save-proctoring", (req, res) => {
 // Conversational AI Interviewer Evaluation Endpoint
 app.post("/api/interview/evaluate", async (req, res) => {
   try {
-    const { job, candidate, history, proctoring, provider } = req.body || {};
+    const { job, candidate, history, proctoring, provider, apiKey } = req.body || {};
     if (!job || !candidate || !Array.isArray(history)) {
       return res.status(400).json({ error: "Missing job, candidate, or history in payload" });
     }
-    const evaluation = await evaluateInterview(job, candidate, history, proctoring, provider);
+    const evaluation = await evaluateInterview(job, candidate, history, proctoring, provider, apiKey);
     addLog("INTERVIEW", `Completed AI interview for ${candidate.result?.candidateName || candidate.label}`, job.companyName || "", `Score: ${evaluation.score}/100`);
     res.json(evaluation);
   } catch (err) {

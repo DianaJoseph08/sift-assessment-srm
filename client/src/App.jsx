@@ -2159,28 +2159,40 @@ function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, C }
   const [groqKey, setGroqKey] = useState(localStorage.getItem("GROQ_API_KEY") || "");
   const [savedMsg, setSavedMsg] = useState("");
 
-  const handleSaveKeys = () => {
+  const handleSaveKeys = async () => {
     if (anthropicKey) localStorage.setItem("ANTHROPIC_API_KEY", anthropicKey);
     if (geminiKey) localStorage.setItem("GEMINI_API_KEY", geminiKey);
     if (groqKey) localStorage.setItem("GROQ_API_KEY", groqKey);
-    setSavedMsg("API Keys saved successfully!");
-    setTimeout(() => setSavedMsg(""), 3000);
+    
+    // Sync Anthropic key to backend persistent database so candidates can interview securely
+    try {
+      if (anthropicKey) {
+        await fetch("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ anthropicKey })
+        });
+      }
+    } catch (e) {}
+
+    setSavedMsg("API Keys saved successfully and synced to server!");
+    setTimeout(() => setSavedMsg(""), 3500);
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 640 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 680 }}>
       <div>
         <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>Settings &amp; Configuration</h2>
-        <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Configure active LLM providers, API authentication keys, and application themes</p>
+        <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Configure active LLM providers, API authentication keys, and interview evaluation criteria</p>
       </div>
 
       <Panel title="Active AI Provider &amp; Model" sub="Select which AI engine screens resumes and conducts AI interviews" C={C}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {[
-            { id: "gemma", name: "Google Gemma 2 (Local / Ollama)", desc: "Google DeepMind open model optimized for technical resume evaluation.", badge: "DEFAULT" },
-            { id: "groq", name: "Meta Llama 3.1 8B", desc: "Fast, open-weights model engine for bulk screening.", badge: "FREE" },
-            { id: "gemini", name: "Google Gemini 1.5 Flash", desc: "Fast & affordable cloud model.", badge: "CLOUD" },
-            { id: "claude", name: "Anthropic Claude 3.5", desc: "High-precision commercial evaluation.", badge: "PAID" },
+            { id: "claude", name: "Anthropic Claude 3.5 Sonnet", desc: "Flagship, state-of-the-art conversational interviewer and talent assessor.", badge: "RECOMMENDED" },
+            { id: "gemini", name: "Google Gemini 1.5 Flash", desc: "Fast & affordable cloud model for automated screening.", badge: "CLOUD" },
+            { id: "groq", name: "Meta Llama 3.1 8B", desc: "High-speed open-weights engine for instant analysis.", badge: "FAST" },
+            { id: "gemma", name: "Google Gemma 2 (Local / Heuristic)", desc: "Offline fallback engine when cloud APIs are disabled.", badge: "OFFLINE" },
           ].map(p => (
             <div
               key={p.id}
@@ -2209,24 +2221,82 @@ function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, C }
         </div>
       </Panel>
 
-      <Panel title="API Credentials" sub="Keys are stored securely in your local browser storage" C={C}>
+      <Panel title="API Credentials" sub="Keys are stored securely and synced with the persistent database" C={C}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Groq API Key</label>
-            <input type="password" value={groqKey} onChange={e => setGroqKey(e.target.value)} placeholder="gsk_..." style={inputStyle(C)} />
+            <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Anthropic Claude API Key</label>
+            <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-api03-..." style={inputStyle(C)} />
+            <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>Used by the conversational interviewer and automated scoring engine.</div>
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Google Gemini API Key</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Google Gemini API Key (Optional)</label>
             <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." style={inputStyle(C)} />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Anthropic Claude API Key</label>
-            <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-..." style={inputStyle(C)} />
+            <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Groq API Key (Optional)</label>
+            <input type="password" value={groqKey} onChange={e => setGroqKey(e.target.value)} placeholder="gsk_..." style={inputStyle(C)} />
           </div>
           <button onClick={handleSaveKeys} style={btn("primary", C)}>
             Save API Keys
           </button>
           {savedMsg && <div style={{ fontSize: 12.5, color: "#16A34A", fontWeight: 700 }}>{savedMsg}</div>}
+        </div>
+      </Panel>
+
+      <Panel title="AI Interview Evaluation Rubric &amp; Prompt" sub="How Anthropic evaluates candidate performance and calculates marks" C={C}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+            Anthropic Claude evaluates the completed video interview transcript and proctoring telemetry using a multi-dimensional rubric:
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ padding: 12, borderRadius: 8, background: C.card, border: `1px solid ${C.line}` }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, marginBottom: 4 }}>💡 Technical Score (0–100)</div>
+              <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.5 }}>
+                Evaluates concept accuracy, depth of explanations, system architecture understanding, and practical implementation examples.
+              </div>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 8, background: C.card, border: `1px solid ${C.line}` }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, marginBottom: 4 }}>🗣️ Communication Score (0–100)</div>
+              <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.5 }}>
+                Evaluates clarity, logical thought structuring, conciseness, and professional workplace articulation.
+              </div>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 8, background: C.card, border: `1px solid ${C.line}` }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, marginBottom: 4 }}>🛡️ Integrity Score (0–100)</div>
+              <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.5 }}>
+                Evaluates proctoring metrics objectively. Looking at the keyboard to type or brief pauses to think are normal (90–100%). Deductions occur only for unexcused window switches or external cheating.
+              </div>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 8, background: C.card, border: `1px solid ${C.line}` }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, marginBottom: 4 }}>🎯 Hiring Recommendation</div>
+              <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.5 }}>
+                • <strong>Strong Hire</strong> (Tech ≥ 80, Integrity ≥ 80)<br/>
+                • <strong>Recommend for Next Round</strong> (Tech ≥ 65, Integrity ≥ 70)<br/>
+                • <strong>Borderline / Review</strong> (Tech 50–64)<br/>
+                • <strong>Do Not Recommend</strong> (Tech &lt; 50)
+              </div>
+            </div>
+          </div>
+
+          <details style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: C.accentSoft, border: `1px solid ${C.line}`, cursor: "pointer" }}>
+            <summary style={{ fontWeight: 700, fontSize: 12, color: C.ink }}>
+              View Complete System Prompt Used by Anthropic Claude
+            </summary>
+            <pre style={{ marginTop: 10, fontSize: 11, color: C.ink, whiteSpace: "pre-wrap", fontFamily: "monospace", lineHeight: 1.5 }}>
+{`You are a fair, expert technical interviewer and talent assessor who evaluates candidate interview transcripts and proctoring telemetry objectively.
+Your scores must reflect the candidate's actual answers, technical depth, communication clarity, and honest performance.
+
+SCORING CRITERIA:
+1. Technical Score (0-100): Accuracy, depth, problem-solving, and practical competence.
+2. Communication Score (0-100): Structure, clarity, and professionalism.
+3. Integrity Score (0-100): Evaluates honest engagement without penalizing typing or thinking pauses.
+4. Recommendation: Actionable hiring decision and constructive technical feedback.`}
+            </pre>
+          </details>
         </div>
       </Panel>
     </div>
@@ -2514,6 +2584,7 @@ export default function App() {
         candidate={activeInterviewCandidate}
         job={activeJob || { title: "Position", companyName: "Client Company" }}
         llmProvider={llmProvider}
+        apiKey={localStorage.getItem("ANTHROPIC_API_KEY") || ""}
         onComplete={(report) => {
           console.log("Interview completed:", report);
         }}

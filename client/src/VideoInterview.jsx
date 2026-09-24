@@ -33,7 +33,7 @@ function MalpracticeBadge({ count, label, color }) {
   );
 }
 
-export default function VideoInterview({ candidate, job, llmProvider, onComplete }) {
+export default function VideoInterview({ candidate, job, llmProvider = "claude", apiKey: propApiKey, onComplete }) {
   const r = candidate?.result || {};
   const candidateName = r.candidateName || candidate?.label || "Candidate";
 
@@ -175,23 +175,24 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
           const results = faceLandmarkerRef.current.detectForVideo(video, now);
           const nFaces = results?.faceLandmarks?.length || 0;
 
+          // Check if candidate is actively typing or focused on typing input
+          const isTypingActive = isTypingFocusedRef.current || (Date.now() - lastTypingTimeRef.current < 5000);
+
           if (nFaces === 0) {
             setFaceMissing(true);
             faceMissingRef.current = true;
             gazeAwayFrames = 0;
             headTurnFrames = 0;
 
-            // Instantly clear draft answer
-            if (awayFrames === 0) {
-              setUserText(""); 
-            }
-            
-            awayFrames++;
-            // If absent for 3 consecutive intervals (~2.1 seconds): auto-submit question and advance
-            if (awayFrames >= 3) {
-              logMalpractice("Left camera frame during question — auto-submitted (fraud prevention)", "faceAbsent");
-              setLastSkippedByAbsence(true);
-              if (submitFnRef.current) submitFnRef.current(true);
+            // Only count absence if candidate is NOT actively typing
+            if (!isTypingActive) {
+              awayFrames++;
+              // Record notice only if absent for 15 consecutive checks (~10.5 seconds)
+              if (awayFrames >= 15) {
+                logMalpractice("Candidate away from camera screen", "faceAbsent");
+                awayFrames = 0;
+              }
+            } else {
               awayFrames = 0;
             }
           } else {
@@ -301,17 +302,20 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
   // ── AI Questions ──────────────────────────────────────────────────────
   const fetchQuestions = useCallback(async () => {
     try {
-      let apiKey = undefined;
-      if (llmProvider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
-      else if (llmProvider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
-      else if (llmProvider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+      let apiKey = propApiKey || undefined;
+      const effectiveProvider = llmProvider || "claude";
+      if (!apiKey) {
+        if (effectiveProvider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
+        else if (effectiveProvider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
+        else if (effectiveProvider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+      }
 
       const res = await fetch("/api/interview/video-questions", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           job: { title: job?.title, description: job?.description, mustHave: job?.mustHave },
           candidate: { name: candidateName, skills: r.topSkills, education: r.education, summary: r.summary },
-          provider: llmProvider,
+          provider: effectiveProvider,
           apiKey
         })
       });
@@ -323,44 +327,47 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
       window.close(); // Close the interview window on critical failure
     }
     return [];
-  }, [candidateName, job, r, llmProvider]);
+  }, [candidateName, job, r, llmProvider, propApiKey]);
 
   const fetchEvaluation = useCallback(async (transcriptData) => {
     try {
-      let apiKey = undefined;
-      if (llmProvider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
-      else if (llmProvider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
-      else if (llmProvider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+      let apiKey = propApiKey || undefined;
+      const effectiveProvider = llmProvider || "claude";
+      if (!apiKey) {
+        if (effectiveProvider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
+        else if (effectiveProvider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
+        else if (effectiveProvider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+      }
 
       const remarksList = [];
       if (malpractice.faceAbsent > 0) {
-        remarksList.push(`MALPRACTICE / FRAUD DETECTED: Candidate was absent from the camera screen ${malpractice.faceAbsent} time(s) during questions. Questions were automatically closed and submitted.`);
+        remarksList.push(`Candidate was away from camera frame ${malpractice.faceAbsent} time(s).`);
       }
       if (malpractice.headTurned > 0) {
         remarksList.push(`Candidate turned head away from screen ${malpractice.headTurned} time(s).`);
       }
       if (malpractice.lookingAway > 0) {
-        remarksList.push(`Candidate looked outside screen or down at notes/desk ${malpractice.lookingAway} time(s).`);
+        remarksList.push(`Candidate looked down or away from screen ${malpractice.lookingAway} time(s).`);
       }
       if (malpractice.tabSwitches > 0) {
         remarksList.push(`Candidate switched browser tabs ${malpractice.tabSwitches} time(s).`);
       }
       if (malpractice.copyPastes > 0) {
-        remarksList.push(`Candidate attempted copy/paste ${malpractice.copyPastes} time(s).`);
+        remarksList.push(`Candidate pasted text into answer box ${malpractice.copyPastes} time(s).`);
       }
       const proctoringPayload = {
         ...malpractice,
-        remarks: remarksList.join(" ") || "No proctoring violations detected. Candidate remained focused on screen throughout the session."
+        remarks: remarksList.join(" ") || "Clean session; candidate remained focused on the screen."
       };
 
       const res = await fetch("/api/interview/video-evaluate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          job: { title: job?.title, description: job?.description },
+          job: { title: job?.title, description: job?.description, mustHave: job?.mustHave },
           candidate: { name: candidateName },
           transcript: transcriptData,
           malpractice: proctoringPayload,
-          provider: llmProvider,
+          provider: effectiveProvider,
           apiKey
         })
       });
@@ -377,7 +384,7 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
         recommendation: "Manual Review Required"
       };
     }
-  }, [job, candidateName, malpractice, llmProvider]);
+  }, [job, candidateName, malpractice, llmProvider, propApiKey]);
 
   // ── Submit Answer ─────────────────────────────────────────────────────────
   const handleSubmitAnswer = useCallback((autoAdvanced = false) => {
@@ -385,8 +392,8 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
 
     setUserText(currentText => {
       let answer = currentText.trim();
-      if (autoAdvanced && (faceMissingRef.current || lastSkippedByAbsence)) {
-        answer = "[NO RESPONSE — Candidate left the camera frame during the question. Question was automatically closed to prevent searching for answers elsewhere (fraud detection).]";
+      if (!answer && autoAdvanced && (faceMissingRef.current || lastSkippedByAbsence)) {
+        answer = "[No response — candidate was not present at camera]";
       } else if (!answer && autoAdvanced) {
         answer = "[No response — time expired]";
       } else if (!answer) {
