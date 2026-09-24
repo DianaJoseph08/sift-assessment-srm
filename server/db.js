@@ -1,9 +1,36 @@
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, "..", "sift.db");
+
+// Persistent database location for Google Cloud (Cloud Storage volume mount or environment variable)
+const bundledDbPath = path.join(__dirname, "..", "sift.db");
+const persistentDir = process.env.DATA_DIR || (fs.existsSync("/app/data") ? "/app/data" : null);
+
+let dbPath = process.env.DB_PATH;
+if (!dbPath) {
+  if (persistentDir) {
+    if (!fs.existsSync(persistentDir)) {
+      try { fs.mkdirSync(persistentDir, { recursive: true }); } catch (e) {}
+    }
+    dbPath = path.join(persistentDir, "sift.db");
+    // Seed persistent directory with pre-existing database if it doesn't exist yet
+    if (!fs.existsSync(dbPath) && fs.existsSync(bundledDbPath)) {
+      try {
+        fs.copyFileSync(bundledDbPath, dbPath);
+        console.log(`[db] Seeded initial database to persistent volume at: ${dbPath}`);
+      } catch (err) {
+        console.warn(`[db] Failed to seed database to ${dbPath}:`, err.message);
+      }
+    }
+  } else {
+    dbPath = bundledDbPath;
+  }
+}
+
+console.log(`[db] Connected to SQLite database at: ${dbPath}`);
 
 // Initialize database
 const db = new DatabaseSync(dbPath);

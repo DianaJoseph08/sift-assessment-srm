@@ -28,9 +28,10 @@ ENV PORT=8080
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy compiled frontend and server
+# Copy compiled frontend, backend server, and pre-seeded SQLite database
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/sift.db ./sift.db
 
 # Expose standard Cloud Run port (Cloud Run automatically injects PORT=8080)
 EXPOSE 8080

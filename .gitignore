@@ -1,12 +1,13 @@
-node_modules/
+﻿node_modules/
 dist/
 .env
 .env.local
 *.log
 .DS_Store
 .vite/
-*.db
-sift.db
+*.db-journal
+*.db-wal
+*.db-shm
 server/sift.db
 scratch/
 fix_*.*
