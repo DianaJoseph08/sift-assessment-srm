@@ -43,8 +43,6 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
   const [qIndex, setQIndex] = useState(0);
   const [transcript, setTranscript] = useState([]);
   const [userText, setUserText] = useState("");
-  const [listening, setListening] = useState(false);
-  const [aiSpeaking, setAiSpeaking] = useState(false);
   const [faceMissing, setFaceMissing] = useState(false);
   const [faceDetectorReady, setFaceDetectorReady] = useState(false);
   const [detectorStatus, setDetectorStatus] = useState("initializing"); // "initializing" | "ready" | "error"
@@ -129,43 +127,6 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
     };
   }, [phase, logMalpractice]);
 
-  // ── Speech Recognition ────────────────────────────────────────────────────
-  const startListening = useCallback(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.lang = "en-IN"; rec.continuous = true; rec.interimResults = true;
-    rec.onresult = (e) => {
-      let final = "";
-      for (let i = e.resultIndex; i < e.results.length; i++)
-        if (e.results[i].isFinal) final += e.results[i][0].transcript + " ";
-      if (final) setUserText(prev => prev + final);
-    };
-    rec.onend = () => setListening(false);
-    rec.start();
-    recognitionRef.current = rec;
-    setListening(true);
-  }, []);
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    setListening(false);
-  }, []);
-
-  // ── Text-to-Speech ────────────────────────────────────────────────────────
-  const speak = useCallback((text) => new Promise((resolve) => {
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "en-US"; utter.rate = 0.92; utter.pitch = 1.05;
-    const preferred = window.speechSynthesis.getVoices().find(v =>
-      v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female"));
-    if (preferred) utter.voice = preferred;
-    utter.onstart = () => setAiSpeaking(true);
-    utter.onend = () => { setAiSpeaking(false); resolve(); };
-    utter.onerror = () => { setAiSpeaking(false); resolve(); };
-    window.speechSynthesis.speak(utter);
-  }), []);
-
   // ── MediaPipe Face Gaze ───────────────────────────────────────────────────
   const initFaceLandmarker = useCallback(async () => {
     if (faceLandmarkerRef.current) return;
@@ -220,10 +181,9 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
             gazeAwayFrames = 0;
             headTurnFrames = 0;
 
-            // Instantly clear draft answer & stop mic
+            // Instantly clear draft answer
             if (awayFrames === 0) {
               setUserText(""); 
-              stopListening();
             }
             
             awayFrames++;
@@ -310,7 +270,7 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
       console.error("[FaceLandmarker] Initialization error:", e);
       setDetectorStatus("error");
     }
-  }, [logMalpractice, stopListening]);
+  }, [logMalpractice]);
 
   // ── Webcam ────────────────────────────────────────────────────────────────
   const startWebcam = useCallback(async () => {
@@ -421,10 +381,7 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
 
   // ── Submit Answer ─────────────────────────────────────────────────────────
   const handleSubmitAnswer = useCallback((autoAdvanced = false) => {
-    stopListening();
     clearInterval(timerRef.current);
-    window.speechSynthesis.cancel();
-    setAiSpeaking(false);
 
     setUserText(currentText => {
       let answer = currentText.trim();
@@ -470,7 +427,6 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
 
                 streamRef.current?.getTracks().forEach(t => t.stop());
                 clearInterval(faceIntervalRef.current);
-                window.speechSynthesis.cancel();
                 if (onComplete) onComplete(report);
               });
             } else {
@@ -485,7 +441,7 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
       });
       return "";
     });
-  }, [stopListening, fetchEvaluation, malpractice, malpracticeLog, candidate, onComplete, lastSkippedByAbsence]);
+  }, [fetchEvaluation, malpractice, malpracticeLog, candidate, onComplete, lastSkippedByAbsence]);
 
   useEffect(() => { submitFnRef.current = handleSubmitAnswer; }, [handleSubmitAnswer]);
 
@@ -548,7 +504,7 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
               ["Candidate", candidateName],
               ["Position", job?.title || "Applied Position"],
               ["Questions", "5 Questions · 3 minutes each"],
-              ["Input", "🎤 Voice or ⌨️ Text — both accepted"],
+              ["Input", "⌨️ Direct text response"],
               ["Proctoring", "🔐 Active (Video + AI Eye Gaze)"],
             ].map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
@@ -567,7 +523,6 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
               </li>
               <li>👁️ <strong>Do NOT look outside the screen</strong> or down at notes/devices: Looking away or turning your head is actively tracked and flagged as malpractice.</li>
               <li>⏱️ <strong>Timer starts automatically</strong>: You have 3 minutes per question. The timer begins as soon as you enter.</li>
-              <li>🔊 <strong>Voice assistance is optional</strong>: Click <strong>"🔊 Hear Question (Optional)"</strong> anytime if you want the AI to read the question out loud.</li>
               <li>🚫 Tab switches, minimizing windows, copy-paste, and keyboard shortcuts are strictly blocked and recorded.</li>
             </ul>
           </div>
@@ -805,14 +760,13 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
         <div style={{ display: "flex", flexDirection: "column", background: "#0F172A" }}>
           {/* AI Header */}
           <div style={{ padding: "14px 24px", background: "#1E293B", borderBottom: "1px solid #334155", display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ position: "relative" }}>
+            <div>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #3B82F6, #8B5CF6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🤖</div>
-              {aiSpeaking && <div style={{ position: "absolute", bottom: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: "#22C55E", border: "2px solid #0F172A", animation: "pulse 1s infinite" }} />}
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 800, color: "#F8FAFC" }}>AI Interviewer ({llmProvider || "Auto"})</div>
-              <div style={{ fontSize: 11, color: aiSpeaking ? "#22C55E" : faceMissing ? "#EF4444" : "#64748B", fontWeight: 600 }}>
-                {aiSpeaking ? "🔊 AI reading question aloud…" : faceMissing ? "🚨 Face not detected — return to camera" : "✅ 3-minute timer running · Answer anytime"}
+              <div style={{ fontSize: 11, color: faceMissing ? "#EF4444" : "#64748B", fontWeight: 600 }}>
+                {faceMissing ? "🚨 Face not detected — return to camera" : "✅ 3-minute timer running · Type and submit your answer"}
               </div>
             </div>
             <div style={{ marginLeft: "auto", textAlign: "right" }}>
@@ -823,31 +777,8 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
 
           {/* Current Question */}
           <div style={{ padding: "20px 28px", background: "#1E293B", borderBottom: "1px solid #334155" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 12, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 10.5, color: "#6366F1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Question {qIndex + 1} of {questions.length}
-              </div>
-              <button
-                onClick={() => {
-                  if (aiSpeaking) {
-                    window.speechSynthesis.cancel();
-                    setAiSpeaking(false);
-                  } else if (currentQ) {
-                    speak(`Question ${qIndex + 1}: ${currentQ}`);
-                  }
-                }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 15px",
-                  background: aiSpeaking ? "#FEF3C7" : "#0F172A",
-                  color: aiSpeaking ? "#B45309" : "#38BDF8",
-                  border: `1px solid ${aiSpeaking ? "#F59E0B" : "#0284C7"}`,
-                  borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                  transition: "all 0.2s"
-                }}
-                title="Optional: Listen to the question read aloud by AI"
-              >
-                {aiSpeaking ? "⏹ Stop Voice" : "🔊 Hear Question (Optional)"}
-              </button>
+            <div style={{ fontSize: 10.5, color: "#6366F1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+              Question {qIndex + 1} of {questions.length}
             </div>
 
             <p style={{ color: "#F8FAFC", fontSize: 15.5, lineHeight: 1.75, margin: 0, fontWeight: 500 }}>
@@ -881,13 +812,7 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
 
           {/* Input Bar */}
           <div style={{ padding: "14px 24px", background: "#1E293B", borderTop: "1px solid #334155" }}>
-            {listening && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, color: "#22C55E", fontSize: 12.5, fontWeight: 600 }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22C55E", animation: "pulse 1s infinite" }} />
-                Listening to your voice… (speak clearly)
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
               <textarea
                 value={userText}
                 onChange={(e) => {
@@ -908,7 +833,7 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
                     handleSubmitAnswer();
                   }
                 }}
-                placeholder={faceMissing ? "🚨 Camera blocked — please return to frame to continue answering..." : "Speak your answer (mic on) or type here… Press Enter or click Submit"}
+                placeholder={faceMissing ? "🚨 Camera blocked — please return to frame to continue answering..." : "Type your answer here… Press Enter to submit or click Submit"}
                 rows={3}
                 disabled={faceMissing}
                 style={{
@@ -917,38 +842,24 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
                   resize: "none", outline: "none", lineHeight: 1.6, opacity: faceMissing ? 0.4 : 1
                 }}
               />
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button
-                  disabled={faceMissing}
-                  onClick={listening ? stopListening : startListening}
-                  style={{
-                    padding: "10px 14px", borderRadius: 10,
-                    background: listening ? "#FEF3C7" : "#064E3B",
-                    color: listening ? "#92400E" : "#22C55E",
-                    border: `1px solid ${listening ? "#F59E0B" : "#22C55E"}`,
-                    cursor: faceMissing ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit",
-                    opacity: faceMissing ? 0.4 : 1
-                  }}
-                >
-                  {listening ? "⏹ Stop Mic" : "🎤 Start Mic"}
-                </button>
-                <button
-                  disabled={faceMissing}
-                  onClick={() => handleSubmitAnswer()}
-                  style={{
-                    padding: "10px 14px", borderRadius: 10,
-                    background: "linear-gradient(135deg, #3B82F6, #6366F1)",
-                    color: "#FFFFFF", border: "none",
-                    cursor: faceMissing ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit",
-                    opacity: faceMissing ? 0.4 : 1
-                  }}
-                >
-                  ✓ Submit
-                </button>
-              </div>
+              <button
+                disabled={faceMissing}
+                onClick={() => handleSubmitAnswer()}
+                style={{
+                  padding: "0 22px", borderRadius: 10,
+                  background: "linear-gradient(135deg, #3B82F6, #6366F1)",
+                  color: "#FFFFFF", border: "none",
+                  cursor: faceMissing ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit",
+                  opacity: faceMissing ? 0.4 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)"
+                }}
+              >
+                ✓ Submit
+              </button>
             </div>
             <div style={{ fontSize: 10.5, color: "#475569", marginTop: 8, textAlign: "center" }}>
-              🎤 Voice + ⌨️ Text both accepted · Submit anytime · Auto-submits at 0:00 · Enter = Submit
+              ⌨️ Type your response · Submit anytime · Auto-submits at 0:00 · Press Enter or click Submit
             </div>
           </div>
         </div>

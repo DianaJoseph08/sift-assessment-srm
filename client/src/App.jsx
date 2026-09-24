@@ -939,7 +939,7 @@ ${interviewLink}
 Session Information & Guidelines:
 • 5 Technical Assessment Questions
 • 3 minutes allotted per question (auto-advancing)
-• Voice speaking or text typing accepted
+• Direct text entry response for each question
 • Active Anti-Fraud Proctoring: Camera & face visibility required; please maintain eye contact with the screen throughout the session.
 
 If you have any questions, please reply directly to this email (${replyToEmail}).
