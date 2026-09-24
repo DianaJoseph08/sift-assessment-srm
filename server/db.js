@@ -8,32 +8,93 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Persistent database location for Google Cloud (Cloud Storage volume mount or environment variable)
 const bundledDbPath = path.join(__dirname, "..", "sift.db");
 const persistentDir = process.env.DATA_DIR || (fs.existsSync("/app/data") ? "/app/data" : null);
+const persistentDbPath = persistentDir ? path.join(persistentDir, "sift.db") : null;
 
-let dbPath = process.env.DB_PATH;
-if (!dbPath) {
-  if (persistentDir) {
+// Determine active working database location:
+// On Cloud Run with GCS FUSE volume mounts (/app/data), GCS FUSE does NOT support POSIX
+// file locks or byte-range random writes required by SQLite.
+// Therefore, we run SQLite on a local POSIX filesystem (/tmp/sift.db) and continuously sync to /app/data.
+let activeDbPath;
+
+if (process.env.DB_PATH) {
+  activeDbPath = process.env.DB_PATH;
+} else if (persistentDir) {
+  activeDbPath = path.join("/tmp", "sift.db");
+  try {
     if (!fs.existsSync(persistentDir)) {
       try { fs.mkdirSync(persistentDir, { recursive: true }); } catch (e) {}
     }
-    dbPath = path.join(persistentDir, "sift.db");
-    // Seed persistent directory with pre-existing database if it doesn't exist yet
-    if (!fs.existsSync(dbPath) && fs.existsSync(bundledDbPath)) {
+    // Check if persistent database exists and has content in the Cloud Storage bucket
+    if (fs.existsSync(persistentDbPath) && fs.statSync(persistentDbPath).size > 0) {
+      fs.copyFileSync(persistentDbPath, activeDbPath);
+      console.log(`[db] Restored existing database from Cloud Storage bucket: ${persistentDbPath} -> ${activeDbPath} (${fs.statSync(activeDbPath).size} bytes)`);
+    } else if (fs.existsSync(bundledDbPath)) {
+      // Seed /tmp from bundled database
+      fs.copyFileSync(bundledDbPath, activeDbPath);
+      console.log(`[db] Seeded initial database to /tmp from bundled template: ${bundledDbPath}`);
+      // Also write initial copy to persistent bucket
       try {
-        fs.copyFileSync(bundledDbPath, dbPath);
-        console.log(`[db] Seeded initial database to persistent volume at: ${dbPath}`);
+        fs.copyFileSync(bundledDbPath, persistentDbPath);
+        console.log(`[db] Initialized Cloud Storage bucket with bundled database: ${persistentDbPath}`);
       } catch (err) {
-        console.warn(`[db] Failed to seed database to ${dbPath}:`, err.message);
+        console.warn(`[db] Warning: Could not write initial seed to persistent volume:`, err.message);
       }
     }
+  } catch (err) {
+    console.warn(`[db] Error during persistent storage initialization:`, err.message);
+    if (!fs.existsSync(activeDbPath) && fs.existsSync(bundledDbPath)) {
+      fs.copyFileSync(bundledDbPath, activeDbPath);
+    }
+  }
+} else {
+  // Local environment or container without volume mount
+  activeDbPath = bundledDbPath;
+}
+
+console.log(`[db] Connected to SQLite database at: ${activeDbPath}`);
+if (persistentDbPath) {
+  console.log(`[db] Persistent Cloud Storage sync enabled: -> ${persistentDbPath}`);
+} else {
+  console.log(`[db] Notice: No persistent volume mounted at /app/data. Running locally.`);
+}
+
+/**
+ * Synchronize local SQLite database to persistent volume (Cloud Storage bucket)
+ */
+let syncTimeout = null;
+
+export function syncToPersistentStorage(immediate = false) {
+  if (!persistentDbPath || activeDbPath === persistentDbPath) return;
+
+  const performSync = () => {
+    try {
+      if (!fs.existsSync(persistentDir)) {
+        try { fs.mkdirSync(persistentDir, { recursive: true }); } catch (e) {}
+      }
+      try {
+        db.exec("PRAGMA wal_checkpoint(PASSIVE)");
+      } catch (e) {}
+      fs.copyFileSync(activeDbPath, persistentDbPath);
+      console.log(`[db] Synced database to persistent Cloud Storage volume at: ${persistentDbPath}`);
+    } catch (err) {
+      console.error(`[db] Failed to sync database to persistent volume (${persistentDbPath}):`, err.message);
+    }
+  };
+
+  if (immediate) {
+    if (syncTimeout) {
+      clearTimeout(syncTimeout);
+      syncTimeout = null;
+    }
+    performSync();
   } else {
-    dbPath = bundledDbPath;
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(performSync, 1000);
   }
 }
 
-console.log(`[db] Connected to SQLite database at: ${dbPath}`);
-
 // Initialize database
-const db = new DatabaseSync(dbPath);
+const db = new DatabaseSync(activeDbPath);
 
 // Create tables if they do not exist
 db.exec(`
@@ -135,6 +196,7 @@ export function saveCompanies(companies) {
       insert.run(c.id, c.name, c.industry || "", c.contactEmail || "", c.notes || "", c.createdAt || new Date().toISOString());
     }
     db.exec("COMMIT");
+    syncToPersistentStorage(true);
   } catch (e) {
     db.exec("ROLLBACK");
     throw e;
@@ -166,6 +228,7 @@ export function addLog(type, message, companyName = "", details = "") {
     const id = `log_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
     const timestamp = new Date().toISOString();
     insert.run(id, timestamp, type, message, companyName, details);
+    syncToPersistentStorage(false);
   } catch (e) {
     console.error("Failed to insert log:", e.message);
   }
@@ -281,6 +344,7 @@ export function saveJobs(jobs) {
       }
     }
     db.exec("COMMIT");
+    syncToPersistentStorage(true);
   } catch (e) {
     db.exec("ROLLBACK");
     throw e;
@@ -324,4 +388,5 @@ export function saveCandidateInterview(id, interviewData) {
 
   const updateQuery = db.prepare("UPDATE candidates SET result = ?, status = 'done' WHERE id = ?");
   updateQuery.run(JSON.stringify(resultObj), id);
+  syncToPersistentStorage(true);
 }

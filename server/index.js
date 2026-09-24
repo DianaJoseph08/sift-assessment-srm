@@ -17,7 +17,13 @@ app.use(express.json({ limit: "30mb" })); // resumes are sent as base64
 
 // Health check
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, keyConfigured: Boolean(process.env.ANTHROPIC_API_KEY) });
+  const hasPersistentMount = fs.existsSync("/app/data") || Boolean(process.env.DATA_DIR);
+  res.json({
+    ok: true,
+    keyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+    persistentStorage: hasPersistentMount ? "Active (/app/data)" : "Local Ephemeral (No volume mounted)",
+    environment: process.env.NODE_ENV || "development"
+  });
 });
 
 // Fetch companies
