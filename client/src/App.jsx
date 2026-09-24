@@ -866,17 +866,53 @@ function CandidateStep({ candidates, setCandidates, onBack, onRun, onGotoResults
 }
 
 /* ============================== STEP 3a: ANALYZING PROGRESS ============================== */
-function Analyzing({ candidates, C }) {
+function Analyzing({ candidates, onComplete, C }) {
   const done = candidates.filter((c) => c.status === "done" || c.status === "error").length;
   const pct = Math.round((done / Math.max(1, candidates.length)) * 100);
+  const isFinished = done >= candidates.length && candidates.length > 0;
+
+  useEffect(() => {
+    if (isFinished && onComplete) {
+      const timer = setTimeout(() => {
+        onComplete();
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [isFinished, onComplete]);
+
   return (
-    <Panel title="The AI Agent is screening candidates"
-      sub="Reading resume content, evaluating fit against client requirements, and calculating match scores..." C={C}>
+    <Panel 
+      title={isFinished ? "AI Screening Complete" : "The AI Agent is screening candidates"}
+      sub={isFinished ? "All resumes evaluated against job requirements. Loading detailed shortlist..." : "Reading resume content, evaluating fit against client requirements, and calculating match scores..."} 
+      C={C}
+    >
       <div style={{ height: 9, background: C.lineSoft, borderRadius: 6, overflow: "hidden", marginBottom: 6 }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: C.accent, borderRadius: 6, transition: "width .4s" }} />
+        <div style={{ width: `${pct}%`, height: "100%", background: isFinished ? "#22C55E" : C.accent, borderRadius: 6, transition: "width .4s" }} />
       </div>
-      <div style={{ fontSize: 13, color: C.sub, marginBottom: 16 }}>
-        {done} of {candidates.length} resumes evaluated
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <span style={{ fontSize: 13, color: C.sub }}>
+          {done} of {candidates.length} resumes evaluated
+        </span>
+        {isFinished && (
+          <button
+            onClick={onComplete}
+            style={{
+              padding: "7px 16px",
+              background: "#2563EB",
+              color: "#FFF",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }}
+          >
+            View Candidate Details & Scores →
+          </button>
+        )}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         {candidates.map((c) => (
@@ -2542,24 +2578,35 @@ export default function App() {
 
         try {
           const result = await analyzeCandidate(jobCriteria, resume, llmProvider);
-          updateActiveJob((j) => ({
-            ...j,
-            candidates: j.candidates.map((c) => (c.id === cand.id ? { ...c, status: "done", result, base64: null } : c)),
-          }));
+          updateActiveJob((j) => {
+            const newCandidates = (j.candidates || []).map((c) => (c.id === cand.id ? { ...c, status: "done", result, base64: null } : c));
+            const isAllDone = newCandidates.length > 0 && newCandidates.every(c => c.status === "done" || c.status === "error");
+            return {
+              ...j,
+              screening: isAllDone ? "done" : j.screening,
+              candidates: newCandidates,
+            };
+          });
         } catch (e) {
-          updateActiveJob((j) => ({
-            ...j,
-            candidates: j.candidates.map((c) =>
-              (c.id === cand.id ? { ...c, status: "error", error: String(e.message || e) } : c)),
-          }));
+          updateActiveJob((j) => {
+            const newCandidates = (j.candidates || []).map((c) =>
+              (c.id === cand.id ? { ...c, status: "error", error: String(e.message || e) } : c));
+            const isAllDone = newCandidates.length > 0 && newCandidates.every(c => c.status === "done" || c.status === "error");
+            return {
+              ...j,
+              screening: isAllDone ? "done" : j.screening,
+              candidates: newCandidates,
+            };
+          });
         }
       });
     } catch (e) {
       console.error("Screening failed:", e);
     }
 
+    const currentJobId = activeJob.id;
     setJobs((prevJobs) => {
-      const updated = prevJobs.map((j) => (j.id === activeJobId ? { ...j, screening: "done" } : j));
+      const updated = prevJobs.map((j) => (j.id === currentJobId ? { ...j, screening: "done" } : j));
       saveJobsToServer(updated);
       return updated;
     });
@@ -2835,8 +2882,12 @@ export default function App() {
                           />
                         )}
 
-                        {step === 3 && activeJob.screening === "running" ? (
-                          <Analyzing candidates={activeJob.candidates || []} C={C} />
+                        {step === 3 && (activeJob.screening === "running" && (activeJob.candidates || []).some(c => c.status === "analyzing" || c.status === "queued")) ? (
+                          <Analyzing 
+                            candidates={activeJob.candidates || []} 
+                            onComplete={() => updateActiveJob((j) => ({ ...j, screening: "done" }))}
+                            C={C} 
+                          />
                         ) : step === 3 && (
                           <Results
                             candidates={activeJob.candidates || []}
