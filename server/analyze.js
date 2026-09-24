@@ -6,13 +6,49 @@ import { getSetting } from "./db.js";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
 const GEMINI_MODEL = "gemini-1.5-flash-002";
-export const CLAUDE_DEFAULT_MODEL = "claude-3-5-sonnet-20241022";
+export const CLAUDE_DEFAULT_MODEL = "claude-sonnet-4-6";
 export const CLAUDE_FALLBACK_MODELS = [
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-5-20250929",
+  "claude-opus-4-6",
   "claude-3-5-sonnet-20241022",
   "claude-3-5-sonnet-latest",
   "claude-3-5-haiku-20241022",
   "claude-3-haiku-20240307"
 ];
+
+let cachedClaudeModels = null;
+export async function getAvailableClaudeModels(client) {
+  if (cachedClaudeModels && cachedClaudeModels.length > 0) return cachedClaudeModels;
+  try {
+    const list = await client.models.list();
+    const ids = (list.data || []).map(m => m.id);
+    const preferred = [
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5-20251001",
+      "claude-sonnet-4-5-20250929",
+      "claude-opus-4-6",
+      "claude-3-5-sonnet-20241022",
+      "claude-3-5-haiku-20241022",
+      "claude-3-haiku-20240307"
+    ];
+    const ordered = [];
+    for (const p of preferred) {
+      if (ids.includes(p)) ordered.push(p);
+    }
+    for (const id of ids) {
+      if (!ordered.includes(id)) ordered.push(id);
+    }
+    if (ordered.length > 0) {
+      cachedClaudeModels = ordered;
+      return ordered;
+    }
+  } catch (e) {
+    console.warn("[Claude models.list fallback]:", e.message);
+  }
+  return CLAUDE_FALLBACK_MODELS;
+}
 const MODEL = process.env.MODEL || (PROVIDER === "ollama" ? "llama3.1" : (PROVIDER === "gemini" ? GEMINI_MODEL : (PROVIDER === "groq" ? "llama-3.1-8b-instant" : CLAUDE_DEFAULT_MODEL)));
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 
@@ -456,10 +492,10 @@ function evaluateHeuristically(job, resumeText, fileName) {
 
 async function analyzeWithClaude(content, model = CLAUDE_DEFAULT_MODEL, apiKey) {
   const client = getClaudeClient(apiKey);
-  
+  const available = await getAvailableClaudeModels(client);
   const modelsToTry = [
     model,
-    ...CLAUDE_FALLBACK_MODELS
+    ...available
   ];
   const uniqueModels = [...new Set(modelsToTry)];
 
@@ -623,7 +659,8 @@ Follow these rules strictly:
 
 async function chatWithClaude(systemPrompt, messages, apiKey) {
   const client = getClaudeClient(apiKey);
-  for (const m of CLAUDE_FALLBACK_MODELS) {
+  const modelsToTry = await getAvailableClaudeModels(client);
+  for (const m of modelsToTry) {
     try {
       const response = await client.messages.create({
         model: m,
@@ -770,7 +807,8 @@ Return ONLY valid JSON. Do not include any markdown formatting, code block backt
   } else {
     const client = getClaudeClient(apiKey);
     let message;
-    for (const m of CLAUDE_FALLBACK_MODELS) {
+    const modelsToTry = await getAvailableClaudeModels(client);
+    for (const m of modelsToTry) {
       try {
         message = await client.messages.create({
           model: m,
@@ -994,7 +1032,8 @@ Return ONLY a valid JSON array of 5 strings, no markdown, no commentary.`;
     // Claude
     const client = getClaudeClient(apiKey);
     let lastErr;
-    for (const m of CLAUDE_FALLBACK_MODELS) {
+    const modelsToTry = await getAvailableClaudeModels(client);
+    for (const m of modelsToTry) {
       try {
         const response = await client.messages.create({
           model: m,
@@ -1112,7 +1151,8 @@ Return ONLY valid JSON.`;
     const client = getClaudeClient(apiKey);
     let message;
     let lastErr;
-    for (const m of CLAUDE_FALLBACK_MODELS) {
+    const modelsToTry = await getAvailableClaudeModels(client);
+    for (const m of modelsToTry) {
       try {
         message = await client.messages.create({
           model: m,
