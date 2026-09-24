@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 
 /* ============================================================
-   SRM AI VIDEO INTERVIEW PLATFORM
+   COGNIHIRE — AI VIDEO INTERVIEW & PROCTORING PLATFORM
    - Powered by AI
    - Video feed + Voice input + Text fallback
    - Full malpractice detection
@@ -10,8 +11,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
    ============================================================ */
 
 const MAX_SECONDS = 180; // 3 minutes per question, auto-advance at 0
-const MEDIAPIPE_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm";
-const FACE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+const MEDIAPIPE_WASM = "/wasm";
+const FACE_MODEL_URL = "/face_landmarker.task";
 
 function formatTime(s) {
   const m = Math.floor(s / 60);
@@ -45,12 +46,16 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
   const [listening, setListening] = useState(false);
   const [aiSpeaking, setAiSpeaking] = useState(false);
   const [faceMissing, setFaceMissing] = useState(false);
+  const [faceDetectorReady, setFaceDetectorReady] = useState(false);
+  const [detectorStatus, setDetectorStatus] = useState("initializing"); // "initializing" | "ready" | "error"
+  const [lastSkippedByAbsence, setLastSkippedByAbsence] = useState(false);
   const [timeLeft, setTimeLeft] = useState(MAX_SECONDS);
   const [finalReport, setFinalReport] = useState(null);
 
   // Malpractice
   const [malpractice, setMalpractice] = useState({
-    tabSwitches: 0, cursorLeaves: 0, copyPastes: 0, keyboardAbuse: 0, lookingAway: 0,
+    tabSwitches: 0, cursorLeaves: 0, copyPastes: 0, keyboardAbuse: 0,
+    lookingAway: 0, faceAbsent: 0, headTurned: 0,
   });
   const [malpracticeLog, setMalpracticeLog] = useState([]);
   const [malpracticeAlert, setMalpracticeAlert] = useState("");
@@ -65,6 +70,11 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
   const chatRef = useRef(null);
   const submitFnRef = useRef(null);
   const lastClickRef = useRef(0); // tracks last click time to suppress false cursor-out events
+  const lastVideoTimeRef = useRef(-1);
+  const lastTypingTimeRef = useRef(0); // tracks keyboard input to suppress false gaze-down events while typing
+  const isTypingFocusedRef = useRef(false); // tracks if textarea is currently focused
+  const faceMissingRef = useRef(false);
+  useEffect(() => { faceMissingRef.current = faceMissing; }, [faceMissing]);
 
   // ── Malpractice logging ──────────────────────────────────────────────────
   const logMalpractice = useCallback((type, key) => {
@@ -91,6 +101,7 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
     const onCopy = (e) => { e.preventDefault(); logMalpractice("Copy attempt blocked", "copyPastes"); };
     const onCtxMenu = (e) => { e.preventDefault(); logMalpractice("Right-click menu blocked", "copyPastes"); };
     const onKeyDown = (e) => {
+      lastTypingTimeRef.current = Date.now();
       const forbidden = (e.ctrlKey || e.metaKey) && ["c","v","t","w","r","u","a"].includes(e.key.toLowerCase());
       const altTab = e.altKey && e.key === "Tab";
       if (forbidden || altTab || e.key === "F12") {
@@ -117,99 +128,6 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [phase, logMalpractice]);
-
-  // ── MediaPipe Face Gaze ───────────────────────────────────────────────────
-  const initFaceLandmarker = useCallback(async () => {
-    try {
-      const { FaceLandmarker, FilesetResolver } = await import(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/vision_bundle.js"
-      ).catch(() => null) || {};
-      if (!FaceLandmarker) return;
-      const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
-      const fl = await FaceLandmarker.createFromOptions(filesetResolver, {
-        baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate: "GPU" },
-        runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true,
-      });
-      faceLandmarkerRef.current = fl;
-      let awayFrames = 0;
-      faceIntervalRef.current = setInterval(() => {
-        if (!videoRef.current || !faceLandmarkerRef.current) return;
-        try {
-          const results = faceLandmarkerRef.current.detectForVideo(videoRef.current, performance.now());
-          const nFaces = results?.faceLandmarks?.length || 0;
-          if (nFaces === 0) {
-            setFaceMissing(true);
-            // Instantly clear their current answer progress so they can't cheat by reading and returning
-            if (awayFrames === 0) {
-                setUserText(""); 
-                stopListening();
-            }
-            
-            if (++awayFrames >= 3) {
-              logMalpractice("Left camera frame - Question Auto-Skipped", "lookingAway");
-              if (submitFnRef.current) submitFnRef.current(true);
-              awayFrames = 0;
-            }
-          } else {
-            setFaceMissing(false);
-            awayFrames = 0;
-            const lm = results.faceLandmarks[0];
-            if (lm && lm.length > 473) {
-              const gazeOffset = Math.abs((lm[468].x + lm[473].x) / 2 - lm[1].x);
-              
-              // Detect if user is on a mobile device
-              const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
-              
-              // Detect looking down (head pitch) by comparing upper and lower face proportions
-              const upperFace = Math.abs(lm[1].y - lm[10].y);
-              const lowerFace = Math.abs(lm[152].y - lm[1].y);
-              const pitchRatio = lowerFace / (upperFace || 1);
-              
-              // Only enforce strict looking-down rules if on desktop
-              let isLookingAway = gazeOffset > 0.08;
-              
-              if (!isMobile) {
-                if (pitchRatio < 0.85) isLookingAway = true;
-                
-                // Also check blendshapes if available
-                const blendshapes = results.faceBlendshapes?.[0]?.categories;
-                if (blendshapes) {
-                  const lookDownScore = Math.max(
-                    blendshapes.find(c => c.categoryName === "eyeLookDownLeft")?.score || 0,
-                    blendshapes.find(c => c.categoryName === "eyeLookDownRight")?.score || 0
-                  );
-                  // Lower threshold to catch slight downward glances on desktop
-                  if (lookDownScore > 0.35) isLookingAway = true;
-                }
-              }
-
-              if (isLookingAway) {
-                // Reduced from 4 to 2 frames (approx 1.6s) to catch quick glances
-                if (++awayFrames >= 2) { logMalpractice(isMobile ? "Eyes looking away from screen" : "Eyes looking away or down at device", "lookingAway"); awayFrames = 0; }
-              } else { awayFrames = Math.max(0, awayFrames - 1); }
-            }
-          }
-        } catch (_) {}
-      }, 800);
-    } catch (e) { console.warn("[FaceLandmarker] not available:", e.message); }
-  }, [logMalpractice]);
-
-  // ── Webcam ────────────────────────────────────────────────────────────────
-  const startWebcam = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      streamRef.current = stream; // just store it — don't touch videoRef yet (it doesn't exist)
-      return true;
-    } catch { return false; }
-  }, []);
-
-  // Attach stream to video element once interview phase renders it
-  useEffect(() => {
-    if (phase === "interview" && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().catch(() => {});
-    }
-  }, [phase]);
 
   // ── Speech Recognition ────────────────────────────────────────────────────
   const startListening = useCallback(() => {
@@ -248,6 +166,178 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
     window.speechSynthesis.speak(utter);
   }), []);
 
+  // ── MediaPipe Face Gaze ───────────────────────────────────────────────────
+  const initFaceLandmarker = useCallback(async () => {
+    if (faceLandmarkerRef.current) return;
+    try {
+      setDetectorStatus("initializing");
+      const wasmPath = window.location.origin + MEDIAPIPE_WASM;
+      const modelPath = window.location.origin + FACE_MODEL_URL;
+      console.log("[FaceLandmarker] Initializing local fileset resolver from", wasmPath);
+      const filesetResolver = await FilesetResolver.forVisionTasks(wasmPath);
+      let fl;
+      try {
+        fl = await FaceLandmarker.createFromOptions(filesetResolver, {
+          baseOptions: { modelAssetPath: modelPath, delegate: "GPU" },
+          runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true,
+        });
+        console.log("[FaceLandmarker] Loaded with GPU delegate successfully");
+      } catch (gpuErr) {
+        console.warn("[FaceLandmarker] GPU delegate failed, trying CPU:", gpuErr?.message);
+        fl = await FaceLandmarker.createFromOptions(filesetResolver, {
+          baseOptions: { modelAssetPath: modelPath, delegate: "CPU" },
+          runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true,
+        });
+        console.log("[FaceLandmarker] Loaded with CPU delegate successfully");
+      }
+      faceLandmarkerRef.current = fl;
+      setFaceDetectorReady(true);
+      setDetectorStatus("ready");
+
+      let awayFrames = 0;
+      let gazeAwayFrames = 0;
+      let headTurnFrames = 0;
+
+      if (faceIntervalRef.current) clearInterval(faceIntervalRef.current);
+
+      faceIntervalRef.current = setInterval(() => {
+        if (!videoRef.current || !faceLandmarkerRef.current) return;
+        const video = videoRef.current;
+        if (video.paused) video.play().catch(() => {});
+        if (video.readyState < 2 || video.videoWidth === 0) return;
+
+        try {
+          const now = performance.now();
+          if (now <= lastVideoTimeRef.current) return;
+          lastVideoTimeRef.current = now;
+
+          const results = faceLandmarkerRef.current.detectForVideo(video, now);
+          const nFaces = results?.faceLandmarks?.length || 0;
+
+          if (nFaces === 0) {
+            setFaceMissing(true);
+            faceMissingRef.current = true;
+            gazeAwayFrames = 0;
+            headTurnFrames = 0;
+
+            // Instantly clear draft answer & stop mic
+            if (awayFrames === 0) {
+              setUserText(""); 
+              stopListening();
+            }
+            
+            awayFrames++;
+            // If absent for 3 consecutive intervals (~2.1 seconds): auto-submit question and advance
+            if (awayFrames >= 3) {
+              logMalpractice("Left camera frame during question — auto-submitted (fraud prevention)", "faceAbsent");
+              setLastSkippedByAbsence(true);
+              if (submitFnRef.current) submitFnRef.current(true);
+              awayFrames = 0;
+            }
+          } else {
+            setFaceMissing(false);
+            faceMissingRef.current = false;
+            awayFrames = 0;
+            const lm = results.faceLandmarks[0];
+            if (lm && lm.length > 473) {
+              const irisX = (lm[468].x + lm[473].x) / 2;
+              const noseX = lm[1].x;
+              const gazeOffset = Math.abs(irisX - noseX);
+
+              // Head yaw (turned left/right significantly away from screen)
+              const distLeft = Math.abs(noseX - lm[33].x);
+              const distRight = Math.abs(lm[263].x - noseX);
+              const yawRatio = distLeft > distRight ? distLeft / (distRight || 0.001) : distRight / (distLeft || 0.001);
+              const isHeadTurned = yawRatio > 2.5;
+              
+              // Detect if user is on a mobile device
+              const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+              
+              // Check if candidate is actively typing or focused on typing input
+              const isTypingActive = isTypingFocusedRef.current || (Date.now() - lastTypingTimeRef.current < 5000);
+
+              // 1. Horizontal gaze away from screen (reading from a secondary screen or another person)
+              const isLookingAwayHorizontally = gazeOffset > 0.15;
+
+              // 2. Downward glance
+              // NOTE: Looking down at keyboard or textarea is completely expected while typing!
+              let isLookingDownExcessively = false;
+              if (!isMobile && !isTypingActive) {
+                const upperFace = Math.abs(lm[1].y - lm[10].y);
+                const lowerFace = Math.abs(lm[152].y - lm[1].y);
+                const pitchRatio = lowerFace / (upperFace || 1);
+                
+                const blendshapes = results.faceBlendshapes?.[0]?.categories;
+                let lookDownScore = 0;
+                if (blendshapes) {
+                  lookDownScore = Math.max(
+                    blendshapes.find(c => c.categoryName === "eyeLookDownLeft")?.score || 0,
+                    blendshapes.find(c => c.categoryName === "eyeLookDownRight")?.score || 0
+                  );
+                }
+                // Only flag if candidate is completely inactive/not typing AND head is deeply tilted down
+                if (pitchRatio < 0.60 || lookDownScore > 0.70) {
+                  isLookingDownExcessively = true;
+                }
+              }
+
+              const isLookingAway = isLookingAwayHorizontally || isLookingDownExcessively;
+
+              if (isHeadTurned) {
+                if (++headTurnFrames >= 3) {
+                  logMalpractice("Head turned away from camera screen", "headTurned");
+                  headTurnFrames = 0;
+                }
+              } else {
+                headTurnFrames = Math.max(0, headTurnFrames - 1);
+              }
+
+              if (isLookingAway && !isHeadTurned) {
+                if (++gazeAwayFrames >= 4) {
+                  logMalpractice(isMobile ? "Eyes looking away from screen" : "Eyes looking outside screen / notes", "lookingAway");
+                  gazeAwayFrames = 0;
+                }
+              } else {
+                gazeAwayFrames = Math.max(0, gazeAwayFrames - 1);
+              }
+            }
+          }
+        } catch (detErr) {
+          console.error("[FaceLandmarker detection error]:", detErr);
+        }
+      }, 700);
+    } catch (e) {
+      console.error("[FaceLandmarker] Initialization error:", e);
+      setDetectorStatus("error");
+    }
+  }, [logMalpractice, stopListening]);
+
+  // ── Webcam ────────────────────────────────────────────────────────────────
+  const startWebcam = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current = stream; // just store it — don't touch videoRef yet (it doesn't exist)
+      return true;
+    } catch { return false; }
+  }, []);
+
+  // Attach stream to video element once interview phase renders it
+  useEffect(() => {
+    if (phase === "interview" && videoRef.current && streamRef.current) {
+      const video = videoRef.current;
+      video.srcObject = streamRef.current;
+      const onReady = () => {
+        video.play().catch(e => console.warn("[Webcam play]:", e));
+      };
+      if (video.readyState >= 1) {
+        onReady();
+      } else {
+        video.onloadedmetadata = onReady;
+      }
+      initFaceLandmarker();
+    }
+  }, [phase, initFaceLandmarker]);
+
   // ── AI Questions ──────────────────────────────────────────────────────
   const fetchQuestions = useCallback(async () => {
     try {
@@ -282,12 +372,34 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
       else if (llmProvider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
       else if (llmProvider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
 
+      const remarksList = [];
+      if (malpractice.faceAbsent > 0) {
+        remarksList.push(`MALPRACTICE / FRAUD DETECTED: Candidate was absent from the camera screen ${malpractice.faceAbsent} time(s) during questions. Questions were automatically closed and submitted.`);
+      }
+      if (malpractice.headTurned > 0) {
+        remarksList.push(`Candidate turned head away from screen ${malpractice.headTurned} time(s).`);
+      }
+      if (malpractice.lookingAway > 0) {
+        remarksList.push(`Candidate looked outside screen or down at notes/desk ${malpractice.lookingAway} time(s).`);
+      }
+      if (malpractice.tabSwitches > 0) {
+        remarksList.push(`Candidate switched browser tabs ${malpractice.tabSwitches} time(s).`);
+      }
+      if (malpractice.copyPastes > 0) {
+        remarksList.push(`Candidate attempted copy/paste ${malpractice.copyPastes} time(s).`);
+      }
+      const proctoringPayload = {
+        ...malpractice,
+        remarks: remarksList.join(" ") || "No proctoring violations detected. Candidate remained focused on screen throughout the session."
+      };
+
       const res = await fetch("/api/interview/video-evaluate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           job: { title: job?.title, description: job?.description },
           candidate: { name: candidateName },
-          transcript: transcriptData, malpractice,
+          transcript: transcriptData,
+          malpractice: proctoringPayload,
           provider: llmProvider,
           apiKey
         })
@@ -311,14 +423,19 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
   const handleSubmitAnswer = useCallback((autoAdvanced = false) => {
     stopListening();
     clearInterval(timerRef.current);
+    window.speechSynthesis.cancel();
+    setAiSpeaking(false);
 
     setUserText(currentText => {
       let answer = currentText.trim();
-      if (!answer && autoAdvanced) {
-         answer = faceMissing ? "[No response — question auto-skipped because candidate left camera frame]" : "[No response — time expired]";
+      if (autoAdvanced && (faceMissingRef.current || lastSkippedByAbsence)) {
+        answer = "[NO RESPONSE — Candidate left the camera frame during the question. Question was automatically closed to prevent searching for answers elsewhere (fraud detection).]";
+      } else if (!answer && autoAdvanced) {
+        answer = "[No response — time expired]";
       } else if (!answer) {
-         answer = "[No response provided]";
+        answer = "[No response provided]";
       }
+      setLastSkippedByAbsence(false);
       setQuestions(currentQs => {
         setQIndex(currentIdx => {
           const currentQ = currentQs[currentIdx];
@@ -357,12 +474,8 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
                 if (onComplete) onComplete(report);
               });
             } else {
-              setTimeout(() => {
-                setQIndex(nextIndex);
-                setTimeLeft(MAX_SECONDS);
-                const nextQ = currentQs[nextIndex];
-                speak(`Thank you. Question ${nextIndex + 1}: ${nextQ}`).then(() => startListening());
-              }, 0);
+              setQIndex(nextIndex);
+              setTimeLeft(MAX_SECONDS);
             }
             return updated;
           });
@@ -372,14 +485,13 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
       });
       return "";
     });
-  }, [stopListening, startListening, speak, fetchEvaluation, malpractice, malpracticeLog, candidate, onComplete]);
+  }, [stopListening, fetchEvaluation, malpractice, malpracticeLog, candidate, onComplete, lastSkippedByAbsence]);
 
   useEffect(() => { submitFnRef.current = handleSubmitAnswer; }, [handleSubmitAnswer]);
 
-  // ── Timer: countdown from 3:00, auto-advance at 0 ────────────────────────
+  // ── Timer: countdown from 3:00 per question, auto-submits at 0:00 ──────────
   useEffect(() => {
     if (phase !== "interview") return;
-    setTimeLeft(MAX_SECONDS);
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -398,13 +510,12 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
     setPhase("permission");
     const ok = await startWebcam();
     if (!ok) { alert("Camera & microphone access is required. Please allow and reload."); return; }
+    initFaceLandmarker();
     const qs = await fetchQuestions();
     setQuestions(qs);
+    setQIndex(0);
+    setTimeLeft(MAX_SECONDS);
     setPhase("interview");
-    setTimeout(initFaceLandmarker, 2000);
-    await speak(`Hello ${candidateName}, welcome to your AI Technical Assessment for the ${job?.title} position. I will ask you ${qs.length} questions. You have 3 minutes per question. You can submit at any time or wait for the timer. Let's begin.`);
-    await speak(qs[0]);
-    startListening();
   };
 
   useEffect(() => {
@@ -427,8 +538,8 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
             <div style={{ width: 72, height: 72, borderRadius: 20, background: "linear-gradient(135deg, #3B82F6, #8B5CF6)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <span style={{ fontSize: 32 }}>🤖</span>
             </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#F8FAFC", margin: "0 0 8px" }}>{job?.companyName || "AI"} Technical Assessment</h1>
-            <p style={{ fontSize: 14, color: "#94A3B8", margin: 0 }}>Powered by {llmProvider === "claude" ? "Anthropic Claude" : llmProvider === "groq" ? "Groq (Llama 3)" : "Google Gemini"}</p>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#F8FAFC", margin: "0 0 8px" }}>CogniHire · {job?.companyName ? `${job.companyName} ` : ""}Technical Assessment</h1>
+            <p style={{ fontSize: 14, color: "#94A3B8", margin: 0 }}>Autonomous AI Interviewer &amp; Proctoring Engine</p>
           </div>
 
           <div style={{ background: "#0F172A", borderRadius: 12, padding: 20, marginBottom: 20, border: "1px solid #334155" }}>
@@ -447,13 +558,17 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
             ))}
           </div>
 
-          <div style={{ background: "#1C1917", border: "1px solid #78350F", borderRadius: 10, padding: 14, marginBottom: 28 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#F59E0B", marginBottom: 8 }}>⚠️ Important Instructions</div>
-            <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#FCD34D", fontSize: 12.5, lineHeight: 1.9 }}>
-              <li>Keep your face visible to the camera at all times</li>
-              <li>Do not switch browser tabs or minimize this window</li>
-              <li>Copy-paste, right-click & browser shortcuts are blocked</li>
-              <li>Submit when ready or wait — timer auto-submits at 3:00</li>
+          <div style={{ background: "#1C1917", border: "1px solid #78350F", borderRadius: 10, padding: 16, marginBottom: 28 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#F59E0B", marginBottom: 10 }}>⚠️ Important Instructions — Anti-Fraud &amp; Proctoring Rules</div>
+            <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#FCD34D", fontSize: 12.5, lineHeight: 2 }}>
+              <li>Keep your face <strong>visible and looking directly at the screen</strong> at all times.</li>
+              <li style={{ color: "#FCA5A5", fontWeight: 800, fontSize: 13 }}>
+                🚨 <strong>Do NOT move away from the screen</strong>: If you leave the camera frame during a question, that question will be <strong>immediately closed and auto-submitted</strong> as a fraud prevention measure, and you will <strong>NOT be able to answer it again</strong>.
+              </li>
+              <li>👁️ <strong>Do NOT look outside the screen</strong> or down at notes/devices: Looking away or turning your head is actively tracked and flagged as malpractice.</li>
+              <li>⏱️ <strong>Timer starts automatically</strong>: You have 3 minutes per question. The timer begins as soon as you enter.</li>
+              <li>🔊 <strong>Voice assistance is optional</strong>: Click <strong>"🔊 Hear Question (Optional)"</strong> anytime if you want the AI to read the question out loud.</li>
+              <li>🚫 Tab switches, minimizing windows, copy-paste, and keyboard shortcuts are strictly blocked and recorded.</li>
             </ul>
           </div>
 
@@ -539,9 +654,17 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {Object.entries(malpractice).map(([key, count]) => {
-                const labels = { tabSwitches: "Tab Switches", cursorLeaves: "Cursor Leaves", copyPastes: "Copy/Paste", keyboardAbuse: "Keyboard Shortcuts", lookingAway: "Looking Away" };
-                if (count === 0) return <span key={key} style={{ fontSize: 12, color: "#22C55E" }}>✓ {labels[key]}: Clean</span>;
-                return <span key={key} style={{ fontSize: 12, color: "#F59E0B", background: "#F59E0B22", padding: "2px 8px", borderRadius: 6, border: "1px solid #F59E0B44" }}>⚠️ {labels[key]}: {count}</span>;
+                const labels = {
+                  tabSwitches: "Tab Switches",
+                  cursorLeaves: "Cursor Leaves",
+                  copyPastes: "Copy/Paste",
+                  keyboardAbuse: "Keyboard Shortcuts",
+                  lookingAway: "Looking Outside Screen",
+                  faceAbsent: "Left Camera Frame (Fraud Risk)",
+                  headTurned: "Head Turned Away"
+                };
+                if (count === 0) return <span key={key} style={{ fontSize: 12, color: "#22C55E" }}>✓ {labels[key] || key}: Clean</span>;
+                return <span key={key} style={{ fontSize: 12, color: key === "faceAbsent" ? "#EF4444" : "#F59E0B", background: key === "faceAbsent" ? "#EF444422" : "#F59E0B22", padding: "2px 8px", borderRadius: 6, border: `1px solid ${key === "faceAbsent" ? "#EF4444" : "#F59E0B"}44` }}>⚠️ {labels[key] || key}: {count}</span>;
               })}
             </div>
           </div>
@@ -564,15 +687,16 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #3B82F6, #8B5CF6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🤖</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#F8FAFC" }}>{job?.companyName || "AI"} Technical Assessment</div>
-            <div style={{ fontSize: 10, color: "#64748B" }}>Powered by {llmProvider === "claude" ? "Claude" : llmProvider === "groq" ? "Groq" : "Gemini"}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#F8FAFC" }}>CogniHire · {job?.companyName ? `${job.companyName} ` : ""}Assessment</div>
+            <div style={{ fontSize: 10, color: "#64748B" }}>AI Video Proctoring Active</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <MalpracticeBadge count={malpractice.faceAbsent} label="Left Camera" color="#EF4444" />
+          <MalpracticeBadge count={malpractice.headTurned} label="Head Turned" color="#F59E0B" />
+          <MalpracticeBadge count={malpractice.lookingAway} label="Looking Away" color="#F59E0B" />
           <MalpracticeBadge count={malpractice.tabSwitches} label="Tab Switch" color="#EF4444" />
           <MalpracticeBadge count={malpractice.copyPastes} label="Copy/Paste" color="#EF4444" />
-          <MalpracticeBadge count={malpractice.lookingAway} label="Eye Away" color="#F59E0B" />
-          <MalpracticeBadge count={malpractice.cursorLeaves} label="Cursor Out" color="#F59E0B" />
           {/* Countdown Timer */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 14px", background: timerColor + "22", border: `1px solid ${timerColor}`, borderRadius: 8 }}>
             <span style={{ fontSize: 14 }}>⏱</span>
@@ -594,19 +718,39 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
 
         {/* Left: Video + Info */}
         <div style={{ background: "#0F172A", borderRight: "1px solid #1E293B", display: "flex", flexDirection: "column", padding: 16, gap: 12, overflowY: "auto" }}>
-          <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", background: "#000", border: "2px solid #334155" }}>
+          <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", background: "#000", border: `2px solid ${faceMissing ? "#EF4444" : "#334155"}` }}>
             <video ref={videoRef} autoPlay muted playsInline style={{ width: "100%", display: "block", transform: "scaleX(-1)" }} />
-            <div style={{ position: "absolute", top: 8, left: 8, display: "flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.75)", padding: "3px 8px", borderRadius: 5, zIndex: 10 }}>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#EF4444", animation: "pulse 1.5s infinite" }} />
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#FFF" }}>LIVE · PROCTORED</span>
+            
+            {/* Real-time Detector Badge */}
+            <div style={{ position: "absolute", top: 8, left: 8, display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.8)", padding: "4px 10px", borderRadius: 6, zIndex: 10 }}>
+              <div style={{
+                width: 8, height: 8, borderRadius: "50%",
+                background: faceMissing ? "#EF4444" : detectorStatus === "ready" ? "#22C55E" : "#F59E0B",
+                animation: faceMissing ? "pulse 0.8s infinite" : "none"
+              }} />
+              <span style={{ fontSize: 10.5, fontWeight: 800, color: "#FFF", letterSpacing: "0.03em" }}>
+                {detectorStatus === "initializing"
+                  ? "AI PROCTOR: INITIALIZING..."
+                  : faceMissing
+                  ? "AI PROCTOR: NO FACE DETECTED"
+                  : "AI PROCTOR: FACE VERIFIED"}
+              </span>
             </div>
             
             {/* Blocking Overlay when Face is Missing */}
             {faceMissing && (
-              <div style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "white", padding: 12, textAlign: "center", backdropFilter: "blur(6px)", zIndex: 20 }}>
-                <span style={{ fontSize: 36, marginBottom: 12 }}>⚠️</span>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#F8FAFC", textTransform: "uppercase", letterSpacing: "0.05em" }}>Face Not Detected</div>
-                <div style={{ fontSize: 11, marginTop: 6, color: "#94A3B8", fontWeight: 600 }}>Please look at the camera to resume answering</div>
+              <div style={{
+                position: "absolute", inset: 0, background: "rgba(127,29,29,0.92)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                color: "white", padding: 16, textAlign: "center", backdropFilter: "blur(4px)", zIndex: 20
+              }}>
+                <span style={{ fontSize: 38, marginBottom: 8 }}>🚨</span>
+                <div style={{ fontSize: 14, fontWeight: 900, color: "#FCA5A5", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Face Not Detected
+                </div>
+                <div style={{ fontSize: 11.5, marginTop: 6, color: "#FEE2E2", fontWeight: 600, lineHeight: 1.5, maxWidth: 240 }}>
+                  ⚠️ Do not leave the camera screen! Question will auto-submit in ~2 seconds to prevent cheating.
+                </div>
               </div>
             )}
           </div>
@@ -667,8 +811,8 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 800, color: "#F8FAFC" }}>AI Interviewer ({llmProvider || "Auto"})</div>
-              <div style={{ fontSize: 11, color: aiSpeaking ? "#22C55E" : "#64748B", fontWeight: 600 }}>
-                {aiSpeaking ? "🔊 Speaking…" : "Ready for your response"}
+              <div style={{ fontSize: 11, color: aiSpeaking ? "#22C55E" : faceMissing ? "#EF4444" : "#64748B", fontWeight: 600 }}>
+                {aiSpeaking ? "🔊 AI reading question aloud…" : faceMissing ? "🚨 Face not detected — return to camera" : "✅ 3-minute timer running · Answer anytime"}
               </div>
             </div>
             <div style={{ marginLeft: "auto", textAlign: "right" }}>
@@ -679,10 +823,42 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
 
           {/* Current Question */}
           <div style={{ padding: "20px 28px", background: "#1E293B", borderBottom: "1px solid #334155" }}>
-            <div style={{ fontSize: 10.5, color: "#6366F1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Question {qIndex + 1}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 12, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 10.5, color: "#6366F1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Question {qIndex + 1} of {questions.length}
+              </div>
+              <button
+                onClick={() => {
+                  if (aiSpeaking) {
+                    window.speechSynthesis.cancel();
+                    setAiSpeaking(false);
+                  } else if (currentQ) {
+                    speak(`Question ${qIndex + 1}: ${currentQ}`);
+                  }
+                }}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 15px",
+                  background: aiSpeaking ? "#FEF3C7" : "#0F172A",
+                  color: aiSpeaking ? "#B45309" : "#38BDF8",
+                  border: `1px solid ${aiSpeaking ? "#F59E0B" : "#0284C7"}`,
+                  borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+                title="Optional: Listen to the question read aloud by AI"
+              >
+                {aiSpeaking ? "⏹ Stop Voice" : "🔊 Hear Question (Optional)"}
+              </button>
+            </div>
+
             <p style={{ color: "#F8FAFC", fontSize: 15.5, lineHeight: 1.75, margin: 0, fontWeight: 500 }}>
               {currentQ || "Loading your personalised question…"}
             </p>
+
+            {lastSkippedByAbsence && (
+              <div style={{ marginTop: 12, padding: "8px 12px", background: "#7F1D1D33", border: "1px solid #EF4444", borderRadius: 8, color: "#FCA5A5", fontSize: 12, fontWeight: 600 }}>
+                ⚠️ Previous question was auto-submitted because you left the camera frame.
+              </div>
+            )}
           </div>
 
           {/* Transcript */}
@@ -693,8 +869,10 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
                   <div style={{ fontSize: 9.5, color: "#6366F1", fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Q{idx + 1}</div>
                   <div style={{ color: "#CBD5E1", fontSize: 12.5 }}>{item.q}</div>
                 </div>
-                <div style={{ background: "#1E3A5F", borderRadius: 10, padding: "10px 14px", border: "1px solid #3B82F6", alignSelf: "flex-end", maxWidth: "88%" }}>
-                  <div style={{ fontSize: 9.5, color: "#60A5FA", fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Your Response</div>
+                <div style={{ background: item.a.includes("left the camera frame") ? "#450A0A" : "#1E3A5F", borderRadius: 10, padding: "10px 14px", border: `1px solid ${item.a.includes("left the camera frame") ? "#EF4444" : "#3B82F6"}`, alignSelf: "flex-end", maxWidth: "88%" }}>
+                  <div style={{ fontSize: 9.5, color: item.a.includes("left the camera frame") ? "#EF4444" : "#60A5FA", fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>
+                    {item.a.includes("left the camera frame") ? "⚠️ FRAUD DETECTED — AUTO-SUBMITTED" : "Your Response"}
+                  </div>
                   <div style={{ color: "#F8FAFC", fontSize: 12.5, lineHeight: 1.6 }}>{item.a}</div>
                 </div>
               </div>
@@ -712,13 +890,29 @@ export default function VideoInterview({ candidate, job, llmProvider, onComplete
             <div style={{ display: "flex", gap: 10 }}>
               <textarea
                 value={userText}
-                onChange={(e) => setUserText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !faceMissing) { e.preventDefault(); handleSubmitAnswer(); } }}
-                placeholder={faceMissing ? "Camera blocked — please return to frame..." : "Speak your answer (mic on) or type here… Press Enter or click Submit"}
+                onChange={(e) => {
+                  lastTypingTimeRef.current = Date.now();
+                  setUserText(e.target.value);
+                }}
+                onFocus={() => {
+                  isTypingFocusedRef.current = true;
+                  lastTypingTimeRef.current = Date.now();
+                }}
+                onBlur={() => {
+                  isTypingFocusedRef.current = false;
+                }}
+                onKeyDown={(e) => {
+                  lastTypingTimeRef.current = Date.now();
+                  if (e.key === "Enter" && !e.shiftKey && !faceMissing) {
+                    e.preventDefault();
+                    handleSubmitAnswer();
+                  }
+                }}
+                placeholder={faceMissing ? "🚨 Camera blocked — please return to frame to continue answering..." : "Speak your answer (mic on) or type here… Press Enter or click Submit"}
                 rows={3}
                 disabled={faceMissing}
                 style={{
-                  flex: 1, padding: "11px 14px", borderRadius: 10, border: "1px solid #334155",
+                  flex: 1, padding: "11px 14px", borderRadius: 10, border: `1px solid ${faceMissing ? "#EF4444" : "#334155"}`,
                   background: "#0F172A", color: "#F8FAFC", fontSize: 13.5, fontFamily: "inherit",
                   resize: "none", outline: "none", lineHeight: 1.6, opacity: faceMissing ? 0.4 : 1
                 }}

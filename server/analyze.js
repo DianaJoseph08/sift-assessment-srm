@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
+import JSON5 from "json5";
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude";
 const GEMINI_MODEL = "gemini-1.5-flash-002";
@@ -39,7 +40,7 @@ function schemaBlock(job, extractedEmails = []) {
   const jobTitle = job.title || "the specified role";
   const emailsList = extractedEmails.length > 0 ? `[${extractedEmails.map(e => `"${e}"`).join(", ")}]` : "[]";
 
-  return `Return ONLY a JSON object — no markdown, no backticks, no commentary — matching this schema:
+  return `Return ONLY a valid JSON object — no markdown, no backticks, no commentary — matching this schema. IMPORTANT: Escape all internal quotation marks inside string values (e.g. use \\" instead of ").
 {
  "requiredDiscipline": "1-2 words. The core academic or professional discipline required by the job (e.g., Mathematics, Physics, Computer Science). Note: If the job title contains an academic field like 'Mathematics', the required discipline MUST be 'Mathematics'.",
  "candidateDiscipline": "1-2 words. The candidate's primary academic discipline based on their highest degree (e.g. Physics, Mathematics, Computer Science, Mechatronics, Mechanical Engineering).",
@@ -140,13 +141,18 @@ function extractJSON(text) {
     for (let i = 0; i < brackets; i++) partial += ']';
     for (let i = 0; i < braces; i++) partial += '}';
     try {
-      return JSON.parse(partial);
+      return JSON5.parse(partial);
     } catch (_) {
       throw new Error("Model response was truncated and could not be repaired. Try re-running.");
     }
   }
   
-  return JSON.parse(t.slice(s, e + 1));
+  try {
+    return JSON5.parse(t.slice(s, e + 1));
+  } catch (e) {
+    console.error("JSON5 parse error:", e.message);
+    throw new Error("Screening failed to generate valid JSON: " + e.message);
+  }
 }
 
 /* ---------- Resume -> message content ---------- */
@@ -170,7 +176,7 @@ async function buildContent(job, resume, rawText, extractedEmails) {
   if (resume.type === "file") {
     const text = (rawText || "").trim();
     if (!text) {
-      throw new Error(`Could not extract text content from file "${resume.filename || 'uploaded file'}". Please ensure it is a un-corrupted PDF, DOCX, or TXT file.`);
+      throw new Error(`Could not extract text content from file "${resume.filename || 'uploaded file'}". This usually happens if the PDF is a scanned image rather than a text document, or if it is encrypted. Please ensure it is an ATS-friendly, text-based PDF or DOCX file.`);
     }
     return `${jd}\n\n---\nCANDIDATE RESUME (${resume.filename || "Uploaded File"}):\n${text}\n\n---\n${schema}`;
   }
@@ -456,7 +462,7 @@ async function analyzeWithClaude(content, model = "claude-sonnet-5", apiKey) {
       console.log(`[Claude] Requesting model: ${m}...`);
       const message = await client.messages.create({
         model: m,
-        max_tokens: 2048,
+        max_tokens: 8192,
         system: SYSTEM,
         messages: [{ role: "user", content }],
       });
@@ -994,12 +1000,14 @@ export async function evaluateVideoInterviewTranscript(job, candidate, transcrip
   const systemPrompt = `You are a strict, highly analytical technical assessor who evaluates video interview transcripts critically and outputs a structured feedback report in JSON.`;
 
   const proctoringInfo = proctoring
-    ? `\nPROCTORING METRICS DURING INTERVIEW:
+    ? `\nPROCTORING METRICS & FRAUD TRACKING:
+- Left Camera Frame / Face Absent Count: ${proctoring.faceAbsent || proctoring.faceNotVisibleCount || 0}
+- Looking Outside Screen / Looking Away Count: ${proctoring.lookingAway || proctoring.lookingAwayCount || 0}
+- Head Turned Away Count: ${proctoring.headTurned || 0}
 - Window focus losses / tab switches: ${proctoring.tabSwitches || 0}
-- Copy-paste actions in input box: ${proctoring.pasteCount || 0}
-- Face Not Visible Count: ${proctoring.faceNotVisibleCount || 0}
-- Looking Away Count: ${proctoring.lookingAwayCount || 0}
-- Multiple People Count: ${proctoring.multipleFacesCount || 0}`
+- Copy-paste actions / attempts: ${proctoring.pasteCount || proctoring.copyPastes || 0}
+- Keyboard shortcut / developer tool abuses: ${proctoring.keyboardAbuse || 0}
+- Additional Proctoring Remarks: ${proctoring.remarks || "None"}`
     : "";
 
   const prompt = `Evaluate the following interview transcript for the role of "${job.title}".
@@ -1009,13 +1017,19 @@ Resume Skills: ${(candidate.result?.topSkills || []).join(", ")}${proctoringInfo
 Interview Transcript:
 ${transcriptText}
 
+CRITICAL PROCTORING & FRAUD RULES:
+1. Examine the PROCTORING METRICS and the answers in the transcript closely.
+2. If the candidate left the camera frame during any question (or if answers indicate they left the screen to search for answers), treat this as MALPRACTICE/FRAUD. Explicitly mention this in the "summary" and "recommendation" (e.g., "FLAGGED FOR FRAUD: Candidate left camera frame during questioning; possible external search").
+3. If the candidate frequently looked outside the screen, turned their head, or switched tabs, explicitly state this in the summary.
+4. If fraud or camera abandonment occurred, integrityScore MUST be below 30, and recommendation MUST be "Reject (Malpractice Detected)".
+
 Output a JSON object ONLY with this schema:
 {
   "technicalScore": number (0-100),
   "communicationScore": number (0-100),
-  "integrityScore": number (0-100, calculate this based entirely on the PROCTORING METRICS. Deduct heavily for tab switches, missing faces, or multiple people.),
-  "summary": "string (a concise paragraph summarizing their performance)",
-  "recommendation": "string (e.g. Proceed to HR Round, Reject, etc)"
+  "integrityScore": number (0-100, calculate based on proctoring metrics and fraud violations),
+  "summary": "string (a concise paragraph summarizing performance and explicitly stating any fraud, camera abandonment, or proctoring violations detected in the remarks)",
+  "recommendation": "string (e.g. 'Proceed to HR Round', 'Reject (Malpractice Detected)', 'Manual Proctoring Review Required')"
 }
 Return ONLY valid JSON.`;
 

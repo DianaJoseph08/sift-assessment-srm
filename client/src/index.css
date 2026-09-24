@@ -42,3 +42,36 @@ body {
 .fade-up {
   animation: fadeUp 0.4s ease both;
 }
+
+@keyframes logoPulseGlow {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.55;
+    filter: blur(6px);
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.9;
+    filter: blur(8px);
+  }
+}
+
+@keyframes logoSpinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes logoSparkle {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+}

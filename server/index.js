@@ -112,14 +112,16 @@ app.post("/api/analyze", async (req, res) => {
 // Send AI Interview Invitation Link via Email Endpoint
 app.post("/api/send-interview-email", (req, res) => {
   try {
-    const { candidateName, email, phone, jobTitle, companyName, interviewLink } = req.body || {};
+    const { candidateName, email, phone, jobTitle, companyName, interviewLink, senderEmail, senderName, replyTo } = req.body || {};
+    const effectiveReplyTo = replyTo || senderEmail || "N/A";
+    const effectiveSender = senderName || "Hiring Team";
     addLog(
       "INTERVIEW_INVITE",
-      `Sent AI Interview Invitation link to ${candidateName || 'Candidate'} (${email || 'N/A'})`,
+      `Sent AI Interview Invitation to ${candidateName || 'Candidate'} (${email || 'N/A'})`,
       companyName || "",
-      `Role: ${jobTitle || 'Opening'} | Contact: ${phone || 'N/A'} | Link: ${interviewLink || 'N/A'}`
+      `From: "${effectiveSender} via CogniHire" | Reply-To: ${effectiveReplyTo} | Role: ${jobTitle || 'Opening'} | Link: ${interviewLink || 'N/A'}`
     );
-    res.json({ ok: true, sentTo: email, interviewLink });
+    res.json({ ok: true, sentTo: email, senderName: effectiveSender, replyTo: effectiveReplyTo, interviewLink });
   } catch (err) {
     console.error("[send-interview-email] error:", err.message);
     res.status(500).json({ error: err.message || "Failed to send email" });
@@ -184,9 +186,15 @@ app.post("/api/interview/video-evaluate", async (req, res) => {
 
     // ── Smart fallback: score based on actual answer length & content ───────
     const answers = (transcript || []).map(t => t.a || "");
+    const faceAbsentCount = (malpractice && malpractice.faceAbsent) || 0;
+    const lookingAwayCount = (malpractice && malpractice.lookingAway) || 0;
+    const headTurnedCount = (malpractice && malpractice.headTurned) || 0;
+    const tabSwitchesCount = (malpractice && malpractice.tabSwitches) || 0;
+    const totalViolations = faceAbsentCount + lookingAwayCount + headTurnedCount + tabSwitchesCount;
+
     const answerScores = answers.map(ans => {
       const words = ans.trim().split(/\s+/).filter(w => w.length > 1);
-      if (!ans.trim() || ans.includes("[No response")) return 10;
+      if (!ans.trim() || ans.toLowerCase().includes("no response") || ans.toLowerCase().includes("left camera")) return 5;
       if (words.length < 10) return 20;
       if (words.length < 25) return 35;
       if (words.length < 50) return 50;
@@ -194,20 +202,33 @@ app.post("/api/interview/video-evaluate", async (req, res) => {
       return 73;
     });
     const totalAnswers = answerScores.length || 1;
-    const techScore = Math.round(answerScores.reduce((a, b) => a + b, 0) / totalAnswers);
+    let techScore = Math.round(answerScores.reduce((a, b) => a + b, 0) / totalAnswers);
+    if (faceAbsentCount > 0) techScore = Math.min(techScore, 35); // Heavy penalty for leaving frame
+
     const commScore = Math.round(techScore * 0.95);
-    const grade = techScore >= 75 ? "Good" : techScore >= 55 ? "Average" : "Poor";
-    const rec = techScore >= 70 ? "Possible" : "Do Not Recommend";
+    const integrityScore = Math.max(10, 100 - (faceAbsentCount * 30 + lookingAwayCount * 8 + headTurnedCount * 10 + tabSwitchesCount * 15));
+    
+    let grade = techScore >= 75 ? "Good" : techScore >= 55 ? "Average" : "Poor";
+    let rec = techScore >= 70 && integrityScore >= 70 ? "Possible" : "Do Not Recommend";
+
+    let fraudSummary = "";
+    if (faceAbsentCount > 0) {
+      rec = "Reject (Malpractice Detected)";
+      grade = "Fail (Fraud Risk)";
+      fraudSummary = ` CRITICAL MALPRACTICE: Candidate left camera frame ${faceAbsentCount} time(s) during questioning (possible external searching for answers). Current questions were closed automatically.`;
+    } else if (lookingAwayCount > 3 || headTurnedCount > 2) {
+      fraudSummary = ` Proctoring notice: Candidate repeatedly looked outside the screen or turned head (${lookingAwayCount + headTurnedCount} times).`;
+    }
 
     res.json({
       technicalScore: techScore,
       communicationScore: commScore,
-      integrityScore: 100, // Approximate fallback
+      integrityScore: integrityScore,
       overallGrade: grade,
       recommendation: rec,
-      summary: `${candidate?.name || "The candidate"}'s responses averaged ${techScore}% based on answer depth and relevance. Manual review recommended.`,
+      summary: `${candidate?.name || "The candidate"}'s responses scored ${techScore}%.${fraudSummary} Proctoring remarks logged.`,
       strengths: techScore >= 60 ? ["Completed all interview questions"] : ["Participated in the interview session"],
-      improvements: ["Provide detailed answers with specific real-world examples"]
+      improvements: faceAbsentCount > 0 ? ["Do not leave the camera screen during interview sessions"] : ["Provide detailed answers with specific real-world examples"]
     });
   } catch (err) {
     console.error("[interview/video-evaluate] error:", err.message);
@@ -331,7 +352,7 @@ if (fs.existsSync(dist)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`\n  SRM Multi-Company Agency Portal listening on http://localhost:${PORT}`);
+  console.log(`\n  CogniHire AI Interviewer & Assessment Portal listening on http://localhost:${PORT}`);
   if (process.env.LLM_PROVIDER === "ollama") {
     console.log(`  LLM Provider: Local Ollama (${process.env.MODEL || "llama3.1"})`);
   } else {

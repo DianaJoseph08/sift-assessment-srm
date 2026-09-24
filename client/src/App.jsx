@@ -58,7 +58,7 @@ const THEMES = {
     cardBorder: "#1E293B",
   },
   "srm-blue": {
-    name: "SRM Corporate Blue",
+    name: "Corporate Blue",
     bg: "#031B3A",
     paper: "#062854",
     panel: "#08346C",
@@ -112,36 +112,125 @@ const gradeColor = (v) =>
 const DISPLAY = "'Outfit', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 const BODY = "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
-const SrmLogo = ({ collapsed = false, theme = "light" }) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-    <svg width={collapsed ? "38" : "180"} height="50" viewBox="0 0 450 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="450" height="35" rx="6" fill="#034DA1" />
-      <rect x="3" y="3" width="444" height="29" rx="4" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
-      <text x="225" y="22" textAnchor="middle" fill="#FFFFFF" fontSize="16" fontFamily="serif" fontWeight="bold" letterSpacing="3">CHENNAI RAMAPURAM</text>
-      
-      <circle cx="70" cy="102" r="42" fill="#034DA1" />
-      <circle cx="70" cy="102" r="42" fill="none" stroke="#D4AF37" strokeWidth="2.5" />
-      <circle cx="70" cy="102" r="32" fill="#FFFFFF" stroke="#D4AF37" strokeWidth="1" />
-      <circle cx="70" cy="102" r="23" fill="#034DA1" />
-      
-      <path d="M68,118 L68,110 Q68,104 64,102 Q68,104 72,102 Q72,110 72,118 Z" fill="#FFFFFF" />
-      <path d="M53,102 C51,99 52,94 56,93 C55,89 59,85 63,87 C66,83 72,83 75,86 C79,84 83,87 83,91 Z" fill="#FFFFFF" />
-      
-      {!collapsed && (
-        <>
-          <text x="135" y="106" fill={theme === "light" ? "#034DA1" : "#38BDF8"} fontSize="72" fontFamily="serif" fontWeight="bold" letterSpacing="-1">SRM</text>
-          <text x="135" y="128" fill={theme === "light" ? "#1E293B" : "#F8FAFC"} fontSize="17.2" fontFamily="serif" fontWeight="bold">INSTITUTE OF SCIENCE &amp; TECHNOLOGY</text>
-          <text x="135" y="145" fill={theme === "light" ? "#475569" : "#94A3B8"} fontSize="13" fontFamily="serif" fontStyle="italic">(Deemed to be University)</text>
-        </>
-      )}
-    </svg>
+const BrandLogo = ({ collapsed = false, theme = "dark" }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 12, userSelect: "none" }}>
+    {/* Animated Modern AI Emblem */}
+    <div style={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
+      {/* Outer ambient pulsing glow */}
+      <div style={{
+        position: "absolute",
+        inset: -2,
+        borderRadius: 14,
+        background: "linear-gradient(135deg, #0284C7, #6366F1, #38BDF8)",
+        animation: "logoPulseGlow 3s ease-in-out infinite",
+        zIndex: 0
+      }} />
+
+      {/* Main icon container */}
+      <div style={{
+        position: "relative",
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        background: "linear-gradient(145deg, #0F172A 0%, #1E293B 100%)",
+        border: "1.5px solid rgba(56, 189, 248, 0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+        zIndex: 1
+      }}>
+        {/* Rotating gradient background beam */}
+        <div style={{
+          position: "absolute",
+          width: 64,
+          height: 64,
+          background: "conic-gradient(from 0deg, transparent 0deg, rgba(56,189,248,0.3) 90deg, transparent 180deg)",
+          animation: "logoSpinSlow 7s linear infinite"
+        }} />
+
+        {/* Center SVG Emblem */}
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ zIndex: 2 }}>
+          <defs>
+            <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#38BDF8" />
+              <stop offset="100%" stopColor="#818CF8" />
+            </linearGradient>
+          </defs>
+          {/* Hexagonal Shield / AI Node */}
+          <path
+            d="M12 2.5L19.5 6.8V17.2L12 21.5L4.5 17.2V6.8L12 2.5Z"
+            stroke="url(#brandGrad)"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Internal connection lines */}
+          <path
+            d="M12 2.5V12M19.5 17.2L12 12M4.5 17.2L12 12"
+            stroke="url(#brandGrad)"
+            strokeWidth="1.2"
+            strokeOpacity="0.65"
+            strokeLinecap="round"
+          />
+          {/* Central Pulsing AI Node */}
+          <circle cx="12" cy="12" r="3.2" fill="url(#brandGrad)" style={{ animation: "logoSparkle 2s ease-in-out infinite" }} />
+          <circle cx="12" cy="12" r="1.3" fill="#FFFFFF" />
+        </svg>
+      </div>
+    </div>
+
+    {!collapsed && (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            fontSize: 18,
+            fontWeight: 800,
+            fontFamily: DISPLAY,
+            color: "#F8FAFC",
+            letterSpacing: "-0.02em"
+          }}>
+            Cogni<span style={{
+              background: "linear-gradient(135deg, #38BDF8 0%, #818CF8 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              fontWeight: 900,
+              marginLeft: 1
+            }}>Hire</span>
+          </span>
+          <span style={{
+            fontSize: 9,
+            fontWeight: 800,
+            padding: "1px 6px",
+            borderRadius: 4,
+            background: "rgba(56, 189, 248, 0.15)",
+            color: "#38BDF8",
+            border: "1px solid rgba(56, 189, 248, 0.35)",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase"
+          }}>
+            AI
+          </span>
+        </div>
+        <div style={{
+          fontSize: 10.5,
+          color: "#64748B",
+          fontWeight: 600,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase"
+        }}>
+          AI Interviewer &amp; Proctoring
+        </div>
+      </div>
+    )}
   </div>
 );
 
 const SAMPLE_COMPANIES = [
-  { id: "comp_motherson", name: "Motherson Group", industry: "Automotive & Manufacturing", contactEmail: "hr@motherson.com", notes: "Key OEM partner for CAE simulation & mechanical roles", createdAt: new Date().toISOString() },
-  { id: "comp_srmtech", name: "SRM Group / IST", industry: "Academic & R&D Institute", contactEmail: "careers@srmist.edu.in", notes: "Faculty recruitment & campus research hiring", createdAt: new Date().toISOString() },
-  { id: "comp_bosch", name: "Bosch India", industry: "Automotive Engineering", contactEmail: "ta@bosch.in", notes: "R&D hiring for Embedded & Mechatronics roles", createdAt: new Date().toISOString() }
+  { id: "comp_motherson", name: "Motherson Group", industry: "Automotive & Manufacturing", contactEmail: "hr@motherson.com", senderName: "Motherson Talent Acquisition", notes: "Key OEM partner for CAE simulation & mechanical roles", createdAt: new Date().toISOString() },
+  { id: "comp_apextech", name: "Apex Technologies", industry: "Software & Cloud Services", contactEmail: "careers@apextech.com", senderName: "Apex Tech Recruitment Team", notes: "Engineering & IT talent acquisition", createdAt: new Date().toISOString() },
+  { id: "comp_bosch", name: "Bosch India", industry: "Automotive Engineering", contactEmail: "ta@bosch.in", senderName: "Bosch India Talent Team", notes: "R&D hiring for Embedded & Mechatronics roles", createdAt: new Date().toISOString() }
 ];
 
 const SAMPLE_JOB = {
@@ -149,6 +238,8 @@ const SAMPLE_JOB = {
   seniority: "Senior",
   minYears: 5,
   location: "Bengaluru / Hybrid",
+  senderName: "",
+  senderEmail: "",
   description:
     "We are hiring a Senior Machine Learning Engineer to design, build, and deploy production ML systems. You will own models end to end — from data pipelines and experimentation to deployment, monitoring, and iteration. You will collaborate with product and data teams to ship recommendation and prediction features at scale.",
   mustHave: ["Python", "PyTorch or TensorFlow", "Machine Learning", "Model Deployment / MLOps", "SQL"],
@@ -383,6 +474,10 @@ const List = ({ items, color, icon, C }) => (
 /* ============================== STEP 1: ROLE DEFINITION ============================== */
 function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, C }) {
   const ready = (job.title || "").trim() && (job.description || "").trim();
+  const selectedComp = companies.find(c => c.id === job.companyId) || companies[0];
+  const companyDefaultSender = selectedComp?.senderName || (selectedComp?.name ? `${selectedComp.name} Talent Team` : "Client Talent Team");
+  const companyDefaultEmail = selectedComp?.contactEmail || "hr@client.com";
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.05fr .95fr", gap: 22 }}>
       <Panel title="Define Job Criteria" sub="Specify the role requirements and select target client company" C={C}>
@@ -437,6 +532,77 @@ function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, C }) {
             placeholder="Key responsibilities, skills, and qualifications required for this client..."
             onChange={(e) => setJob({ ...job, description: e.target.value })} />
         </Field>
+
+        {/* Recruiter & Sender Email Configuration */}
+        <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
+            <Mail size={16} color={C.accent} />
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, fontFamily: DISPLAY }}>
+              AI Interview Email Sender &amp; Reply-To Settings
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <Field
+                label="Job-Specific Recruiter / Sender Name (Optional)"
+                hint={`Leave blank to inherit: "${companyDefaultSender}"`}
+                C={C}
+              >
+                <input
+                  style={inputStyle(C)}
+                  value={job.senderName || ""}
+                  placeholder={`e.g. ${selectedComp?.name || 'Company'} CAE Lead`}
+                  onChange={(e) => setJob({ ...job, senderName: e.target.value })}
+                />
+              </Field>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <Field
+                label="Job-Specific Reply-To Email (Optional)"
+                hint={`Leave blank to inherit: "${companyDefaultEmail}"`}
+                C={C}
+              >
+                <input
+                  type="email"
+                  style={inputStyle(C)}
+                  value={job.senderEmail || ""}
+                  placeholder={`e.g. hiring-${(job.title || 'team').toLowerCase().replace(/\s+/g, '')}@${selectedComp?.name?.toLowerCase().replace(/\s+/g, '') || 'client'}.com`}
+                  onChange={(e) => setJob({ ...job, senderEmail: e.target.value })}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div style={{
+            background: C.bg,
+            border: `1px solid ${C.line}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontSize: 11.5,
+            color: C.sub,
+            lineHeight: 1.5,
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            marginTop: 8
+          }}>
+            <span style={{ fontSize: 14 }}>🛡️</span>
+            <div>
+              <strong style={{ color: C.ink }}>SPF/DKIM Deliverability Guarantee:</strong> Candidate invitations are delivered safely to the inbox from CogniHire's verified domain as:
+              <br />
+              <code style={{ background: C.paper, padding: "2px 6px", borderRadius: 4, color: C.accent, fontWeight: 700, display: "inline-block", marginTop: 2 }}>
+                From: "{job.senderName?.trim() || companyDefaultSender} via CogniHire" &lt;invitations@cognihire.ai&gt;
+              </code>
+              <br />
+              Candidate replies will land directly in:
+              <code style={{ background: C.paper, padding: "2px 6px", borderRadius: 4, color: "#16A34A", fontWeight: 700, marginLeft: 4 }}>
+                Reply-To: {job.senderEmail?.trim() || companyDefaultEmail}
+              </code>
+            </div>
+          </div>
+        </div>
       </Panel>
 
       <div>
@@ -744,29 +910,241 @@ function Analyzing({ candidates, C }) {
   );
 }
 
+/* ============================== CANDIDATE INVITATION EMAIL MODAL ============================== */
+function InviteCandidateModal({ c, job, company, onClose, C }) {
+  const r = c.result;
+  const initialEmail = (r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu")) ? r.email : "";
+  const [recipientEmail, setRecipientEmail] = useState(initialEmail);
+  
+  const companyName = company?.name || job?.companyName || "Client Company";
+  const defaultSenderName = (job?.senderName || "").trim() || (company?.senderName || "").trim() || `${companyName} Talent Team`;
+  const defaultReplyTo = (job?.senderEmail || "").trim() || (company?.contactEmail || "").trim() || "hr@client.com";
+
+  const [senderDisplayName, setSenderDisplayName] = useState(defaultSenderName);
+  const [replyToEmail, setReplyToEmail] = useState(defaultReplyTo);
+  const [subject, setSubject] = useState(`AI Technical Interview Invitation — ${job?.title || 'Position'} at ${companyName}`);
+
+  const interviewLink = `${window.location.origin}/interview?cand=${c.id}`;
+
+  const defaultBody = 
+`Dear ${r?.candidateName || 'Candidate'},
+
+Congratulations! You have been shortlisted for the position of ${job?.title || 'the role'} at ${companyName}.
+
+As the next step in our evaluation process, you are invited to complete an automated, proctored AI Technical Interview on the CogniHire platform.
+
+👉 Access Your AI Interview Session:
+${interviewLink}
+
+Session Information & Guidelines:
+• 5 Technical Assessment Questions
+• 3 minutes allotted per question (auto-advancing)
+• Voice speaking or text typing accepted
+• Active Anti-Fraud Proctoring: Camera & face visibility required; please maintain eye contact with the screen throughout the session.
+
+If you have any questions, please reply directly to this email (${replyToEmail}).
+
+Best regards,
+${senderDisplayName}
+${companyName}`;
+
+  const [emailBody, setEmailBody] = useState(defaultBody);
+
+  const handleOpenGmail = () => {
+    if (!recipientEmail) {
+      alert("Please enter a candidate recipient email address.");
+      return;
+    }
+    const encSub = encodeURIComponent(subject);
+    const encBody = encodeURIComponent(emailBody);
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encSub}&body=${encBody}`, "_blank");
+
+    // Asynchronously log to system activity logs
+    try {
+      fetch("/api/send-interview-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateName: r?.candidateName || c.label,
+          email: recipientEmail,
+          phone: r?.phone || "",
+          jobTitle: job?.title || "Role",
+          companyName,
+          interviewLink,
+          senderName: senderDisplayName,
+          senderEmail: "invitations@cognihire.ai",
+          replyTo: replyToEmail
+        })
+      });
+    } catch (e) {}
+
+    onClose();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 }}>
+      <div style={{ background: C.paper, borderRadius: 16, width: 640, maxWidth: "96%", maxHeight: "90vh", display: "flex", flexDirection: "column", border: `1px solid ${C.cardBorder}`, boxShadow: "0 20px 40px rgba(0,0,0,0.4)", overflow: "hidden" }}>
+        
+        {/* Modal Header */}
+        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Mail size={18} color={C.accent} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>
+                Send AI Interview Invitation
+              </h3>
+              <p style={{ fontSize: 12, color: C.sub, margin: "2px 0 0" }}>
+                Candidate: <strong>{r?.candidateName || c.label}</strong> · {job?.title || 'Role'}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.faint, cursor: "pointer", padding: 4 }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+          
+          {/* Deliverability & Routing Explanation Badge */}
+          <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px", fontSize: 12, lineHeight: 1.55 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, color: C.ink, marginBottom: 4 }}>
+              <span>🛡️</span> <span>SPF/DKIM Authenticated Multi-Tier Delivery</span>
+            </div>
+            <div style={{ color: C.sub }}>
+              • <strong>From Header:</strong> <code style={{ color: C.accent, fontWeight: 700 }}>"{senderDisplayName} via CogniHire" &lt;invitations@cognihire.ai&gt;</code> (100% Inbox Delivery)
+              <br />
+              • <strong>Reply-To Header:</strong> <code style={{ color: "#16A34A", fontWeight: 700 }}>{replyToEmail}</code> (Candidate replies land directly in this recruiter inbox)
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+                Candidate Recipient Email (To) *
+              </label>
+              <input
+                type="email"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                placeholder="candidate@email.com"
+                style={inputStyle(C)}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+                Recruiter Reply-To Email *
+              </label>
+              <input
+                type="email"
+                value={replyToEmail}
+                onChange={(e) => setReplyToEmail(e.target.value)}
+                placeholder="recruiter@clientcompany.com"
+                style={inputStyle(C)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+              Sender Display Name
+            </label>
+            <input
+              type="text"
+              value={senderDisplayName}
+              onChange={(e) => setSenderDisplayName(e.target.value)}
+              placeholder="e.g. Motherson Talent Acquisition"
+              style={inputStyle(C)}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+              Email Subject
+            </label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              style={inputStyle(C)}
+            />
+          </div>
+
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: C.sub }}>
+                Invitation Message &amp; Guidelines
+              </label>
+              <span style={{ fontSize: 10.5, color: C.faint }}>Unique candidate link included</span>
+            </div>
+            <textarea
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              rows={8}
+              style={{ ...inputStyle(C), minHeight: 140, resize: "vertical", fontFamily: "monospace", fontSize: 12, lineHeight: 1.5 }}
+            />
+          </div>
+        </div>
+
+        {/* Modal Footer Actions - Open Web Gmail Only */}
+        <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.line}`, background: C.paper, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "9px 16px",
+              background: C.bg,
+              color: C.ink,
+              border: `1px solid ${C.line}`,
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: BODY,
+            }}
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenGmail}
+            style={{
+              padding: "10px 22px",
+              background: "#EA4335",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontFamily: BODY,
+              boxShadow: "0 2px 8px rgba(234, 67, 53, 0.28)"
+            }}
+            title="Open Google Web Gmail in browser tab with all fields pre-filled"
+          >
+            <Mail size={16} /> Open Web Gmail
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 /* ============================== STEP 3b: RESULTS & RECOMMENDATIONS ============================== */
-function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
+function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }) {
   const [open, setOpen] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const r = c.result;
 
   const [actionNotice, setActionNotice] = useState("");
-
-  const getInterviewBody = (targetEmail, interviewLink) => {
-    const subject = encodeURIComponent(`AI Technical Interview Invitation — ${jobTitle}`);
-    const body = encodeURIComponent(`Dear ${r?.candidateName || 'Candidate'},\n\nYou have been shortlisted for the position of ${jobTitle}.\n\nPlease click the link below to complete your automated AI Technical Interview:\n\n👉 Interview Link: ${interviewLink}\n\nBest regards,\nRecruitment Team`);
-    return { subject, body };
-  };
-
-  const handleOpenWebGmail = (e) => {
-    e.stopPropagation();
-    const targetEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "";
-    const interviewLink = `${window.location.origin}/interview?cand=${c.id}`;
-    const { subject, body } = getInterviewBody(targetEmail, interviewLink);
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${targetEmail}&su=${subject}&body=${body}`, "_blank");
-    setActionNotice("gmail");
-    setTimeout(() => setActionNotice(""), 3500);
-  };
 
   const handleCopyLink = async (e) => {
     e.stopPropagation();
@@ -775,16 +1153,6 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
       await navigator.clipboard.writeText(interviewLink);
     } catch (err) {}
     setActionNotice("copy");
-    setTimeout(() => setActionNotice(""), 3500);
-  };
-
-  const handleOpenDesktopMail = (e) => {
-    e.stopPropagation();
-    const targetEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "";
-    const interviewLink = `${window.location.origin}/interview?cand=${c.id}`;
-    const { subject, body } = getInterviewBody(targetEmail, interviewLink);
-    window.open(`mailto:${targetEmail}?subject=${subject}&body=${body}`, "_self");
-    setActionNotice("mailto");
     setTimeout(() => setActionNotice(""), 3500);
   };
 
@@ -860,13 +1228,13 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
           </div>
 
           <button
-            onClick={handleOpenWebGmail}
-            title="Opens Google Web Gmail in browser tab with pre-filled candidate email, subject and interview link"
+            onClick={(e) => { e.stopPropagation(); setShowInviteModal(true); }}
+            title="Configure and send personalized AI interview invitation with dynamic client Reply-To"
             style={{
-              padding: "7px 12px",
-              background: actionNotice === "gmail" ? "#DCFCE7" : C.accent,
-              color: actionNotice === "gmail" ? "#15803D" : "#FFFFFF",
-              border: `1px solid ${actionNotice === "gmail" ? "#86EFAC" : C.accent}`,
+              padding: "7px 14px",
+              background: C.accent,
+              color: "#FFFFFF",
+              border: "none",
               borderRadius: 8,
               fontSize: 12,
               fontWeight: 700,
@@ -875,11 +1243,11 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
               alignItems: "center",
               gap: 6,
               fontFamily: BODY,
-              transition: "all 0.15s ease"
+              transition: "all 0.15s ease",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.12)"
             }}
           >
-            {actionNotice === "gmail" ? <Check size={14} color="#15803D" /> : <Mail size={14} />}
-            {actionNotice === "gmail" ? "Web Gmail Opened!" : "🌐 Send via Web Gmail"}
+            <Mail size={14} /> Invite Candidate
           </button>
 
           <button
@@ -932,64 +1300,6 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
 
       <div style={{ padding: "0 17px 13px", fontSize: 13, color: C.sub, lineHeight: 1.5 }}>
         {r.summary}
-      </div>
-
-      {/* Prominent Extracted Contact & Email Link Bar */}
-      <div style={{ margin: "0 17px 14px", background: C.accentSoft, borderRadius: 10, padding: "12px 16px", border: `1px solid ${C.accent}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: C.accent, letterSpacing: ".06em" }}>
-            Extracted Candidate Contact Details &amp; Interview Access
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginTop: 4, display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <span>✉️ Extracted Candidate Email: <strong style={{ color: C.accent }}>{candidateEmail}</strong></span>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            onClick={handleOpenWebGmail}
-            title="Launches Google Web Gmail in browser with pre-filled candidate email, subject and interview link"
-            style={{
-              padding: "8px 14px",
-              background: actionNotice === "gmail" ? "#DCFCE7" : C.accent,
-              color: actionNotice === "gmail" ? "#15803D" : "#FFFFFF",
-              border: `1px solid ${actionNotice === "gmail" ? "#86EFAC" : C.accent}`,
-              borderRadius: 8,
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontFamily: BODY,
-              boxShadow: "0 2px 5px rgba(0,0,0,0.12)"
-            }}
-          >
-            {actionNotice === "gmail" ? <Check size={15} color="#15803D" /> : <Mail size={15} />}
-            {actionNotice === "gmail" ? "Web Gmail Opened!" : "🌐 Open Web Gmail"}
-          </button>
-
-          <button
-            onClick={handleCopyLink}
-            title="Copies candidate interview link to clipboard"
-            style={{
-              padding: "8px 14px",
-              background: actionNotice === "copy" ? "#DCFCE7" : C.paper,
-              color: actionNotice === "copy" ? "#15803D" : C.ink,
-              border: `1px solid ${actionNotice === "copy" ? "#86EFAC" : C.line}`,
-              borderRadius: 8,
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontFamily: BODY
-            }}
-          >
-            {actionNotice === "copy" ? <Check size={15} color="#15803D" /> : <Copy size={15} />}
-            {actionNotice === "copy" ? "Link Copied!" : "📋 Copy Link"}
-          </button>
-        </div>
       </div>
 
       {open && (
@@ -1084,13 +1394,34 @@ function CandidateCard({ rank, c, threshold, jobTitle, onStartInterview, C }) {
           )}
         </div>
       )}
+
+      {showInviteModal && (
+        <InviteCandidateModal
+          c={c}
+          job={job}
+          company={company}
+          onClose={() => setShowInviteModal(false)}
+          C={C}
+        />
+      )}
     </div>
   );
 }
 
-function Results({ candidates, job, onReRun, onRestart, onStartInterview, C }) {
+function Results({ candidates, job, companies = [], onReRun, onRestart, onStartInterview, filterMode = "all", setFilterMode, C }) {
   const [threshold, setThreshold] = useState(70);
   const [sortKey, setSortKey] = useState("score");
+  const [localFilter, setLocalFilter] = useState(filterMode);
+
+  useEffect(() => {
+    setLocalFilter(filterMode);
+  }, [filterMode]);
+
+  const activeFilter = setFilterMode ? filterMode : localFilter;
+  const changeFilter = (m) => {
+    if (setFilterMode) setFilterMode(m);
+    setLocalFilter(m);
+  };
 
   const valid = candidates.filter((c) => c.status === "done" && c.result);
   const failed = candidates.filter((c) => c.status === "error" || (c.status === "done" && !c.result));
@@ -1104,6 +1435,13 @@ function Results({ candidates, job, onReRun, onRestart, onStartInterview, C }) {
 
   const shortlistedCount = sorted.filter((c) => c.result.overallScore >= threshold).length;
   const avgScore = valid.length ? Math.round(valid.reduce((s, c) => s + c.result.overallScore, 0) / valid.length) : 0;
+
+  const displayed = useMemo(() => {
+    if (activeFilter === "shortlisted") {
+      return sorted.filter((c) => c.result.overallScore >= threshold);
+    }
+    return sorted;
+  }, [sorted, activeFilter, threshold]);
 
   const handleExportCSV = () => {
     const rows = sorted.map((c, i) => ({
@@ -1125,14 +1463,50 @@ function Results({ candidates, job, onReRun, onRestart, onStartInterview, C }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 150, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Candidates Screened</div>
+        <div
+          onClick={() => changeFilter("all")}
+          style={{
+            flex: 1,
+            minWidth: 150,
+            background: C.paper,
+            border: activeFilter === "all" ? `2px solid ${C.accent}` : `1px solid ${C.line}`,
+            borderRadius: 12,
+            padding: "15px 16px",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+            boxShadow: activeFilter === "all" ? `0 4px 14px ${C.accentSoft}` : "none",
+          }}
+          title="Click to view all screened candidates"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: activeFilter === "all" ? C.accent : C.sub, textTransform: "uppercase" }}>Candidates Screened</div>
+            {activeFilter === "all" && <span style={{ fontSize: 10, fontWeight: 800, color: C.accent, background: C.accentSoft, padding: "2px 6px", borderRadius: 4 }}>ACTIVE</span>}
+          </div>
           <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: C.ink, marginTop: 4 }}>{valid.length}</div>
         </div>
-        <div style={{ flex: 1, minWidth: 150, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Shortlisted (≥{threshold}%)</div>
+
+        <div
+          onClick={() => changeFilter("shortlisted")}
+          style={{
+            flex: 1,
+            minWidth: 150,
+            background: C.paper,
+            border: activeFilter === "shortlisted" ? "2px solid #16A34A" : `1px solid ${C.line}`,
+            borderRadius: 12,
+            padding: "15px 16px",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+            boxShadow: activeFilter === "shortlisted" ? "0 4px 14px rgba(22, 163, 74, 0.2)" : "none",
+          }}
+          title="Click to view shortlisted candidates only"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: activeFilter === "shortlisted" ? "#16A34A" : C.sub, textTransform: "uppercase" }}>Shortlisted (≥{threshold}%)</div>
+            {activeFilter === "shortlisted" && <span style={{ fontSize: 10, fontWeight: 800, color: "#16A34A", background: "#DCFCE7", padding: "2px 6px", borderRadius: 4 }}>FILTERED</span>}
+          </div>
           <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: "#16A34A", marginTop: 4 }}>{shortlistedCount}</div>
         </div>
+
         <div style={{ flex: 1, minWidth: 150, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Average Fit Score</div>
           <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: gradeColor(avgScore), marginTop: 4 }}>{avgScore}%</div>
@@ -1140,10 +1514,48 @@ function Results({ candidates, job, onReRun, onRestart, onStartInterview, C }) {
       </div>
 
       <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>Shortlist Cutoff Score:</span>
-          <input type="range" min={30} max={90} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} style={{ width: 140 }} />
-          <span style={{ fontSize: 14, fontWeight: 800, color: C.accent }}>{threshold}%</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>Cutoff Score:</span>
+            <input type="range" min={30} max={90} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} style={{ width: 120 }} />
+            <span style={{ fontSize: 14, fontWeight: 800, color: C.accent }}>{threshold}%</span>
+          </div>
+
+          {/* Quick Filter Pill Buttons */}
+          <div style={{ display: "flex", background: C.bg, border: `1px solid ${C.line}`, borderRadius: 8, padding: 3, gap: 4 }}>
+            <button
+              onClick={() => changeFilter("all")}
+              style={{
+                padding: "4px 10px",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                background: activeFilter === "all" ? C.accent : "transparent",
+                color: activeFilter === "all" ? "#FFFFFF" : C.sub,
+                transition: "all 0.15s ease",
+              }}
+            >
+              All ({valid.length})
+            </button>
+            <button
+              onClick={() => changeFilter("shortlisted")}
+              style={{
+                padding: "4px 10px",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                background: activeFilter === "shortlisted" ? "#16A34A" : "transparent",
+                color: activeFilter === "shortlisted" ? "#FFFFFF" : C.sub,
+                transition: "all 0.15s ease",
+              }}
+            >
+              Shortlisted Only ({shortlistedCount})
+            </button>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
@@ -1157,9 +1569,34 @@ function Results({ candidates, job, onReRun, onRestart, onStartInterview, C }) {
       </div>
 
       <div>
-        {sorted.map((c, i) => (
-          <CandidateCard key={c.id} rank={i + 1} c={c} threshold={threshold} jobTitle={job.title} onStartInterview={onStartInterview} C={C} />
-        ))}
+        {displayed.length === 0 ? (
+          <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "36px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, marginBottom: 6 }}>
+              {activeFilter === "shortlisted" ? `No candidates scored above the ${threshold}% cutoff threshold.` : "No candidates have been screened yet."}
+            </div>
+            {activeFilter === "shortlisted" && (
+              <button
+                onClick={() => changeFilter("all")}
+                style={{ ...btn("primary", C), marginTop: 10, display: "inline-flex" }}
+              >
+                Show All Candidates ({valid.length})
+              </button>
+            )}
+          </div>
+        ) : (
+          displayed.map((c, i) => (
+            <CandidateCard
+              key={c.id}
+              rank={i + 1}
+              c={c}
+              threshold={threshold}
+              job={job}
+              company={companies.find(comp => comp.id === job?.companyId) || { name: job?.companyName, contactEmail: "" }}
+              onStartInterview={onStartInterview}
+              C={C}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -1193,10 +1630,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
     }}>
       {/* Brand Header */}
       <div style={{ padding: "0 4px 20px", borderBottom: `1px solid ${C.lineDark}` }}>
-        <SrmLogo theme="dark" />
-        <div style={{ marginTop: 10, fontSize: 11, color: "#64748B", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-          Agency Shortlist Engine
-        </div>
+        <BrandLogo theme="dark" />
       </div>
 
       {/* Client Company Quick Selector */}
@@ -1318,7 +1752,7 @@ const isMatchForComp = (j, comp) => {
 };
 
 /* ============================== WELCOME & AGENCY DASHBOARD ============================== */
-function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, C }) {
+function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, onNavigateTab, C }) {
   const filteredJobs = useMemo(() => {
     if (!activeCompany) return jobs;
     return jobs.filter(j => isMatchForComp(j, activeCompany));
@@ -1333,18 +1767,6 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
       const shortlisted = (j.candidates || []).filter(c => c.status === "done" && c.result && c.result.overallScore >= 70);
       return acc + shortlisted.length;
     }, 0);
-  }, [filteredJobs]);
-
-  const recentShortlist = useMemo(() => {
-    const list = [];
-    filteredJobs.forEach(j => {
-      (j.candidates || []).forEach(c => {
-        if (c.status === "done" && c.result) {
-          list.push({ candidate: c, job: j });
-        }
-      });
-    });
-    return list.sort((a, b) => (b.candidate.result.overallScore || 0) - (a.candidate.result.overallScore || 0)).slice(0, 5);
   }, [filteredJobs]);
 
   return (
@@ -1364,7 +1786,7 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
       }}>
         <div style={{ maxWidth: 560 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
-            <Sparkles size={14} /> Agency AI Shortlisting Hub
+            <Sparkles size={14} /> CogniHire AI Interview &amp; Screening Hub
           </div>
           <h2 style={{ fontSize: 26, fontWeight: 800, margin: 0, fontFamily: DISPLAY, lineHeight: 1.2 }}>
             Candidate Screening &amp; Client Recommendation Portal
@@ -1416,84 +1838,176 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-        <Panel C={C}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Building2 size={22} color={C.accent} />
+      {/* Metrics Row - Interactive Navigation Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+        {/* Card 1: Client Companies */}
+        <div
+          onClick={() => onNavigateTab("companies")}
+          style={{
+            background: C.paper,
+            borderRadius: 14,
+            border: `1px solid ${C.line}`,
+            padding: "18px 20px",
+            cursor: "pointer",
+            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-3px)";
+            e.currentTarget.style.borderColor = C.accent;
+            e.currentTarget.style.boxShadow = `0 8px 20px -4px ${C.accentSoft}`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.borderColor = C.line;
+            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+          }}
+          title="Click to view Client Companies"
+          role="button"
+          tabIndex={0}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Building2 size={24} color={C.accent} />
             </div>
             <div>
               <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Client Companies</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{companies.length}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{companies.length}</div>
             </div>
           </div>
-        </Panel>
+          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
+        </div>
 
-        <Panel C={C}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Briefcase size={22} color={C.accent} />
+        {/* Card 2: Active Opening Jobs */}
+        <div
+          onClick={() => onNavigateTab("jobs", { step: 1 })}
+          style={{
+            background: C.paper,
+            borderRadius: 14,
+            border: `1px solid ${C.line}`,
+            padding: "18px 20px",
+            cursor: "pointer",
+            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-3px)";
+            e.currentTarget.style.borderColor = C.accent;
+            e.currentTarget.style.boxShadow = `0 8px 20px -4px ${C.accentSoft}`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.borderColor = C.line;
+            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+          }}
+          title="Click to view Active Opening Jobs"
+          role="button"
+          tabIndex={0}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Briefcase size={24} color={C.accent} />
             </div>
             <div>
               <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Active Opening Jobs</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{filteredJobs.length}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{filteredJobs.length}</div>
             </div>
           </div>
-        </Panel>
+          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
+        </div>
 
-        <Panel C={C}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Users size={22} color={C.accent} />
+        {/* Card 3: Total Resumes Screened */}
+        <div
+          onClick={() => onNavigateTab("jobs", { step: 3 })}
+          style={{
+            background: C.paper,
+            borderRadius: 14,
+            border: `1px solid ${C.line}`,
+            padding: "18px 20px",
+            cursor: "pointer",
+            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-3px)";
+            e.currentTarget.style.borderColor = C.accent;
+            e.currentTarget.style.boxShadow = `0 8px 20px -4px ${C.accentSoft}`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.borderColor = C.line;
+            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+          }}
+          title="Click to view Total Resumes Screened & Results"
+          role="button"
+          tabIndex={0}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Users size={24} color={C.accent} />
             </div>
             <div>
               <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Total Resumes Screened</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>{totalCandidates}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{totalCandidates}</div>
             </div>
           </div>
-        </Panel>
+          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
+        </div>
 
-        <Panel C={C}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Star size={22} color="#16A34A" />
+        {/* Card 4: Shortlisted Candidates */}
+        <div
+          onClick={() => onNavigateTab("jobs", { step: 3, filter: "shortlisted" })}
+          style={{
+            background: C.paper,
+            borderRadius: 14,
+            border: `1px solid ${C.line}`,
+            padding: "18px 20px",
+            cursor: "pointer",
+            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-3px)";
+            e.currentTarget.style.borderColor = "#16A34A";
+            e.currentTarget.style.boxShadow = "0 8px 20px -4px rgba(22, 163, 74, 0.25)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.borderColor = C.line;
+            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+          }}
+          title="Click to view Shortlisted Candidates"
+          role="button"
+          tabIndex={0}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Star size={24} color="#16A34A" />
             </div>
             <div>
               <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Shortlisted Candidates</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#16A34A", fontFamily: DISPLAY }}>{totalShortlisted}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#16A34A", fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{totalShortlisted}</div>
             </div>
           </div>
-        </Panel>
+          <div style={{ color: "#16A34A", fontSize: 20, fontWeight: 700, opacity: 0.8 }}>›</div>
+        </div>
       </div>
-
-      {/* Minimal Dashboard Section */}
-      <Panel title="Top Client Candidate Recommendations" sub="Highest scoring candidates ready to recommend to client companies" C={C}>
-        {recentShortlist.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px 0", color: C.faint, fontSize: 13 }}>
-            No scored candidates yet. Go to <strong style={{ color: C.accent }}>Job Openings &amp; Screening</strong> tab to screen resumes and generate recommendations.
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
-            {recentShortlist.map(({ candidate, job }) => (
-              <div key={candidate.id} style={{ padding: 14, borderRadius: 10, border: `1px solid ${C.line}`, background: C.bg, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{candidate.result.candidateName || candidate.label}</div>
-                  <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>🏢 {job.companyName} — {job.title}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: gradeColor(candidate.result.overallScore) }}>
-                    {candidate.result.overallScore}%
-                  </span>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: REC[candidate.result.recommendation]?.dot || C.sub, marginTop: 2 }}>
-                    {candidate.result.recommendation}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
     </div>
   );
 }
@@ -1560,7 +2074,16 @@ function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onS
                 </div>
                 <h3 style={{ fontSize: 17, fontWeight: 700, color: C.ink, margin: "12px 0 4px", fontFamily: DISPLAY }}>{comp.name}</h3>
                 <div style={{ fontSize: 12, color: C.sub }}>Industry: {comp.industry}</div>
-                {comp.contactEmail && <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>✉ {comp.contactEmail}</div>}
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5 }}>
+                  {comp.contactEmail && (
+                    <div style={{ color: "#16A34A", display: "flex", alignItems: "center", gap: 5 }}>
+                      <span>✉️</span> <span>Default Reply-To: <strong>{comp.contactEmail}</strong></span>
+                    </div>
+                  )}
+                  <div style={{ color: C.sub, display: "flex", alignItems: "center", gap: 5 }}>
+                    <span>👤</span> <span>Sender Display: <strong>{comp.senderName || `${comp.name} Talent Team`}</strong></span>
+                  </div>
+                </div>
                 {comp.notes && <p style={{ fontSize: 12, color: C.sub, marginTop: 8, lineHeight: 1.4 }}>{comp.notes}</p>}
               </div>
 
@@ -1747,6 +2270,7 @@ export default function App() {
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
   const [savedJobNotice, setSavedJobNotice] = useState(false);
+  const [resultsFilter, setResultsFilter] = useState("all");
 
   const handleSaveJobExplicitly = () => {
     saveJobsToServer(jobs);
@@ -1870,6 +2394,8 @@ export default function App() {
       seniority: "Senior",
       minYears: 3,
       location: "Chennai / Hybrid",
+      senderName: "",
+      senderEmail: "",
       description: "",
       mustHave: [],
       niceToHave: [],
@@ -2047,6 +2573,31 @@ export default function App() {
                 onCreateCompany={() => setShowAddCompanyModal(true)}
                 onCreateJob={handleCreateJobForCompany}
                 onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); setStep(3); }}
+                onNavigateTab={(tab, options = {}) => {
+                  if (options.jobId) {
+                    setActiveJobId(options.jobId);
+                  } else if (tab === "jobs") {
+                    if (options.step === 3) {
+                      const currentHasResults = jobs.find(j => j.id === activeJobId && (j.candidates || []).some(c => c.status === "done" && c.result));
+                      if (!currentHasResults) {
+                        const jobWithResults = jobs.find(j => (j.candidates || []).some(c => c.status === "done" && c.result)) || jobs[0];
+                        if (jobWithResults) setActiveJobId(jobWithResults.id);
+                      }
+                    } else if (!activeJobId && jobs.length > 0) {
+                      setActiveJobId(jobs[0].id);
+                    }
+                  }
+                  if (options.step) {
+                    setStep(options.step);
+                    setMaxReached((prev) => Math.max(prev, options.step));
+                  }
+                  if (options.filter) {
+                    setResultsFilter(options.filter);
+                  } else {
+                    setResultsFilter("all");
+                  }
+                  setActiveTab(tab);
+                }}
                 C={C}
               />
             )}
@@ -2240,9 +2791,12 @@ export default function App() {
                           <Results
                             candidates={activeJob.candidates || []}
                             job={activeJob}
+                            companies={companies}
                             onReRun={() => runScreening(true)}
                             onRestart={() => goto(1)}
                             onStartInterview={(cand) => setActiveInterviewCandidate(cand)}
+                            filterMode={resultsFilter}
+                            setFilterMode={setResultsFilter}
                             C={C}
                           />
                         )}
@@ -2269,6 +2823,7 @@ export default function App() {
                 name: form.name.value,
                 industry: form.industry.value || "General",
                 contactEmail: form.email.value || "",
+                senderName: form.senderName.value || "",
                 notes: form.notes.value || "",
                 createdAt: new Date().toISOString()
               };
@@ -2285,8 +2840,14 @@ export default function App() {
                   <input name="industry" placeholder="e.g. Automotive & Manufacturing" style={inputStyle(C)} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>HR / Contact Email</label>
-                  <input name="email" type="email" placeholder="hr@clientcompany.com" style={inputStyle(C)} />
+                  <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Default Hiring / Reply-To Email</label>
+                  <input name="email" type="email" placeholder="e.g. hr@motherson.com" style={inputStyle(C)} />
+                  <span style={{ fontSize: 11, color: C.faint }}>Candidate replies will route directly here</span>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Default Sender / Team Display Name</label>
+                  <input name="senderName" placeholder="e.g. Motherson Talent Acquisition" style={inputStyle(C)} />
+                  <span style={{ fontSize: 11, color: C.faint }}>Shows as "Sender via CogniHire"</span>
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Notes / Guidelines</label>
