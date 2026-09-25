@@ -9,7 +9,7 @@ import {
   Plus, Download, RotateCcw, ArrowRight, ArrowLeft, AlertCircle, Users, Star,
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
   Mail, Send, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
-  ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen
+  ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen, Scale
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
 import VideoInterview from "./VideoInterview.jsx";
@@ -408,7 +408,7 @@ function SkillEditor({ skills, onChange, placeholder, C }) {
 }
 
 function Stepper({ step, maxReached, go, C }) {
-  const steps = ["Define Job Criteria", "Add Resumes", "Review Shortlist & Recommend"];
+  const steps = ["Define Job Criteria", "Add Resumes", "Review Shortlist & Recommend", "Compare Candidates"];
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 20 }}>
       {steps.map((label, i) => {
@@ -432,7 +432,7 @@ function Stepper({ step, maxReached, go, C }) {
               <span style={{ fontSize: 13, fontWeight: active ? 700 : 500,
                 color: active ? C.ink : C.sub }}>{label}</span>
             </div>
-            {n < 3 && <div style={{ width: 24, height: 1, background: C.line }} />}
+            {n < 4 && <div style={{ width: 24, height: 1, background: C.line }} />}
           </React.Fragment>
         );
       })}
@@ -1423,7 +1423,7 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }
   );
 }
 
-function Results({ candidates, job, companies = [], onReRun, onRestart, onStartInterview, filterMode = "all", setFilterMode, C }) {
+function Results({ candidates, job, companies = [], onReRun, onRestart, onStartInterview, onCompare, filterMode = "all", setFilterMode, C }) {
   const [threshold, setThreshold] = useState(70);
   const [sortKey, setSortKey] = useState("score");
   const [localFilter, setLocalFilter] = useState(filterMode);
@@ -1477,6 +1477,65 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
 
   return (
     <div>
+      {/* View Switcher: Candidate Cards vs Comparison Matrix */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", gap: 6, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 10, padding: 4 }}>
+          <button
+            style={{
+              padding: "6px 14px",
+              border: "none",
+              borderRadius: 7,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              background: C.accent,
+              color: "#FFFFFF",
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }}
+          >
+            📋 Candidate Cards
+          </button>
+          <button
+            onClick={onCompare}
+            style={{
+              padding: "6px 14px",
+              border: "none",
+              borderRadius: 7,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              background: "transparent",
+              color: C.sub,
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }}
+          >
+            <Scale size={14} /> ⚖️ Compare Candidates View
+          </button>
+        </div>
+
+        {valid.length >= 2 && onCompare && (
+          <button
+            onClick={onCompare}
+            style={{
+              ...btn("primary", C),
+              background: "linear-gradient(135deg, #2563EB, #7C3AED)",
+              borderColor: "transparent",
+              color: "#FFFFFF",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12.5
+            }}
+          >
+            <Scale size={14} /> Compare Candidates Side-by-Side →
+          </button>
+        )}
+      </div>
+
       <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
         <div
           onClick={() => changeFilter("all")}
@@ -1612,6 +1671,666 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
             />
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================== STEP 4: CANDIDATE COMPARISON MATRIX ============================== */
+function CandidateComparisonView({ candidates, job, onBack, onStartInterview, llmProvider, C }) {
+  const valid = useMemo(() => {
+    return (candidates || [])
+      .filter((c) => c.status === "done" && c.result)
+      .sort((a, b) => (b.result?.overallScore || 0) - (a.result?.overallScore || 0));
+  }, [candidates]);
+
+  // Default to selecting up to 4 candidates
+  const [selectedIds, setSelectedIds] = useState(() => valid.slice(0, 4).map(c => c.id));
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  useEffect(() => {
+    if (selectedIds.length === 0 && valid.length > 0) {
+      setSelectedIds(valid.slice(0, 4).map(c => c.id));
+    }
+  }, [valid]);
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) {
+        if (prev.length <= 1) return prev; // Keep at least one candidate
+        return prev.filter(x => x !== id);
+      } else {
+        if (prev.length >= 5) return prev; // Limit to 5 side-by-side
+        return [...prev, id];
+      }
+    });
+  };
+
+  const selectedCandidates = useMemo(() => {
+    return valid.filter(c => selectedIds.includes(c.id));
+  }, [valid, selectedIds]);
+
+  const topCandidate = selectedCandidates[0] || valid[0];
+  const mustHaves = job?.mustHave || [];
+
+  // Automated algorithmic score difference justification
+  const scoreDeltas = useMemo(() => {
+    if (selectedCandidates.length < 2) return [];
+    const leader = selectedCandidates[0];
+    const leaderScore = leader?.result?.overallScore || 0;
+    const leaderSkills = leader?.result?.subScores?.skills || 0;
+    const leaderExp = leader?.result?.yearsExperience || 0;
+    const leaderMustHaves = mustHaves.filter(m => !(leader?.result?.missingMustHaves || []).some(miss => miss.toLowerCase() === m.toLowerCase())).length;
+
+    return selectedCandidates.slice(1).map((cand) => {
+      const candScore = cand?.result?.overallScore || 0;
+      const candSkills = cand?.result?.subScores?.skills || 0;
+      const candExp = cand?.result?.yearsExperience || 0;
+      const candMustHaves = mustHaves.filter(m => !(cand?.result?.missingMustHaves || []).some(miss => miss.toLowerCase() === m.toLowerCase())).length;
+
+      const diff = leaderScore - candScore;
+      const skillDiff = leaderSkills - candSkills;
+      const mustHaveDiff = leaderMustHaves - candMustHaves;
+      const expDiff = leaderExp - candExp;
+
+      const reasons = [];
+      if (mustHaveDiff > 0) {
+        reasons.push(`Matches ${mustHaveDiff} more required must-have skill(s) than ${cand.result?.candidateName || cand.label}`);
+      }
+      if (skillDiff > 8) {
+        reasons.push(`Higher technical skill depth (+${skillDiff}% higher Skills Score)`);
+      }
+      if (expDiff > 1) {
+        reasons.push(`Greater practical experience (+${expDiff} more year(s) in field)`);
+      } else if (expDiff < -1) {
+        reasons.push(`Even with fewer total years (${leaderExp} vs ${candExp} yrs), skill stack matches required job tools more accurately`);
+      }
+      if (cand.result?.missingMustHaves && cand.result.missingMustHaves.length > 0) {
+        reasons.push(`${cand.result?.candidateName || cand.label} was penalized for missing: ${cand.result.missingMustHaves.slice(0, 3).join(", ")}`);
+      }
+      if (reasons.length === 0) {
+        reasons.push("Closer holistic alignment with job requirements and project depth");
+      }
+
+      return {
+        candidateName: cand.result?.candidateName || cand.label,
+        leaderName: leader.result?.candidateName || leader.label,
+        scoreDiff: diff,
+        reasons
+      };
+    });
+  }, [selectedCandidates, mustHaves]);
+
+  const handleRequestAiComparison = async () => {
+    if (selectedCandidates.length < 2) return;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      let apiKey = "";
+      const effectiveProvider = llmProvider || "claude";
+      if (effectiveProvider === "claude") apiKey = localStorage.getItem("ANTHROPIC_API_KEY");
+      else if (effectiveProvider === "gemini") apiKey = localStorage.getItem("GEMINI_API_KEY");
+      else if (effectiveProvider === "groq") apiKey = localStorage.getItem("GROQ_API_KEY");
+
+      const res = await fetch("/api/candidate-compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job: { title: job?.title, seniority: job?.seniority, minYears: job?.minYears, mustHave: job?.mustHave, description: job?.description },
+          candidates: selectedCandidates,
+          provider: effectiveProvider,
+          apiKey
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate AI comparison");
+      setAiAnalysis(data);
+    } catch (err) {
+      setAiError(err.message || "Failed to generate AI comparison");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  if (valid.length === 0) {
+    return (
+      <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+        <Scale size={42} color={C.faint} style={{ margin: "0 auto 12px" }} />
+        <div style={{ fontSize: 17, fontWeight: 700, color: C.ink }}>No Screened Candidates Available to Compare</div>
+        <div style={{ fontSize: 13, color: C.sub, marginTop: 4, maxWidth: 440, margin: "6px auto 16px" }}>
+          Please complete Step 2 ("Add Resumes") and run screening to generate match scores before comparing candidates.
+        </div>
+        <button onClick={onBack} style={btn("primary", C)}>
+          ← Back to Add Resumes
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Top Header & View Switcher */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", gap: 6, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 10, padding: 4 }}>
+          <button
+            onClick={onBack}
+            style={{
+              padding: "6px 14px",
+              border: "none",
+              borderRadius: 7,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              background: "transparent",
+              color: C.sub,
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }}
+          >
+            📋 Candidate Cards
+          </button>
+          <button
+            style={{
+              padding: "6px 14px",
+              border: "none",
+              borderRadius: 7,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              background: C.accent,
+              color: "#FFFFFF",
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }}
+          >
+            <Scale size={14} /> ⚖️ Compare Candidates View
+          </button>
+        </div>
+
+        <button onClick={onBack} style={btn("ghost", C)}>
+          <ArrowLeft size={14} /> Back to Shortlist Cards
+        </button>
+      </div>
+
+      {/* Candidate Selection Bar */}
+      <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, padding: "16px 20px", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.ink, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>Select Candidates to Compare</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: C.accentSoft, padding: "2px 8px", borderRadius: 12 }}>
+                {selectedCandidates.length} of {valid.length} selected
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
+              Click candidate pills to add or remove them from the side-by-side comparison matrix (Max 5).
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setSelectedIds(valid.slice(0, 4).map(c => c.id))}
+              style={{ padding: "5px 10px", fontSize: 12, fontWeight: 700, borderRadius: 6, border: `1px solid ${C.line}`, background: C.bg, color: C.ink, cursor: "pointer" }}
+            >
+              Select Top 4
+            </button>
+            {valid.length >= 2 && (
+              <button
+                onClick={() => setSelectedIds(valid.slice(0, 2).map(c => c.id))}
+                style={{ padding: "5px 10px", fontSize: 12, fontWeight: 700, borderRadius: 6, border: `1px solid ${C.line}`, background: C.bg, color: C.ink, cursor: "pointer" }}
+              >
+                Compare Top 2
+              </button>
+            )}
+            <button
+              onClick={() => setSelectedIds(valid.map(c => c.id))}
+              style={{ padding: "5px 10px", fontSize: 12, fontWeight: 700, borderRadius: 6, border: `1px solid ${C.line}`, background: C.bg, color: C.ink, cursor: "pointer" }}
+            >
+              Select All ({valid.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Candidate Pills */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {valid.map((c, i) => {
+            const isSelected = selectedIds.includes(c.id);
+            const score = c.result?.overallScore || 0;
+            const meta = recMeta(c.result?.recommendation);
+            return (
+              <div
+                key={c.id}
+                onClick={() => toggleSelect(c.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "7px 12px",
+                  borderRadius: 8,
+                  border: `2px solid ${isSelected ? C.accent : C.line}`,
+                  background: isSelected ? C.accentSoft : C.bg,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  userSelect: "none"
+                }}
+              >
+                <div style={{
+                  width: 16, height: 16, borderRadius: 4,
+                  border: `1.5px solid ${isSelected ? C.accent : C.faint}`,
+                  background: isSelected ? C.accent : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  {isSelected && <Check size={12} color="#FFF" />}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: isSelected ? C.accent : C.ink }}>
+                  #{i + 1} {c.result?.candidateName || c.label}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: meta.dot,
+                  background: meta.bg,
+                  padding: "1px 6px",
+                  borderRadius: 4
+                }}>
+                  {score}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Section 2: Automated AI Score Justification Banner */}
+      {selectedCandidates.length >= 2 && (
+        <div style={{
+          background: `linear-gradient(135deg, ${C.paper}, ${C.panel})`,
+          border: `1px solid ${C.accent}44`,
+          borderRadius: 14,
+          padding: "20px 24px",
+          marginBottom: 24,
+          boxShadow: `0 4px 20px ${C.accentSoft}`
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 20 }}>🏆</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>
+                  Why #{1} {topCandidate?.result?.candidateName || topCandidate?.label} Scored Highest ({topCandidate?.result?.overallScore}%)
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: C.sub, margin: 0 }}>
+                Automated score differentiation based on client must-haves, domain depth, and technical requirements.
+              </p>
+            </div>
+
+            <button
+              onClick={handleRequestAiComparison}
+              disabled={aiLoading}
+              style={{
+                ...btn("primary", C),
+                background: "linear-gradient(135deg, #3B82F6, #8B5CF6)",
+                borderColor: "transparent",
+                color: "#FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)"
+              }}
+            >
+              {aiLoading ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+              {aiLoading ? "Consulting Claude…" : "Ask Claude to Compare"}
+            </button>
+          </div>
+
+          {/* Quick Delta Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginBottom: 12 }}>
+            {scoreDeltas.map((delta, idx) => (
+              <div key={idx} style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+                    vs. {delta.candidateName}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "#16A34A", background: "#DCFCE7", padding: "2px 8px", borderRadius: 6 }}>
+                    +{delta.scoreDiff}% Margin
+                  </span>
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
+                  {delta.reasons.map((r, rIdx) => (
+                    <li key={rIdx}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* Claude In-Depth Analysis Memo */}
+          {aiAnalysis && (
+            <div style={{ background: C.paper, border: `1px solid #8B5CF644`, borderRadius: 12, padding: "16px 20px", marginTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#8B5CF6", fontWeight: 800, fontSize: 13.5 }}>
+                <Sparkles size={16} /> Anthropic Claude Executive Comparison
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, marginBottom: 8 }}>
+                "{aiAnalysis.headline}"
+              </div>
+              <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: "0 0 10px" }}>
+                {aiAnalysis.winnerAnalysis}
+              </p>
+              {aiAnalysis.differentiators && aiAnalysis.differentiators.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, marginBottom: 4 }}>Key Differentiating Factors:</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                    {aiAnalysis.differentiators.map((d, dIdx) => (
+                      <li key={dIdx}>{d}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {aiAnalysis.hiringRecommendation && (
+                <div style={{ background: C.accentSoft, borderRadius: 8, padding: "10px 14px", fontSize: 12.5, color: C.accentDeep, fontWeight: 600 }}>
+                  💡 <strong>Hiring Advice:</strong> {aiAnalysis.hiringRecommendation}
+                </div>
+              )}
+            </div>
+          )}
+
+          {aiError && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEE2E2", color: "#DC2626", borderRadius: 8, fontSize: 12 }}>
+              ⚠️ {aiError}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Section 3: Head-to-Head Comparison Table */}
+      <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: C.panel, borderBottom: `2px solid ${C.line}` }}>
+                <th style={{ padding: "16px 20px", width: 220, minWidth: 200, color: C.sub, fontWeight: 800, textTransform: "uppercase", fontSize: 11, letterSpacing: "0.05em" }}>
+                  Candidate / Metric
+                </th>
+                {selectedCandidates.map((c, i) => {
+                  const meta = recMeta(c.result?.recommendation);
+                  return (
+                    <th key={c.id} style={{ padding: "16px 20px", minWidth: 240, borderLeft: `1px solid ${C.line}`, verticalAlign: "top" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: i === 0 ? "#16A34A" : C.faint, background: i === 0 ? "#DCFCE7" : C.bg, padding: "2px 8px", borderRadius: 10 }}>
+                          {i === 0 ? "🏆 RANK #1" : `RANK #${i + 1}`}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: meta.dot, background: meta.bg, padding: "2px 8px", borderRadius: 4 }}>
+                          {c.result?.recommendation}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: C.ink, marginBottom: 2 }}>
+                        {c.result?.candidateName || c.label}
+                      </div>
+                      <div style={{ fontSize: 12, color: C.sub, marginBottom: 10 }}>
+                        {c.result?.currentTitle || "Title not specified"}
+                      </div>
+                      <button
+                        onClick={() => onStartInterview(c)}
+                        style={{
+                          width: "100%",
+                          padding: "6px 12px",
+                          background: C.accent,
+                          color: "#FFF",
+                          border: "none",
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6
+                        }}
+                      >
+                        <Play size={12} /> AI Interview
+                      </button>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {/* Row 1: Overall Match Score */}
+              <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.bg }}>
+                <td style={{ padding: "14px 20px", fontWeight: 700, color: C.ink }}>
+                  Overall Match Score
+                </td>
+                {selectedCandidates.map((c, i) => {
+                  const score = c.result?.overallScore || 0;
+                  const delta = i === 0 ? 0 : score - (topCandidate?.result?.overallScore || 0);
+                  const meta = recMeta(c.result?.recommendation);
+                  return (
+                    <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}` }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                        <span style={{ fontSize: 24, fontWeight: 900, color: meta.dot, fontFamily: DISPLAY }}>
+                          {score}%
+                        </span>
+                        {i > 0 && (
+                          <span style={{ fontSize: 11.5, fontWeight: 800, color: "#DC2626" }}>
+                            ({delta}%)
+                          </span>
+                        )}
+                        {i === 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 800, color: "#16A34A" }}>
+                            (Top Score)
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ height: 6, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ width: `${score}%`, height: "100%", background: meta.dot, borderRadius: 3 }} />
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+
+              {/* Row 2: Skills Fit */}
+              <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                <td style={{ padding: "12px 20px", fontWeight: 600, color: C.ink }}>
+                  🎯 Skills Fit Score
+                </td>
+                {selectedCandidates.map((c) => {
+                  const s = c.result?.subScores?.skills || 0;
+                  return (
+                    <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
+                        <span style={{ fontSize: 11, color: C.faint }}>Weight: 40%</span>
+                      </div>
+                      <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ width: `${s}%`, height: "100%", background: "#3B82F6", borderRadius: 3 }} />
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+
+              {/* Row 3: Experience Fit */}
+              <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                <td style={{ padding: "12px 20px", fontWeight: 600, color: C.ink }}>
+                  💼 Experience Fit
+                </td>
+                {selectedCandidates.map((c) => {
+                  const s = c.result?.subScores?.experience || 0;
+                  const yrs = c.result?.yearsExperience ?? "N/A";
+                  return (
+                    <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
+                        <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600 }}>{yrs} yrs exp</span>
+                      </div>
+                      <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ width: `${s}%`, height: "100%", background: "#10B981", borderRadius: 3 }} />
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+
+              {/* Row 4: Education & Discipline */}
+              <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                <td style={{ padding: "12px 20px", fontWeight: 600, color: C.ink }}>
+                  🎓 Education &amp; Discipline
+                </td>
+                {selectedCandidates.map((c) => {
+                  const s = c.result?.subScores?.education || 0;
+                  const edu = c.result?.education || "N/A";
+                  const disc = c.result?.candidateDiscipline || "";
+                  return (
+                    <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
+                        <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600 }}>{disc}</span>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.3, marginBottom: 4 }}>{edu}</div>
+                      <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ width: `${s}%`, height: "100%", background: "#8B5CF6", borderRadius: 3 }} />
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+
+              {/* Row 5: Domain Fit */}
+              <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                <td style={{ padding: "12px 20px", fontWeight: 600, color: C.ink }}>
+                  🏢 Domain Relevance
+                </td>
+                {selectedCandidates.map((c) => {
+                  const s = c.result?.subScores?.domain || 0;
+                  return (
+                    <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
+                      </div>
+                      <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ width: `${s}%`, height: "100%", background: "#F59E0B", borderRadius: 3 }} />
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+
+              {/* Row 6: AI Interview Marks */}
+              <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.bg }}>
+                <td style={{ padding: "14px 20px", fontWeight: 700, color: C.ink }}>
+                  🤖 AI Interview Marks
+                </td>
+                {selectedCandidates.map((c) => {
+                  const iv = c.result?.interview;
+                  return (
+                    <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}` }}>
+                      {iv?.score !== undefined ? (
+                        <div>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
+                            <span style={{ fontSize: 18, fontWeight: 900, color: iv.score >= 70 ? "#16A34A" : "#F59E0B" }}>
+                              {iv.score}%
+                            </span>
+                            <span style={{ fontSize: 11, color: C.faint }}>Technical Mark</span>
+                          </div>
+                          <div style={{ fontSize: 11.5, color: C.sub }}>
+                            Integrity: <strong>{iv.proctoring?.integrityScore ?? 100}%</strong>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: C.faint, fontStyle: "italic" }}>
+                          Not Interviewed Yet
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+
+              {/* Must-Have Skills Header */}
+              {mustHaves.length > 0 && (
+                <tr style={{ background: C.panel, borderBottom: `1px solid ${C.line}` }}>
+                  <td colSpan={selectedCandidates.length + 1} style={{ padding: "10px 20px", fontWeight: 800, color: C.accent, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Must-Have Skills Matching Matrix ({mustHaves.length} Required)
+                  </td>
+                </tr>
+              )}
+
+              {/* Rows for Each Must-Have Skill */}
+              {mustHaves.map((skill, sIdx) => (
+                <tr key={sIdx} style={{ borderBottom: `1px solid ${C.line}` }}>
+                  <td style={{ padding: "10px 20px", fontWeight: 600, color: C.ink, fontSize: 12.5 }}>
+                    {skill}
+                  </td>
+                  {selectedCandidates.map((c) => {
+                    const isMissing = (c.result?.missingMustHaves || []).some(m => m.toLowerCase() === skill.toLowerCase());
+                    return (
+                      <td key={c.id} style={{ padding: "10px 20px", borderLeft: `1px solid ${C.line}` }}>
+                        {isMissing ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#DC2626", background: "#FEE2E2", padding: "2px 8px", borderRadius: 4 }}>
+                            <X size={13} /> Missing
+                          </span>
+                        ) : (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#16A34A", background: "#DCFCE7", padding: "2px 8px", borderRadius: 4 }}>
+                            <Check size={13} /> Matched
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+
+              {/* Row: Strengths */}
+              <tr style={{ borderBottom: `1px solid ${C.line}`, verticalAlign: "top" }}>
+                <td style={{ padding: "14px 20px", fontWeight: 700, color: "#16A34A" }}>
+                  ⭐ Key Strengths
+                </td>
+                {selectedCandidates.map((c) => (
+                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, fontSize: 12 }}>
+                    <ul style={{ margin: 0, paddingLeft: 16, color: C.sub, lineHeight: 1.6 }}>
+                      {(c.result?.strengths || ["No strengths noted"]).map((st, i) => (
+                        <li key={i}>{st}</li>
+                      ))}
+                    </ul>
+                  </td>
+                ))}
+              </tr>
+
+              {/* Row: Gaps & Penalties */}
+              <tr style={{ borderBottom: `1px solid ${C.line}`, verticalAlign: "top" }}>
+                <td style={{ padding: "14px 20px", fontWeight: 700, color: "#DC2626" }}>
+                  ⚠️ Critical Gaps
+                </td>
+                {selectedCandidates.map((c) => (
+                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, fontSize: 12 }}>
+                    <ul style={{ margin: 0, paddingLeft: 16, color: "#B91C1C", lineHeight: 1.6 }}>
+                      {(c.result?.gaps || ["No critical gaps noted"]).map((gp, i) => (
+                        <li key={i}>{gp}</li>
+                      ))}
+                    </ul>
+                  </td>
+                ))}
+              </tr>
+
+              {/* Row: AI Evaluation Summary */}
+              <tr style={{ verticalAlign: "top", background: C.bg }}>
+                <td style={{ padding: "14px 20px", fontWeight: 700, color: C.ink }}>
+                  📝 AI Summary
+                </td>
+                {selectedCandidates.map((c) => (
+                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, fontSize: 12, color: C.sub, lineHeight: 1.6, fontStyle: "italic" }}>
+                    "{c.result?.summary || "No summary available."}"
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -2669,7 +3388,7 @@ export default function App() {
                 setActiveCompany={setActiveCompany}
                 onCreateCompany={() => setShowAddCompanyModal(true)}
                 onCreateJob={handleCreateJobForCompany}
-                onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); setStep(3); }}
+                onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); setStep(3); setMaxReached(4); }}
                 onNavigateTab={(tab, options = {}) => {
                   if (options.jobId) {
                     setActiveJobId(options.jobId);
@@ -2779,10 +3498,10 @@ export default function App() {
                               setActiveJobId(j.id);
                               if (hasScreened) {
                                 setStep(3);
-                                setMaxReached(3);
+                                setMaxReached(4);
                               } else {
                                 setStep(1);
-                                setMaxReached(3); // Unlocked so they can view scores/candidates at any time
+                                setMaxReached(4); // Unlocked so they can view scores/candidates at any time
                               }
                             }}
                           >
@@ -2888,7 +3607,7 @@ export default function App() {
                             onComplete={() => updateActiveJob((j) => ({ ...j, screening: "done" }))}
                             C={C} 
                           />
-                        ) : step === 3 && (
+                        ) : step === 3 ? (
                           <Results
                             candidates={activeJob.candidates || []}
                             job={activeJob}
@@ -2896,11 +3615,21 @@ export default function App() {
                             onReRun={() => runScreening(true)}
                             onRestart={() => goto(1)}
                             onStartInterview={(cand) => setActiveInterviewCandidate(cand)}
+                            onCompare={() => goto(4)}
                             filterMode={resultsFilter}
                             setFilterMode={setResultsFilter}
                             C={C}
                           />
-                        )}
+                        ) : step === 4 ? (
+                          <CandidateComparisonView
+                            candidates={activeJob.candidates || []}
+                            job={activeJob}
+                            onBack={() => goto(3)}
+                            onStartInterview={(cand) => setActiveInterviewCandidate(cand)}
+                            llmProvider={llmProvider}
+                            C={C}
+                          />
+                        ) : null}
                       </div>
                     )}
                   </div>

@@ -1175,3 +1175,87 @@ Return ONLY valid JSON.`;
 
   return extractJSON(resultText);
 }
+
+export async function compareCandidatesWithClaude(job = {}, candidates = [], overrideProvider, apiKey) {
+  const candidateSummaries = candidates.map((c, i) => {
+    const r = c.result || {};
+    return `Candidate ${i + 1}: ${r.candidateName || c.label || "Candidate"}
+Overall Fit Score: ${r.overallScore ?? "N/A"}% (Rank: #${i + 1})
+Recommendation: ${r.recommendation || "N/A"}
+Sub-Scores: Skills: ${r.subScores?.skills ?? "N/A"}%, Experience: ${r.subScores?.experience ?? "N/A"}%, Education: ${r.subScores?.education ?? "N/A"}%, Domain: ${r.subScores?.domain ?? "N/A"}%
+Experience: ${r.yearsExperience ?? "N/A"} years (${r.currentTitle || "N/A"})
+Education / Discipline: ${r.education || "N/A"} (Discipline: ${r.candidateDiscipline || "N/A"})
+Top Skills: ${(r.topSkills || []).join(", ") || "None"}
+Missing Must-Have Skills: ${(r.missingMustHaves || []).join(", ") || "None"}
+Key Strengths: ${(r.strengths || []).join("; ") || "None"}
+Key Gaps: ${(r.gaps || []).join("; ") || "None"}
+Interview Technical Score: ${r.interview?.score !== undefined ? `${r.interview.score}%` : "Not interviewed yet"}`;
+  }).join("\n---\n");
+
+  const systemPrompt = `You are a senior recruitment director and talent assessor advising a hiring manager.
+Compare the candidates for the job role "${job.title || "the position"}" and explain clearly, objectively, and concisely why higher-scoring candidates outperformed lower-scoring ones.
+Highlight specific skill gaps, experience differences, must-have requirements, and trade-offs.
+
+Return ONLY a valid JSON object matching this schema:
+{
+  "headline": "A sharp 1-sentence executive verdict comparing the candidate pool",
+  "winnerAnalysis": "2-3 sentences explaining why the top-ranked candidate scored highest (specific skills, must-haves, domain depth)",
+  "differentiators": [
+    "Key factor 1 that separated the top candidate from the others",
+    "Key factor 2...",
+    "Key factor 3..."
+  ],
+  "hiringRecommendation": "A 2-3 sentence executive recommendation for the recruiter (who to advance, who to reject or hold)"
+}`;
+
+  const userPrompt = `JOB REQUIREMENTS:
+Title: ${job.title || "N/A"}
+Seniority: ${job.seniority || "N/A"}
+Min Experience: ${job.minYears || 0} years
+Must-Have Skills: ${(job.mustHave || []).join(", ") || "N/A"}
+Description: ${job.description || "N/A"}
+
+CANDIDATES TO COMPARE:
+${candidateSummaries}
+
+Please generate the comparative breakdown now.`;
+
+  const messages = [{ role: "user", content: userPrompt }];
+  const activeProvider = overrideProvider || process.env.LLM_PROVIDER || "claude";
+
+  let resultText = "";
+  if (activeProvider === "gemini") {
+    resultText = await chatWithGemini(systemPrompt, messages);
+  } else if (activeProvider === "groq") {
+    resultText = await chatWithGroq(systemPrompt, messages);
+  } else if (activeProvider === "ollama") {
+    resultText = await chatWithOllama(systemPrompt, messages);
+  } else {
+    const client = getClaudeClient(apiKey);
+    let message;
+    let lastErr;
+    const modelsToTry = await getAvailableClaudeModels(client);
+    for (const m of modelsToTry) {
+      try {
+        message = await client.messages.create({
+          model: m,
+          max_tokens: 1500,
+          system: systemPrompt,
+          messages: messages
+        });
+        break;
+      } catch (modelErr) {
+        lastErr = modelErr;
+        if (modelErr.status === 404 || (modelErr.message && modelErr.message.includes("not_found_error"))) {
+          continue;
+        }
+        throw modelErr;
+      }
+    }
+    if (!message) throw lastErr || new Error("Failed to compare with Claude");
+    resultText = (message.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+  }
+
+  return extractJSON(resultText);
+}
+

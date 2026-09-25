@@ -5,7 +5,7 @@ import cors from "cors";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { analyzeResume, getNextInterviewQuestion, evaluateInterview, generateInterviewQuestions, evaluateVideoInterviewTranscript } from "./analyze.js";
+import { analyzeResume, getNextInterviewQuestion, evaluateInterview, generateInterviewQuestions, evaluateVideoInterviewTranscript, compareCandidatesWithClaude } from "./analyze.js";
 import { getJobs, saveJobs, getCandidate, saveCandidateInterview, getCompanies, saveCompanies, getLogs, addLog, getSetting, saveSetting } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -276,6 +276,27 @@ app.post("/api/save-proctoring", (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Candidate Comparative Analysis Endpoint
+app.post("/api/candidate-compare", async (req, res) => {
+  try {
+    const { job, candidates, provider, apiKey } = req.body || {};
+    if (!candidates || candidates.length < 2) {
+      return res.status(400).json({ error: "At least 2 candidates are required for comparison." });
+    }
+    const comparison = await compareCandidatesWithClaude(job, candidates, provider, apiKey);
+    addLog(
+      "COMPARISON",
+      `Generated comparative analysis between ${candidates.length} candidates for ${job?.title || 'Job Opening'}`,
+      "",
+      `Verdict: ${comparison?.headline || 'Analysis complete'}`
+    );
+    res.json(comparison);
+  } catch (err) {
+    console.error("[candidate-compare] error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
