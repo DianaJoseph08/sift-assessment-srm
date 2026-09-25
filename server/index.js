@@ -11,11 +11,19 @@ import { getJobs, saveJobs, getCandidate, saveCandidateInterview, getCompanies, 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8787;
 
+process.on("uncaughtException", (err) => {
+  console.error("[CRITICAL] Uncaught exception:", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[CRITICAL] Unhandled rejection:", reason);
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "30mb" })); // resumes are sent as base64
 
-// Health check
+// Health check endpoints
+app.get("/healthz", (_req, res) => res.status(200).send("OK"));
 app.get("/api/health", (_req, res) => {
   const hasPersistentMount = fs.existsSync("/app/data") || Boolean(process.env.DATA_DIR);
   const keyConfigured = Boolean(process.env.ANTHROPIC_API_KEY || getSetting("ANTHROPIC_API_KEY"));
@@ -399,8 +407,8 @@ if (fs.existsSync(dist)) {
   app.get("*", (_req, res) => res.sendFile(path.join(dist, "index.html")));
 }
 
-app.listen(PORT, () => {
-  console.log(`\n  CogniHire AI Interviewer & Assessment Portal listening on http://localhost:${PORT}`);
+const server = app.listen(Number(PORT), "0.0.0.0", () => {
+  console.log(`\n  CogniHire AI Interviewer & Assessment Portal listening on http://0.0.0.0:${PORT}`);
   if (process.env.LLM_PROVIDER === "ollama") {
     console.log(`  LLM Provider: Local Ollama (${process.env.MODEL || "llama3.1"})`);
   } else {
@@ -410,4 +418,8 @@ app.listen(PORT, () => {
     }
   }
   console.log("");
+});
+
+server.on("error", (err) => {
+  console.error("[CRITICAL] HTTP server failed to start:", err);
 });

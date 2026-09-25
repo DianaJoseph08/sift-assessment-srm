@@ -93,8 +93,23 @@ export function syncToPersistentStorage(immediate = false) {
   }
 }
 
-// Initialize database
-const db = new DatabaseSync(activeDbPath);
+// Initialize database with resilient fallback
+let db;
+try {
+  db = new DatabaseSync(activeDbPath);
+} catch (err) {
+  console.error(`[db] Critical: Could not open database at ${activeDbPath}:`, err.message);
+  activeDbPath = path.join("/tmp", `sift_fallback_${Date.now()}.db`);
+  try {
+    if (fs.existsSync(bundledDbPath)) {
+      fs.copyFileSync(bundledDbPath, activeDbPath);
+      console.log(`[db] Recovered using clean bundled template at: ${activeDbPath}`);
+    }
+  } catch (copyErr) {
+    console.warn(`[db] Could not copy bundled template:`, copyErr.message);
+  }
+  db = new DatabaseSync(activeDbPath);
+}
 
 // Create tables if they do not exist
 db.exec(`
