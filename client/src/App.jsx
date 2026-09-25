@@ -230,6 +230,7 @@ const BrandLogo = ({ collapsed = false, theme = "dark" }) => (
 
 const SAMPLE_COMPANIES = [
   { id: "comp_motherson", name: "Motherson Group", industry: "Automotive & Manufacturing", contactEmail: "hr@motherson.com", senderName: "Motherson Talent Acquisition", notes: "Key OEM partner for CAE simulation & mechanical roles", createdAt: new Date().toISOString() },
+  { id: "comp_skavianex", name: "Skavianex", industry: "Technology Solutions", contactEmail: "contact@skavianex.com", senderName: "Skavianex Talent Acquisition", notes: "Client Partner for Technology & Engineering Hiring", createdAt: new Date().toISOString() },
   { id: "comp_apextech", name: "Apex Technologies", industry: "Software & Cloud Services", contactEmail: "careers@apextech.com", senderName: "Apex Tech Recruitment Team", notes: "Engineering & IT talent acquisition", createdAt: new Date().toISOString() },
   { id: "comp_bosch", name: "Bosch India", industry: "Automotive Engineering", contactEmail: "ta@bosch.in", senderName: "Bosch India Talent Team", notes: "R&D hiring for Embedded & Mechatronics roles", createdAt: new Date().toISOString() }
 ];
