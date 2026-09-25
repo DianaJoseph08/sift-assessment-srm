@@ -155,28 +155,6 @@ try {
   `);
 } catch (e) {}
 
-// Ensure Skavianex client company exists
-try {
-  const existingSkavianex = db.prepare("SELECT id FROM companies WHERE LOWER(name) LIKE '%skavianex%'").get();
-  if (!existingSkavianex) {
-    db.prepare(`
-      INSERT INTO companies (id, name, industry, contact_email, notes, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      'comp_skavianex',
-      'Skavianex',
-      'Technology Solutions',
-      'contact@skavianex.com',
-      'Client Partner for Technology & Engineering Hiring',
-      new Date().toISOString()
-    );
-    console.log("[db] Auto-seeded client company: Skavianex");
-    syncToPersistentStorage(true);
-  }
-} catch (e) {
-  console.warn("[db] Could not seed Skavianex:", e.message);
-}
-
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS candidates (
