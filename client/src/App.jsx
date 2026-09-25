@@ -3195,7 +3195,6 @@ SCORING CRITERIA:
 /* ============================== USER GUIDE & MANUAL ============================== */
 function UserGuideView({ onNavigateTab, C }) {
   const [activeCat, setActiveCat] = useState("all");
-  const [search, setSearch] = useState("");
   const [openFaq, setOpenFaq] = useState({ 0: true });
 
   const categories = [
@@ -3213,11 +3212,6 @@ function UserGuideView({ onNavigateTab, C }) {
 
   const toggleFaq = (idx) => {
     setOpenFaq(prev => ({ ...prev, [idx]: !prev[idx] }));
-  };
-
-  const matchesSearch = (text) => {
-    if (!search.trim()) return true;
-    return text.toLowerCase().includes(search.toLowerCase());
   };
 
   const showCat = (catId) => {
@@ -3278,25 +3272,8 @@ function UserGuideView({ onNavigateTab, C }) {
           <span>6. AI Video Interview</span>
         </div>
 
-        {/* Search Bar & Category Filters */}
+        {/* Category Filters */}
         <div style={{ marginTop: 20 }}>
-          <div style={{ position: "relative", marginBottom: 14 }}>
-            <Search size={16} color={C.faint} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search guide (e.g., 'proctoring', 'weights', 'must-have', 'timer', 'api key', 'compare')..."
-              style={{
-                ...inputStyle(C),
-                paddingLeft: 38,
-                fontSize: 13.5,
-                background: C.paper,
-                borderRadius: 10
-              }}
-            />
-          </div>
-
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {categories.map(c => {
               const active = activeCat === c.id;
@@ -3325,7 +3302,7 @@ function UserGuideView({ onNavigateTab, C }) {
       </div>
 
       {/* Chapter 1: ⚡ 3-Minute Quickstart */}
-      {showCat("quickstart") && matchesSearch("quick start workflow step upload resume screen compare interview") && (
+      {showCat("quickstart") && (
         <Panel title="⚡ 3-Minute Quickstart: From Zero to Shortlisted" sub="The fastest way to evaluate your first pool of candidate resumes" C={C}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 16 }}>
             <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 18px" }}>
@@ -3402,7 +3379,7 @@ function UserGuideView({ onNavigateTab, C }) {
       )}
 
       {/* Chapter 2: 🏢 Client Companies */}
-      {showCat("companies") && matchesSearch("client company multi tenant isolation email routing reply to") && (
+      {showCat("companies") && (
         <Panel title="🏢 Client Companies &amp; Recruiter Routing" sub="Organizing hiring across corporate divisions, clients, and subsidiaries" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
@@ -3443,7 +3420,7 @@ function UserGuideView({ onNavigateTab, C }) {
       )}
 
       {/* Chapter 3: 📋 Job Criteria & Rules */}
-      {showCat("jobs") && matchesSearch("job criteria must have nice to have weights scoring seniority experience") && (
+      {showCat("jobs") && (
         <Panel title="📋 Defining Job Criteria &amp; Scoring Formulas" sub="How to configure job openings for maximum assessment precision" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
@@ -3513,7 +3490,7 @@ function UserGuideView({ onNavigateTab, C }) {
       )}
 
       {/* Chapter 4: 📄 Resume Screening & Recommendations */}
-      {showCat("screening") && matchesSearch("resume screening upload pdf docx recommendations csv export threshold") && (
+      {showCat("screening") && (
         <Panel title="📄 Resume Upload, Screening &amp; Shortlist Cards" sub="How to parse bulk resumes and interpret AI candidate scorecards" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -3587,7 +3564,7 @@ function UserGuideView({ onNavigateTab, C }) {
       )}
 
       {/* Chapter 5: ⚖️ Candidate Comparison Matrix */}
-      {showCat("comparison") && matchesSearch("comparison compare candidates side by side score difference justification delta claude memo") && (
+      {showCat("comparison") && (
         <Panel title="⚖️ Head-to-Head Candidate Comparison Matrix" sub="Understand why candidates scored higher than others and compare side-by-side" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
@@ -3637,7 +3614,7 @@ function UserGuideView({ onNavigateTab, C }) {
       )}
 
       {/* Chapter 6: 🤖 AI Video Interview & Proctoring */}
-      {showCat("interview") && matchesSearch("video interview ai proctoring camera cheating timer 30 mins transcript marks integrity") && (
+      {showCat("interview") && (
         <Panel title="🤖 AI Video Interview &amp; Anti-Cheating Proctoring" sub="Conversational technical interviews with live proctoring telemetry" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
@@ -3703,7 +3680,7 @@ function UserGuideView({ onNavigateTab, C }) {
       )}
 
       {/* Chapter 7: ☁️ Data Persistence & Cloud */}
-      {showCat("persistence") && matchesSearch("persistence database google cloud storage gcs bucket reload refresh lose data") && (
+      {showCat("persistence") && (
         <Panel title="☁️ Data Persistence &amp; Google Cloud Storage" sub="How your job data, candidate resumes, and interview records remain safe" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
@@ -3726,7 +3703,7 @@ function UserGuideView({ onNavigateTab, C }) {
       )}
 
       {/* Chapter 8: ⚙️ Settings & API Keys */}
-      {showCat("settings") && matchesSearch("settings api key anthropic claude gemini groq theme dark mode") && (
+      {showCat("settings") && (
         <Panel title="⚙️ AI Providers, API Keys &amp; Theme Customization" sub="Connecting your AI account and personalizing the portal interface" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -3764,7 +3741,7 @@ function UserGuideView({ onNavigateTab, C }) {
       )}
 
       {/* Chapter 9: ❓ Frequently Asked Questions */}
-      {showCat("faq") && matchesSearch("faq questions error answers help phone mobile format") && (
+      {showCat("faq") && (
         <Panel title="❓ Frequently Asked Questions (FAQ)" sub="Common questions and quick troubleshooting tips" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[
