@@ -2615,7 +2615,12 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
 
 const isMatchForComp = (j, comp) => {
   if (!comp) return true;
-  return j.companyId === comp.id;
+  return (
+    j.companyId === comp.id ||
+    j.company_id === comp.id ||
+    (j.companyName && comp.name && j.companyName.toLowerCase() === comp.name.toLowerCase()) ||
+    (j.company_name && comp.name && j.company_name.toLowerCase() === comp.name.toLowerCase())
+  );
 };
 
 /* ============================== WELCOME & AGENCY DASHBOARD ============================== */
@@ -4203,19 +4208,184 @@ export default function App() {
 
             {activeTab === "jobs" && (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                   <div>
                     <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>
-                      {activeCompany ? `Openings for ${activeCompany.name}` : "All Client Openings & Resume Screening"}
+                      {activeCompany ? `Job Openings — ${activeCompany.name}` : "All Client Openings & Resume Screening"}
                     </h2>
-                    <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Upload job descriptions and candidate resumes for automated AI shortlisting</p>
+                    <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>
+                      Select a client company and opening to screen candidates, compare profiles, and send AI interview invitations
+                    </p>
                   </div>
-                  <button
-                    onClick={handleCreateJobForCompany}
-                    style={btn("primary", C)}
-                  >
-                    + Post New Opening Job
-                  </button>
+                </div>
+
+                {/* Option 1: Two Connected Dropdowns Navigation Toolbar */}
+                <div style={{
+                  background: C.paper,
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 12,
+                  padding: "16px 20px",
+                  marginBottom: 20,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)"
+                }}>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    flexWrap: "wrap"
+                  }}>
+                    {/* Left: Connected Dropdowns */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", flex: 1, minWidth: 320 }}>
+                      {/* Dropdown 1: Client Company */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 230, flex: "1 1 230px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 800, color: C.sub, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                          <Building2 size={13} color={C.accent} />
+                          <span>1. Client Company</span>
+                        </div>
+                        <div style={{ position: "relative" }}>
+                          <select
+                            value={activeCompany?.id || "all"}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const targetComp = val === "all" ? null : companies.find(c => c.id === val) || null;
+                              setActiveCompany(targetComp);
+                              const relatedJobs = !targetComp ? jobs : jobs.filter(j => isMatchForComp(j, targetComp));
+                              if (relatedJobs.length > 0) {
+                                setActiveJobId(relatedJobs[0].id);
+                                const screened = (relatedJobs[0].candidates || []).filter(c => c.status === "done" && c.result);
+                                if (screened.length > 0 || relatedJobs[0].screening === "done") {
+                                  setStep(3);
+                                  setMaxReached(4);
+                                } else {
+                                  setStep(1);
+                                  setMaxReached(4);
+                                }
+                              } else {
+                                setActiveJobId(null);
+                              }
+                            }}
+                            style={{
+                              ...inputStyle(C),
+                              padding: "9px 34px 9px 12px",
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              width: "100%",
+                              borderRadius: 8,
+                              background: C.bg,
+                              appearance: "none",
+                              border: `1.5px solid ${C.line}`
+                            }}
+                          >
+                            <option value="all">🌐 All Client Companies ({jobs.length} total roles)</option>
+                            {companies.map(c => {
+                              const count = jobs.filter(j => isMatchForComp(j, c)).length;
+                              return (
+                                <option key={c.id} value={c.id}>
+                                  🏢 {c.name} ({count} {count === 1 ? "opening" : "openings"})
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <ChevronDown size={15} color={C.sub} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                        </div>
+                      </div>
+
+                      {/* Connecting Arrow */}
+                      <div style={{ color: C.faint, fontSize: 16, fontWeight: 700, marginTop: 18 }}>➔</div>
+
+                      {/* Dropdown 2: Client Related Job Openings */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 280, flex: "2 1 280px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 800, color: C.sub, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                          <Briefcase size={13} color={C.accent} />
+                          <span>2. Client Job Opening {activeCompany ? `(${activeCompany.name})` : ""}</span>
+                        </div>
+                        <div style={{ position: "relative" }}>
+                          <select
+                            value={activeJobId || ""}
+                            onChange={(e) => {
+                              const selectedId = e.target.value;
+                              setActiveJobId(selectedId);
+                              const targetJ = jobs.find(j => j.id === selectedId);
+                              if (targetJ) {
+                                const screened = (targetJ.candidates || []).filter(c => c.status === "done" && c.result);
+                                if (screened.length > 0 || targetJ.screening === "done") {
+                                  setStep(3);
+                                  setMaxReached(4);
+                                } else {
+                                  setStep(1);
+                                  setMaxReached(4);
+                                }
+                              }
+                            }}
+                            disabled={displayedJobs.length === 0}
+                            style={{
+                              ...inputStyle(C),
+                              padding: "9px 34px 9px 12px",
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: displayedJobs.length === 0 ? "not-allowed" : "pointer",
+                              width: "100%",
+                              borderRadius: 8,
+                              background: C.bg,
+                              appearance: "none",
+                              border: `1.5px solid ${activeJob ? C.accent : C.line}`
+                            }}
+                          >
+                            {displayedJobs.length === 0 ? (
+                              <option value="">No openings for {activeCompany ? activeCompany.name : "selected company"}</option>
+                            ) : (
+                              displayedJobs.map(j => {
+                                const screened = (j.candidates || []).filter(c => c.status === "done" && c.result);
+                                const statusTag = screened.length > 0 ? ` [✓ ${screened.length} Screened]` : " [Draft]";
+                                const compPrefix = !activeCompany && j.companyName ? `${j.companyName} — ` : "";
+                                return (
+                                  <option key={j.id} value={j.id}>
+                                    🎯 {compPrefix}{j.title || "Untitled Role"}{statusTag} ({j.seniority || "Junior/Mid"}, {j.minYears || 0}+ yrs)
+                                  </option>
+                                );
+                              })
+                            )}
+                          </select>
+                          <ChevronDown size={15} color={C.sub} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Quick Action & Candidate Count */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
+                      {activeJob && (() => {
+                        const screenedCount = (activeJob.candidates || []).filter(c => c.status === "done" && c.result).length;
+                        const totalCount = (activeJob.candidates || []).length;
+                        return screenedCount > 0 ? (
+                          <span style={{ fontSize: 11.5, fontWeight: 800, color: "#16A34A", background: "#DCFCE7", border: "1px solid #BBF7D0", padding: "7px 12px", borderRadius: 8, whiteSpace: "nowrap" }}>
+                            ✓ {screenedCount} of {totalCount} Screened
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, background: C.bg, border: `1px solid ${C.line}`, padding: "7px 12px", borderRadius: 8, whiteSpace: "nowrap" }}>
+                            {totalCount} Resumes Uploaded
+                          </span>
+                        );
+                      })()}
+
+                      <button
+                        onClick={handleCreateJobForCompany}
+                        style={{
+                          ...btn("primary", C),
+                          fontSize: 12.5,
+                          padding: "7px 14px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        <Plus size={14} /> Post New Job
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {displayedJobs.length === 0 ? (
@@ -4229,61 +4399,6 @@ export default function App() {
                   </Panel>
                 ) : (
                   <div>
-                    {/* Job Selection Tabs */}
-                    <div style={{ display: "flex", gap: 10, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-                      {displayedJobs.map(j => {
-                        const screenedCands = (j.candidates || []).filter(c => c.status === "done" && c.result);
-                        const hasScreened = screenedCands.length > 0 || j.screening === "done";
-                        return (
-                          <div
-                            key={j.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              padding: "7px 14px",
-                              borderRadius: 8,
-                              border: `1px solid ${activeJobId === j.id ? C.accent : C.line}`,
-                              background: activeJobId === j.id ? C.accentSoft : C.paper,
-                              color: activeJobId === j.id ? C.accent : C.ink,
-                              fontWeight: 700,
-                              fontSize: 13,
-                              cursor: "pointer",
-                              fontFamily: BODY,
-                              transition: "all 0.15s ease"
-                            }}
-                            onClick={() => {
-                              setActiveJobId(j.id);
-                              if (hasScreened) {
-                                setStep(3);
-                                setMaxReached(4);
-                              } else {
-                                setStep(1);
-                                setMaxReached(4); // Unlocked so they can view scores/candidates at any time
-                              }
-                            }}
-                          >
-                            <span>🏢 {j.companyName ? `${j.companyName} — ` : ""}{j.title || "Untitled Opening"}</span>
-                            {hasScreened && (
-                              <span style={{ fontSize: 10.5, fontWeight: 800, color: "#16A34A", background: "#DCFCE7", padding: "2px 6px", borderRadius: 4 }}>
-                                ✓ {screenedCands.length} Screened
-                              </span>
-                            )}
-                            <Trash2
-                              size={14}
-                              color={C.faint}
-                              style={{ cursor: "pointer", opacity: 0.7, marginLeft: 4 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteJob(j.id);
-                              }}
-                              title="Delete this job opening"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-
                     {activeJob && (
                       <div style={{ marginBottom: 20 }}>
                         {/* Stepper Header */}
