@@ -9,7 +9,8 @@ import {
   Plus, Download, RotateCcw, ArrowRight, ArrowLeft, AlertCircle, Users, Star,
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
   Mail, Send, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
-  ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen, Scale
+  ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen, Scale,
+  HelpCircle, CheckCircle2, Clock
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
 import VideoInterview from "./VideoInterview.jsx";
@@ -2482,7 +2483,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
     { id: "jobs", label: "Job Openings & Screening", icon: Briefcase },
     { id: "logs", label: "Activity & Audit Logs", icon: Activity },
     { id: "settings", label: "Settings & AI Keys", icon: Settings },
-    { id: "study_material", label: "Demo Study Guide", icon: BookOpen, isExternal: true },
+    { id: "guide", label: "User Guide & Manual", icon: BookOpen },
   ];
 
   return (
@@ -2544,13 +2545,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
           return (
             <button
               key={item.id}
-              onClick={() => {
-                if (item.isExternal) {
-                  window.open("/study_material.html", "_blank");
-                } else {
-                  setActiveTab(item.id);
-                }
-              }}
+              onClick={() => setActiveTab(item.id)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -2558,9 +2553,9 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
                 padding: "10px 12px",
                 borderRadius: 8,
                 border: "none",
-                background: isActive && !item.isExternal ? C.sidebarActiveBg : "transparent",
-                color: isActive && !item.isExternal ? C.sidebarActive : C.sidebarText,
-                fontWeight: isActive && !item.isExternal ? 700 : 500,
+                background: isActive ? C.sidebarActiveBg : "transparent",
+                color: isActive ? C.sidebarActive : C.sidebarText,
+                fontWeight: isActive ? 700 : 500,
                 fontSize: 13.5,
                 textAlign: "left",
                 cursor: "pointer",
@@ -2568,7 +2563,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
                 fontFamily: BODY,
               }}
             >
-              <Icon size={18} color={isActive && !item.isExternal ? C.sidebarActive : C.sidebarText} />
+              <Icon size={18} color={isActive ? C.sidebarActive : C.sidebarText} />
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.badge !== undefined && (
                 <span style={{
@@ -3196,6 +3191,640 @@ SCORING CRITERIA:
   );
 }
 
+/* ============================== USER GUIDE & MANUAL ============================== */
+function UserGuideView({ onNavigateTab, C }) {
+  const [activeCat, setActiveCat] = useState("all");
+  const [search, setSearch] = useState("");
+  const [openFaq, setOpenFaq] = useState({ 0: true });
+
+  const categories = [
+    { id: "all", label: "📚 All Chapters" },
+    { id: "quickstart", label: "⚡ 3-Min Quickstart" },
+    { id: "companies", label: "🏢 Client Companies" },
+    { id: "jobs", label: "📋 Job Criteria & Rules" },
+    { id: "screening", label: "📄 Resume Screening & Weights" },
+    { id: "comparison", label: "⚖️ Comparison Matrix" },
+    { id: "interview", label: "🤖 AI Video Interview & Proctoring" },
+    { id: "persistence", label: "☁️ Data Persistence & Cloud" },
+    { id: "settings", label: "⚙️ Settings & API Keys" },
+    { id: "faq", label: "❓ Frequently Asked Questions" },
+  ];
+
+  const toggleFaq = (idx) => {
+    setOpenFaq(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const matchesSearch = (text) => {
+    if (!search.trim()) return true;
+    return text.toLowerCase().includes(search.toLowerCase());
+  };
+
+  const showCat = (catId) => {
+    if (activeCat !== "all" && activeCat !== catId) return false;
+    return true;
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1000, margin: "0 auto" }}>
+      {/* Hero Header */}
+      <div style={{
+        background: `linear-gradient(135deg, ${C.paper}, ${C.panel})`,
+        border: `1px solid ${C.cardBorder}`,
+        borderRadius: 16,
+        padding: "28px 32px",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.04)"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <BookOpen size={24} color={C.accent} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, color: C.ink, fontFamily: DISPLAY }}>
+              CogniHire Operational Manual &amp; User Guide
+            </h1>
+            <p style={{ fontSize: 13.5, color: C.sub, margin: "4px 0 0" }}>
+              Complete step-by-step handbook to shortlisting resumes, head-to-head candidate comparisons, and conversational AI proctored interviews.
+            </p>
+          </div>
+        </div>
+
+        {/* Quick Stepper Overview */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: C.bg,
+          padding: "12px 18px",
+          borderRadius: 10,
+          border: `1px solid ${C.line}`,
+          marginTop: 18,
+          flexWrap: "wrap",
+          fontSize: 12.5,
+          color: C.ink,
+          fontWeight: 700
+        }}>
+          <span style={{ color: C.accent }}>Standard Workflow:</span>
+          <span>1. Client Company</span>
+          <span style={{ color: C.faint }}>➔</span>
+          <span>2. Define Job Criteria</span>
+          <span style={{ color: C.faint }}>➔</span>
+          <span>3. Screen Resumes</span>
+          <span style={{ color: C.faint }}>➔</span>
+          <span>4. Review Shortlist</span>
+          <span style={{ color: C.faint }}>➔</span>
+          <span>5. Compare Candidates</span>
+          <span style={{ color: C.faint }}>➔</span>
+          <span>6. AI Video Interview</span>
+        </div>
+
+        {/* Search Bar & Category Filters */}
+        <div style={{ marginTop: 20 }}>
+          <div style={{ position: "relative", marginBottom: 14 }}>
+            <Search size={16} color={C.faint} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search guide (e.g., 'proctoring', 'weights', 'must-have', 'timer', 'api key', 'compare')..."
+              style={{
+                ...inputStyle(C),
+                paddingLeft: 38,
+                fontSize: 13.5,
+                background: C.paper,
+                borderRadius: 10
+              }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {categories.map(c => {
+              const active = activeCat === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setActiveCat(c.id)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 20,
+                    fontSize: 12,
+                    fontWeight: active ? 800 : 600,
+                    cursor: "pointer",
+                    border: `1px solid ${active ? C.accent : C.line}`,
+                    background: active ? C.accent : C.paper,
+                    color: active ? "#FFFFFF" : C.sub,
+                    transition: "all 0.15s ease"
+                  }}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Chapter 1: ⚡ 3-Minute Quickstart */}
+      {showCat("quickstart") && matchesSearch("quick start workflow step upload resume screen compare interview") && (
+        <Panel title="⚡ 3-Minute Quickstart: From Zero to Shortlisted" sub="The fastest way to evaluate your first pool of candidate resumes" C={C}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 16 }}>
+            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: C.accent, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>1</span>
+                <span style={{ fontWeight: 800, color: C.ink, fontSize: 14 }}>Select Client &amp; Job</span>
+              </div>
+              <p style={{ fontSize: 12.5, color: C.sub, margin: 0, lineHeight: 1.5 }}>
+                Choose a client company or select an existing opening from the <strong>Job Openings</strong> tab.
+              </p>
+            </div>
+
+            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: C.accent, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>2</span>
+                <span style={{ fontWeight: 800, color: C.ink, fontSize: 14 }}>Set Must-Have Skills</span>
+              </div>
+              <p style={{ fontSize: 12.5, color: C.sub, margin: 0, lineHeight: 1.5 }}>
+                Enter mandatory tools and languages (e.g. <code>Python</code>, <code>React</code>). Candidates missing any will be flagged.
+              </p>
+            </div>
+
+            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: C.accent, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>3</span>
+                <span style={{ fontWeight: 800, color: C.ink, fontSize: 14 }}>Upload Resumes in Bulk</span>
+              </div>
+              <p style={{ fontSize: 12.5, color: C.sub, margin: 0, lineHeight: 1.5 }}>
+                In Step 2, drag &amp; drop PDF, Word DOCX, or TXT resumes. Multiple files upload and queue automatically.
+              </p>
+            </div>
+
+            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: C.accent, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>4</span>
+                <span style={{ fontWeight: 800, color: C.ink, fontSize: 14 }}>Run AI Screening</span>
+              </div>
+              <p style={{ fontSize: 12.5, color: C.sub, margin: 0, lineHeight: 1.5 }}>
+                Click <strong>"Run AI Screening"</strong>. Watch real-time multi-dimensional scoring and instant recommendation badges.
+              </p>
+            </div>
+
+            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: C.accent, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>5</span>
+                <span style={{ fontWeight: 800, color: C.ink, fontSize: 14 }}>Compare Candidates</span>
+              </div>
+              <p style={{ fontSize: 12.5, color: C.sub, margin: 0, lineHeight: 1.5 }}>
+                Click Step 4 <strong>"Compare Candidates"</strong> to see side-by-side matrices and why #1 scored higher than others.
+              </p>
+            </div>
+
+            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: C.accent, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>6</span>
+                <span style={{ fontWeight: 800, color: C.ink, fontSize: 14 }}>Send AI Interview Link</span>
+              </div>
+              <p style={{ fontSize: 12.5, color: C.sub, margin: 0, lineHeight: 1.5 }}>
+                Click <strong>"Invite Candidate"</strong>. The candidate completes a 30-minute conversational interview with live proctoring.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button
+              onClick={() => onNavigateTab("jobs", { step: 1 })}
+              style={{ ...btn("primary", C), display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <span>🚀 Open Job Openings &amp; Try Now</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </Panel>
+      )}
+
+      {/* Chapter 2: 🏢 Client Companies */}
+      {showCat("companies") && matchesSearch("client company multi tenant isolation email routing reply to") && (
+        <Panel title="🏢 Client Companies &amp; Recruiter Routing" sub="Organizing hiring across corporate divisions, clients, and subsidiaries" C={C}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
+              CogniHire supports multi-tenant recruitment. Whether you represent a centralized talent acquisition team, a university placement cell, or a recruitment agency serving corporate clients (e.g. <em>Motherson Group</em>, <em>SRM Technologies</em>), you can keep candidate pipelines isolated.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 6 }}>🏢 Company Profiles</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  <li>Create custom companies with industry tags and notes.</li>
+                  <li>Use the <strong>Target Client Company</strong> dropdown in the sidebar to filter openings.</li>
+                  <li>Review aggregated candidate count and average fit scores per company on the Dashboard.</li>
+                </ul>
+              </div>
+
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 6 }}>📧 Cascading Email Hierarchy</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  <li>Each company has a <strong>Default Contact Email</strong> and <strong>Sender Display Name</strong>.</li>
+                  <li>Candidate interview invitation replies automatically route to this email.</li>
+                  <li>Guarantees 100% SPF/DKIM delivery without corporate spam rejections.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={{ background: C.accentSoft, borderRadius: 8, padding: "10px 14px", fontSize: 12.5, color: C.accentDeep, fontWeight: 600 }}>
+              💡 <strong>Pro-Tip:</strong> Set your team's real hiring email in each company card (e.g. <code>careers@motherson.com</code>) so candidate inquiries arrive directly in your recruiters' inboxes.
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={() => onNavigateTab("companies")} style={btn("primary", C)}>
+                🏢 View Client Companies
+              </button>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* Chapter 3: 📋 Job Criteria & Rules */}
+      {showCat("jobs") && matchesSearch("job criteria must have nice to have weights scoring seniority experience") && (
+        <Panel title="📋 Defining Job Criteria &amp; Scoring Formulas" sub="How to configure job openings for maximum assessment precision" C={C}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
+              In Step 1 (<strong>Define Job Criteria</strong>), recruiters configure the benchmark requirements the AI uses to evaluate resumes:
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px" }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#DC2626", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Target size={16} /> Must-Have Skills (Mandatory)
+                </div>
+                <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  These are strict requirements. If a candidate does not demonstrate proficiency in a must-have skill:
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    <li>Their Skills Fit Score receives an automated penalty.</li>
+                    <li>The missing skill is flagged under <strong>"Critical Gaps"</strong> and tagged in the Comparison Matrix.</li>
+                    <li>Examples: <code>Python</code>, <code>Catia V5</code>, <code>TypeScript</code>, <code>AWS</code>.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px" }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#16A34A", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Star size={16} /> Nice-to-Have Skills (Bonus)
+                </div>
+                <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  Secondary preferences that set top candidates apart:
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    <li>Candidates with these skills receive bonus points on their technical depth.</li>
+                    <li>Missing a nice-to-have skill does <strong>not</strong> trigger a penalty.</li>
+                    <li>Examples: <code>Docker</code>, <code>CI/CD Pipelines</code>, <code>Scrum Master Certification</code>.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Weights Breakdown */}
+            <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "16px 20px" }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: C.ink, marginBottom: 12, fontFamily: DISPLAY }}>
+                The 4-Pillar Weighted Scoring Formula (100% Total)
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                <div style={{ borderLeft: "3px solid #3B82F6", paddingLeft: 10 }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: "#3B82F6" }}>40% Weight</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>Technical Skills Fit</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>Must-have coverage, keyword depth, verified tooling.</div>
+                </div>
+                <div style={{ borderLeft: "3px solid #10B981", paddingLeft: 10 }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: "#10B981" }}>25% Weight</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>Experience Fit</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>Tenure length, title seniority, career progression.</div>
+                </div>
+                <div style={{ borderLeft: "3px solid #F59E0B", paddingLeft: 10 }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: "#F59E0B" }}>20% Weight</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>Domain Relevance</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>Automotive, manufacturing, fintech, cloud systems.</div>
+                </div>
+                <div style={{ borderLeft: "3px solid #8B5CF6", paddingLeft: 10 }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: "#8B5CF6" }}>15% Weight</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>Education &amp; Discipline</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>Degree level (B.E., M.Tech, Ph.D.), discipline alignment.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* Chapter 4: 📄 Resume Screening & Recommendations */}
+      {showCat("screening") && matchesSearch("resume screening upload pdf docx recommendations csv export threshold") && (
+        <Panel title="📄 Resume Upload, Screening &amp; Shortlist Cards" sub="How to parse bulk resumes and interpret AI candidate scorecards" C={C}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Upload size={16} color={C.accent} /> Bulk Resume Upload
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  <li>Supports <strong>PDF (.pdf)</strong>, <strong>Microsoft Word (.docx)</strong>, and <strong>Plain Text (.txt)</strong>.</li>
+                  <li>Multi-file upload: Select 10 to 50 resumes simultaneously.</li>
+                  <li>Automatic deduplication and resume text extraction.</li>
+                </ul>
+              </div>
+
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Download size={16} color={C.accent} /> Shortlist Filtering &amp; CSV Export
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  <li>Adjust the <strong>Score Threshold Slider</strong> (e.g. 70%) to immediately filter top candidates.</li>
+                  <li>Click <strong>"Export Shortlist CSV"</strong> to download a formatted spreadsheet with rank, score, email, and summaries.</li>
+                  <li>Candidate cards display radar charts of sub-scores.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Recommendation Badges Table */}
+            <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ background: C.panel, borderBottom: `1px solid ${C.line}`, textAlign: "left" }}>
+                    <th style={{ padding: "10px 14px", color: C.sub }}>Recommendation Badge</th>
+                    <th style={{ padding: "10px 14px", color: C.sub }}>Score Range</th>
+                    <th style={{ padding: "10px 14px", color: C.sub }}>Recommended Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                    <td style={{ padding: "10px 14px" }}>
+                      <span style={{ background: "#DCFCE7", color: "#15803D", padding: "3px 8px", borderRadius: 4, fontWeight: 800 }}>✓ Strong Match</span>
+                    </td>
+                    <td style={{ padding: "10px 14px", fontWeight: 700, color: C.ink }}>80% – 100%</td>
+                    <td style={{ padding: "10px 14px", color: C.sub }}>Fast-track to technical interview immediately. Exceeds core requirements.</td>
+                  </tr>
+                  <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                    <td style={{ padding: "10px 14px" }}>
+                      <span style={{ background: "#FEF9C3", color: "#A16207", padding: "3px 8px", borderRadius: 4, fontWeight: 800 }}>⚡ Good Match</span>
+                    </td>
+                    <td style={{ padding: "10px 14px", fontWeight: 700, color: C.ink }}>70% – 79%</td>
+                    <td style={{ padding: "10px 14px", color: C.sub }}>Solid candidate. Meets all must-haves, minor gaps in secondary tools.</td>
+                  </tr>
+                  <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                    <td style={{ padding: "10px 14px" }}>
+                      <span style={{ background: "#FFEDD5", color: "#C2410C", padding: "3px 8px", borderRadius: 4, fontWeight: 800 }}>? Possible Match</span>
+                    </td>
+                    <td style={{ padding: "10px 14px", fontWeight: 700, color: C.ink }}>50% – 69%</td>
+                    <td style={{ padding: "10px 14px", color: C.sub }}>Borderline match. Missing some relevant experience or domain depth.</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: "10px 14px" }}>
+                      <span style={{ background: "#FEE2E2", color: "#B91C1C", padding: "3px 8px", borderRadius: 4, fontWeight: 800 }}>✗ Weak Match</span>
+                    </td>
+                    <td style={{ padding: "10px 14px", fontWeight: 700, color: C.ink }}>0% – 49%</td>
+                    <td style={{ padding: "10px 14px", color: C.sub }}>Does not meet baseline criteria. Missing primary required skills.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* Chapter 5: ⚖️ Candidate Comparison Matrix */}
+      {showCat("comparison") && matchesSearch("comparison compare candidates side by side score difference justification delta claude memo") && (
+        <Panel title="⚖️ Head-to-Head Candidate Comparison Matrix" sub="Understand why candidates scored higher than others and compare side-by-side" C={C}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
+              The **Candidate Comparison View** (Step 4) lets recruiters directly analyze candidate strengths and weaknesses against each other:
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 6 }}>🎯 Interactive Multi-Selector</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  <li>Click candidate pills to dynamically compare 2 to 5 candidates side-by-side.</li>
+                  <li>Use shortcuts: <strong>"Select Top 4"</strong>, <strong>"Compare Top 2"</strong>, or <strong>"Select All"</strong>.</li>
+                  <li>Shows rank, recommendation badge, and score delta (e.g. <code>-8%</code> vs leader).</li>
+                </ul>
+              </div>
+
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 6 }}>🏆 Automated Score Justification</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  <li>Explains mathematically why <strong>#1 Ranked Candidate</strong> beat runner-ups.</li>
+                  <li>Highlights must-have skill count differences (e.g. <em>"Matches 2 more required skills"</em>).</li>
+                  <li>Explains technical margin % and experience depth tradeoffs.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={{ background: C.panel, border: `1px solid #8B5CF644`, borderRadius: 10, padding: "14px 18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#8B5CF6", fontWeight: 800, fontSize: 13.5, marginBottom: 6 }}>
+                <Sparkles size={16} /> "Ask Claude to Compare" Button
+              </div>
+              <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                Clicking <strong>"Ask Claude to Compare"</strong> sends the candidate pool and full job description to Anthropic Claude to synthesize an executive memorandum:
+                <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                  <li><strong>Headline Verdict</strong>: A sharp one-sentence executive summary.</li>
+                  <li><strong>Winner Deep-Dive</strong>: Detailed explanation of candidate strengths and edge over others.</li>
+                  <li><strong>Differentiating Factors</strong>: Key capabilities separating the leader from runner-ups.</li>
+                  <li><strong>Recruiter Hiring Advice</strong>: Clear recommendations on who to advance or reject.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={{ background: C.accentSoft, borderRadius: 8, padding: "10px 14px", fontSize: 12.5, color: C.accentDeep, fontWeight: 600 }}>
+              📌 <strong>Frozen Header &amp; Column:</strong> As you scroll down through must-haves, strengths, gaps, and summaries, the candidate names stay pinned at the top, and the metric column stays pinned on the left.
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* Chapter 6: 🤖 AI Video Interview & Proctoring */}
+      {showCat("interview") && matchesSearch("video interview ai proctoring camera cheating timer 30 mins transcript marks integrity") && (
+        <Panel title="🤖 AI Video Interview &amp; Anti-Cheating Proctoring" sub="Conversational technical interviews with live proctoring telemetry" C={C}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
+              CogniHire features a built-in automated conversational interviewer powered by Anthropic Claude, complete with video telemetry and anti-cheating proctoring.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px" }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: C.ink, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Clock size={16} color={C.accent} /> 30-Minute Global Timer
+                </div>
+                <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  Rather than stressful 3-minute per-question timers, candidates receive a <strong>30-minute global countdown</strong> for the entire interview.
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    <li>Candidates answer questions at their natural pace.</li>
+                    <li>Allows thoughtful technical explanations without artificial rush.</li>
+                    <li>Automatic graceful submission when timer expires.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px" }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: C.ink, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <MessageSquare size={16} color={C.accent} /> Conversational AI Follow-Ups
+                </div>
+                <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  Anthropic Claude conducts the interview dynamically:
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    <li>Generates questions specific to the candidate's resume projects.</li>
+                    <li>Listens to candidate responses and asks relevant technical follow-ups.</li>
+                    <li>Evaluates problem solving, code quality, and technical vocabulary.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Proctoring Shield */}
+            <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "16px 20px" }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#16A34A", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                <ShieldCheck size={18} /> Anti-Cheating Telemetry &amp; Proctoring Matrix
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                <div style={{ background: C.bg, padding: "10px 12px", borderRadius: 8 }}>
+                  <div style={{ fontWeight: 800, fontSize: 12.5, color: C.ink }}>👁️ Face Orientation</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>Flags candidate looking away from the screen for extended intervals.</div>
+                </div>
+                <div style={{ background: C.bg, padding: "10px 12px", borderRadius: 8 }}>
+                  <div style={{ fontWeight: 800, fontSize: 12.5, color: C.ink }}>👥 Multiple Persons</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>Detects secondary individuals entering the camera frame.</div>
+                </div>
+                <div style={{ background: C.bg, padding: "10px 12px", borderRadius: 8 }}>
+                  <div style={{ fontWeight: 800, fontSize: 12.5, color: C.ink }}>🪟 Tab &amp; Window Focus</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>Detects when candidate minimizes tab to search for answers.</div>
+                </div>
+                <div style={{ background: C.bg, padding: "10px 12px", borderRadius: 8 }}>
+                  <div style={{ fontWeight: 800, fontSize: 12.5, color: C.ink }}>📊 Fair Integrity Score</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>Starts at 100% and calculates proportional deductions based on telemetry.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* Chapter 7: ☁️ Data Persistence & Cloud */}
+      {showCat("persistence") && matchesSearch("persistence database google cloud storage gcs bucket reload refresh lose data") && (
+        <Panel title="☁️ Data Persistence &amp; Google Cloud Storage" sub="How your job data, candidate resumes, and interview records remain safe" C={C}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
+              Recruiters frequently ask: <em>"Will my created jobs and candidate marks be lost if I reload the page or when Cloud Run restarts?"</em>
+            </p>
+
+            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 20px" }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#16A34A", marginBottom: 6 }}>
+                ✓ 100% Zero Data Loss Architecture
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                <li><strong>Local SQLite Database:</strong> Runs on a fast in-memory POSIX filesystem for instantaneous UI responsiveness.</li>
+                <li><strong>Google Cloud Storage Sync:</strong> CogniHire is connected to persistent bucket <code>gs://cognihire-app-data</code> mounted at <code>/app/data</code>.</li>
+                <li>Every time you post a job, upload resumes, run a screening, or submit an interview, changes are atomically persisted to Cloud Storage.</li>
+                <li>Even across container restarts, browser reloads, or code redeployments, your data remains fully intact.</li>
+              </ul>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* Chapter 8: ⚙️ Settings & API Keys */}
+      {showCat("settings") && matchesSearch("settings api key anthropic claude gemini groq theme dark mode") && (
+        <Panel title="⚙️ AI Providers, API Keys &amp; Theme Customization" sub="Connecting your AI account and personalizing the portal interface" C={C}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 6 }}>🔑 Configuring Anthropic Claude API Key</div>
+                <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  1. Go to <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>console.anthropic.com</a> and generate an API key.
+                  <br />2. Navigate to <strong>Settings &amp; AI Keys</strong> in CogniHire.
+                  <br />3. Paste your key (<code>sk-ant-api03-...</code>) and click <strong>Save API Keys</strong>.
+                  <br />4. Keys are saved locally and securely synced to the server database for candidate interview links.
+                </div>
+              </div>
+
+              <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 6 }}>🎨 Theme Customization</div>
+                <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.6 }}>
+                  CogniHire includes 4 branded themes:
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    <li><strong>Light Mode</strong>: Clean high-contrast corporate theme.</li>
+                    <li><strong>Dark Mode</strong>: Modern low-glare dark palette.</li>
+                    <li><strong>SRM Blue</strong>: Academic navy &amp; ocean blue.</li>
+                    <li><strong>Motherson Gold</strong>: Luxury automotive gold &amp; charcoal.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={() => onNavigateTab("settings")} style={btn("primary", C)}>
+                ⚙️ Open Settings &amp; API Keys
+              </button>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* Chapter 9: ❓ Frequently Asked Questions */}
+      {showCat("faq") && matchesSearch("faq questions error answers help phone mobile format") && (
+        <Panel title="❓ Frequently Asked Questions (FAQ)" sub="Common questions and quick troubleshooting tips" C={C}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              {
+                q: "What resume file formats are supported?",
+                a: "CogniHire supports PDF (.pdf), Microsoft Word (.docx), and plain text (.txt). The parser automatically strips formatting, extracts candidate contact info, detects timelines, and standardizes skills."
+              },
+              {
+                q: "What should candidates do if they lose camera/mic permissions during the video interview?",
+                a: "Candidates should click the lock or camera icon in their browser address bar, set Camera and Microphone to 'Allow', and refresh the page. The 30-minute interview state is preserved."
+              },
+              {
+                q: "Can I re-screen candidates if I change the job criteria or add new must-haves?",
+                a: "Yes! In Step 3 (Results), click 'Re-Run Screening'. CogniHire will re-evaluate all candidates against your updated criteria and refresh all match scores."
+              },
+              {
+                q: "How does CogniHire prevent AI bias in candidate shortlisting?",
+                a: "CogniHire focuses strictly on objective job requirements: verified tenure, skill mastery, must-have keyword matching, and academic credentials. It ignores subjective demographic proxies."
+              },
+              {
+                q: "Where can I see an audit trail of all invitation emails and screening actions?",
+                a: "Click 'Activity & Audit Logs' in the sidebar to inspect a chronological audit log with timestamps, company tags, and delivery statuses."
+              }
+            ].map((faq, idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: C.bg,
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 10,
+                  overflow: "hidden"
+                }}
+              >
+                <div
+                  onClick={() => toggleFaq(idx)}
+                  style={{
+                    padding: "14px 18px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    userSelect: "none"
+                  }}
+                >
+                  <span style={{ fontSize: 13.5, fontWeight: 700, color: C.ink }}>{faq.q}</span>
+                  {openFaq[idx] ? <ChevronUp size={16} color={C.sub} /> : <ChevronDown size={16} color={C.sub} />}
+                </div>
+                {openFaq[idx] && (
+                  <div style={{ padding: "0 18px 14px", fontSize: 12.5, color: C.sub, lineHeight: 1.6, borderTop: `1px solid ${C.line}44` }}>
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+    </div>
+  );
+}
+
 /* ============================== MAIN APP COMPONENT ============================== */
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -3577,6 +4206,20 @@ export default function App() {
                 setLlmProvider={setLlmProvider}
                 currentTheme={themeKey}
                 setTheme={setThemeKey}
+                C={C}
+              />
+            )}
+
+            {activeTab === "guide" && (
+              <UserGuideView
+                onNavigateTab={(tab, options = {}) => {
+                  if (options.jobId) setActiveJobId(options.jobId);
+                  if (options.step) {
+                    setStep(options.step);
+                    setMaxReached((prev) => Math.max(prev, options.step));
+                  }
+                  setActiveTab(tab);
+                }}
                 C={C}
               />
             )}
