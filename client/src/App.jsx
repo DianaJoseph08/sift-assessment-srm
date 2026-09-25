@@ -2046,291 +2046,429 @@ function CandidateComparisonView({ candidates, job, onBack, onStartInterview, ll
         </div>
       )}
 
-      {/* Section 3: Head-to-Head Comparison Table */}
-      <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: C.panel, borderBottom: `2px solid ${C.line}` }}>
-                <th style={{ padding: "16px 20px", width: 220, minWidth: 200, color: C.sub, fontWeight: 800, textTransform: "uppercase", fontSize: 11, letterSpacing: "0.05em" }}>
-                  Candidate / Metric
-                </th>
-                {selectedCandidates.map((c, i) => {
-                  const meta = recMeta(c.result?.recommendation);
-                  return (
-                    <th key={c.id} style={{ padding: "16px 20px", minWidth: 240, borderLeft: `1px solid ${C.line}`, verticalAlign: "top" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: i === 0 ? "#16A34A" : C.faint, background: i === 0 ? "#DCFCE7" : C.bg, padding: "2px 8px", borderRadius: 10 }}>
-                          {i === 0 ? "🏆 RANK #1" : `RANK #${i + 1}`}
+      {/* Section 3: Head-to-Head Comparison Table with Frozen Headers */}
+      <div style={{
+        background: C.paper,
+        border: `1px solid ${C.line}`,
+        borderRadius: 14,
+        overflow: "auto",
+        maxHeight: "75vh",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+        position: "relative"
+      }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, textAlign: "left", fontSize: 13 }}>
+          <thead>
+            <tr>
+              <th style={{
+                position: "sticky",
+                top: 0,
+                left: 0,
+                zIndex: 30,
+                background: C.panel,
+                padding: "16px 20px",
+                width: 220,
+                minWidth: 200,
+                color: C.sub,
+                fontWeight: 800,
+                textTransform: "uppercase",
+                fontSize: 11,
+                letterSpacing: "0.05em",
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `2px solid ${C.line}`,
+                boxShadow: "2px 2px 6px rgba(0,0,0,0.06)"
+              }}>
+                Candidate / Metric
+              </th>
+              {selectedCandidates.map((c, i) => {
+                const meta = recMeta(c.result?.recommendation);
+                return (
+                  <th key={c.id} style={{
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 20,
+                    background: C.panel,
+                    padding: "16px 20px",
+                    minWidth: 250,
+                    borderLeft: `1px solid ${C.line}`,
+                    borderBottom: `2px solid ${C.line}`,
+                    verticalAlign: "top",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.06)"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: i === 0 ? "#16A34A" : C.faint, background: i === 0 ? "#DCFCE7" : C.bg, padding: "2px 8px", borderRadius: 10 }}>
+                        {i === 0 ? "🏆 RANK #1" : `RANK #${i + 1}`}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: meta.dot, background: meta.bg, padding: "2px 8px", borderRadius: 4 }}>
+                        {c.result?.recommendation}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: C.ink, marginBottom: 2 }}>
+                      {c.result?.candidateName || c.label}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.sub }}>
+                      {c.result?.currentTitle || "Title not specified"}
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {/* Row 1: Overall Match Score */}
+            <tr style={{ background: C.bg }}>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.bg,
+                padding: "14px 20px",
+                fontWeight: 700,
+                color: C.ink,
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                Overall Match Score
+              </td>
+              {selectedCandidates.map((c, i) => {
+                const score = c.result?.overallScore || 0;
+                const delta = i === 0 ? 0 : score - (topCandidate?.result?.overallScore || 0);
+                const meta = recMeta(c.result?.recommendation);
+                return (
+                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, background: C.bg }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 24, fontWeight: 900, color: meta.dot, fontFamily: DISPLAY }}>
+                        {score}%
+                      </span>
+                      {i > 0 && (
+                        <span style={{ fontSize: 11.5, fontWeight: 800, color: "#DC2626" }}>
+                          ({delta}%)
                         </span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: meta.dot, background: meta.bg, padding: "2px 8px", borderRadius: 4 }}>
-                          {c.result?.recommendation}
+                      )}
+                      {i === 0 && (
+                        <span style={{ fontSize: 11, fontWeight: 800, color: "#16A34A" }}>
+                          (Top Score)
                         </span>
-                      </div>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: C.ink, marginBottom: 2 }}>
-                        {c.result?.candidateName || c.label}
-                      </div>
-                      <div style={{ fontSize: 12, color: C.sub, marginBottom: 10 }}>
-                        {c.result?.currentTitle || "Title not specified"}
-                      </div>
-                      <button
-                        onClick={() => onStartInterview(c)}
-                        style={{
-                          width: "100%",
-                          padding: "6px 12px",
-                          background: C.accent,
-                          color: "#FFF",
-                          border: "none",
-                          borderRadius: 6,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 6
-                        }}
-                      >
-                        <Play size={12} /> AI Interview
-                      </button>
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Row 1: Overall Match Score */}
-              <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.bg }}>
-                <td style={{ padding: "14px 20px", fontWeight: 700, color: C.ink }}>
-                  Overall Match Score
-                </td>
-                {selectedCandidates.map((c, i) => {
-                  const score = c.result?.overallScore || 0;
-                  const delta = i === 0 ? 0 : score - (topCandidate?.result?.overallScore || 0);
-                  const meta = recMeta(c.result?.recommendation);
-                  return (
-                    <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}` }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontSize: 24, fontWeight: 900, color: meta.dot, fontFamily: DISPLAY }}>
-                          {score}%
-                        </span>
-                        {i > 0 && (
-                          <span style={{ fontSize: 11.5, fontWeight: 800, color: "#DC2626" }}>
-                            ({delta}%)
+                      )}
+                    </div>
+                    <div style={{ height: 6, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${score}%`, height: "100%", background: meta.dot, borderRadius: 3 }} />
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* Row 2: Skills Fit */}
+            <tr>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.paper,
+                padding: "12px 20px",
+                fontWeight: 600,
+                color: C.ink,
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                🎯 Skills Fit Score
+              </td>
+              {selectedCandidates.map((c) => {
+                const s = c.result?.subScores?.skills || 0;
+                return (
+                  <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
+                      <span style={{ fontSize: 11, color: C.faint }}>Weight: 40%</span>
+                    </div>
+                    <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${s}%`, height: "100%", background: "#3B82F6", borderRadius: 3 }} />
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* Row 3: Experience Fit */}
+            <tr>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.paper,
+                padding: "12px 20px",
+                fontWeight: 600,
+                color: C.ink,
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                💼 Experience Fit
+              </td>
+              {selectedCandidates.map((c) => {
+                const s = c.result?.subScores?.experience || 0;
+                const yrs = c.result?.yearsExperience ?? "N/A";
+                return (
+                  <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
+                      <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600 }}>{yrs} yrs exp</span>
+                    </div>
+                    <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${s}%`, height: "100%", background: "#10B981", borderRadius: 3 }} />
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* Row 4: Education & Discipline */}
+            <tr>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.paper,
+                padding: "12px 20px",
+                fontWeight: 600,
+                color: C.ink,
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                🎓 Education &amp; Discipline
+              </td>
+              {selectedCandidates.map((c) => {
+                const s = c.result?.subScores?.education || 0;
+                const edu = c.result?.education || "N/A";
+                const disc = c.result?.candidateDiscipline || "";
+                return (
+                  <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
+                      <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600 }}>{disc}</span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.3, marginBottom: 4 }}>{edu}</div>
+                    <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${s}%`, height: "100%", background: "#8B5CF6", borderRadius: 3 }} />
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* Row 5: Domain Fit */}
+            <tr>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.paper,
+                padding: "12px 20px",
+                fontWeight: 600,
+                color: C.ink,
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                🏢 Domain Relevance
+              </td>
+              {selectedCandidates.map((c) => {
+                const s = c.result?.subScores?.domain || 0;
+                return (
+                  <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
+                    </div>
+                    <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${s}%`, height: "100%", background: "#F59E0B", borderRadius: 3 }} />
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* Row 6: AI Interview Marks */}
+            <tr style={{ background: C.bg }}>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.bg,
+                padding: "14px 20px",
+                fontWeight: 700,
+                color: C.ink,
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                🤖 AI Interview Marks
+              </td>
+              {selectedCandidates.map((c) => {
+                const iv = c.result?.interview;
+                return (
+                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, background: C.bg }}>
+                    {iv?.score !== undefined ? (
+                      <div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontSize: 18, fontWeight: 900, color: iv.score >= 70 ? "#16A34A" : "#F59E0B" }}>
+                            {iv.score}%
                           </span>
-                        )}
-                        {i === 0 && (
-                          <span style={{ fontSize: 11, fontWeight: 800, color: "#16A34A" }}>
-                            (Top Score)
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ height: 6, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ width: `${score}%`, height: "100%", background: meta.dot, borderRadius: 3 }} />
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-
-              {/* Row 2: Skills Fit */}
-              <tr style={{ borderBottom: `1px solid ${C.line}` }}>
-                <td style={{ padding: "12px 20px", fontWeight: 600, color: C.ink }}>
-                  🎯 Skills Fit Score
-                </td>
-                {selectedCandidates.map((c) => {
-                  const s = c.result?.subScores?.skills || 0;
-                  return (
-                    <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
-                        <span style={{ fontSize: 11, color: C.faint }}>Weight: 40%</span>
-                      </div>
-                      <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ width: `${s}%`, height: "100%", background: "#3B82F6", borderRadius: 3 }} />
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-
-              {/* Row 3: Experience Fit */}
-              <tr style={{ borderBottom: `1px solid ${C.line}` }}>
-                <td style={{ padding: "12px 20px", fontWeight: 600, color: C.ink }}>
-                  💼 Experience Fit
-                </td>
-                {selectedCandidates.map((c) => {
-                  const s = c.result?.subScores?.experience || 0;
-                  const yrs = c.result?.yearsExperience ?? "N/A";
-                  return (
-                    <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
-                        <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600 }}>{yrs} yrs exp</span>
-                      </div>
-                      <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ width: `${s}%`, height: "100%", background: "#10B981", borderRadius: 3 }} />
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-
-              {/* Row 4: Education & Discipline */}
-              <tr style={{ borderBottom: `1px solid ${C.line}` }}>
-                <td style={{ padding: "12px 20px", fontWeight: 600, color: C.ink }}>
-                  🎓 Education &amp; Discipline
-                </td>
-                {selectedCandidates.map((c) => {
-                  const s = c.result?.subScores?.education || 0;
-                  const edu = c.result?.education || "N/A";
-                  const disc = c.result?.candidateDiscipline || "";
-                  return (
-                    <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
-                        <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600 }}>{disc}</span>
-                      </div>
-                      <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.3, marginBottom: 4 }}>{edu}</div>
-                      <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ width: `${s}%`, height: "100%", background: "#8B5CF6", borderRadius: 3 }} />
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-
-              {/* Row 5: Domain Fit */}
-              <tr style={{ borderBottom: `1px solid ${C.line}` }}>
-                <td style={{ padding: "12px 20px", fontWeight: 600, color: C.ink }}>
-                  🏢 Domain Relevance
-                </td>
-                {selectedCandidates.map((c) => {
-                  const s = c.result?.subScores?.domain || 0;
-                  return (
-                    <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 800, color: C.ink }}>{s}%</span>
-                      </div>
-                      <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ width: `${s}%`, height: "100%", background: "#F59E0B", borderRadius: 3 }} />
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-
-              {/* Row 6: AI Interview Marks */}
-              <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.bg }}>
-                <td style={{ padding: "14px 20px", fontWeight: 700, color: C.ink }}>
-                  🤖 AI Interview Marks
-                </td>
-                {selectedCandidates.map((c) => {
-                  const iv = c.result?.interview;
-                  return (
-                    <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}` }}>
-                      {iv?.score !== undefined ? (
-                        <div>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
-                            <span style={{ fontSize: 18, fontWeight: 900, color: iv.score >= 70 ? "#16A34A" : "#F59E0B" }}>
-                              {iv.score}%
-                            </span>
-                            <span style={{ fontSize: 11, color: C.faint }}>Technical Mark</span>
-                          </div>
-                          <div style={{ fontSize: 11.5, color: C.sub }}>
-                            Integrity: <strong>{iv.proctoring?.integrityScore ?? 100}%</strong>
-                          </div>
+                          <span style={{ fontSize: 11, color: C.faint }}>Technical Mark</span>
                         </div>
+                        <div style={{ fontSize: 11.5, color: C.sub }}>
+                          Integrity: <strong>{iv.proctoring?.integrityScore ?? 100}%</strong>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: C.faint, fontStyle: "italic" }}>
+                        Not Interviewed Yet
+                      </div>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* Must-Have Skills Header */}
+            {mustHaves.length > 0 && (
+              <tr style={{ background: C.panel }}>
+                <td
+                  colSpan={selectedCandidates.length + 1}
+                  style={{
+                    position: "sticky",
+                    left: 0,
+                    padding: "10px 20px",
+                    fontWeight: 800,
+                    color: C.accent,
+                    fontSize: 11.5,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    borderBottom: `1px solid ${C.line}`,
+                    background: C.panel
+                  }}
+                >
+                  Must-Have Skills Matching Matrix ({mustHaves.length} Required)
+                </td>
+              </tr>
+            )}
+
+            {/* Rows for Each Must-Have Skill */}
+            {mustHaves.map((skill, sIdx) => (
+              <tr key={sIdx}>
+                <td style={{
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 10,
+                  background: C.paper,
+                  padding: "10px 20px",
+                  fontWeight: 600,
+                  color: C.ink,
+                  fontSize: 12.5,
+                  borderRight: `1px solid ${C.line}`,
+                  borderBottom: `1px solid ${C.line}`,
+                  boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+                }}>
+                  {skill}
+                </td>
+                {selectedCandidates.map((c) => {
+                  const isMissing = (c.result?.missingMustHaves || []).some(m => m.toLowerCase() === skill.toLowerCase());
+                  return (
+                    <td key={c.id} style={{ padding: "10px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
+                      {isMissing ? (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#DC2626", background: "#FEE2E2", padding: "2px 8px", borderRadius: 4 }}>
+                          <X size={13} /> Missing
+                        </span>
                       ) : (
-                        <div style={{ fontSize: 12, color: C.faint, fontStyle: "italic" }}>
-                          Not Interviewed Yet
-                        </div>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#16A34A", background: "#DCFCE7", padding: "2px 8px", borderRadius: 4 }}>
+                          <Check size={13} /> Matched
+                        </span>
                       )}
                     </td>
                   );
                 })}
               </tr>
+            ))}
 
-              {/* Must-Have Skills Header */}
-              {mustHaves.length > 0 && (
-                <tr style={{ background: C.panel, borderBottom: `1px solid ${C.line}` }}>
-                  <td colSpan={selectedCandidates.length + 1} style={{ padding: "10px 20px", fontWeight: 800, color: C.accent, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    Must-Have Skills Matching Matrix ({mustHaves.length} Required)
-                  </td>
-                </tr>
-              )}
-
-              {/* Rows for Each Must-Have Skill */}
-              {mustHaves.map((skill, sIdx) => (
-                <tr key={sIdx} style={{ borderBottom: `1px solid ${C.line}` }}>
-                  <td style={{ padding: "10px 20px", fontWeight: 600, color: C.ink, fontSize: 12.5 }}>
-                    {skill}
-                  </td>
-                  {selectedCandidates.map((c) => {
-                    const isMissing = (c.result?.missingMustHaves || []).some(m => m.toLowerCase() === skill.toLowerCase());
-                    return (
-                      <td key={c.id} style={{ padding: "10px 20px", borderLeft: `1px solid ${C.line}` }}>
-                        {isMissing ? (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#DC2626", background: "#FEE2E2", padding: "2px 8px", borderRadius: 4 }}>
-                            <X size={13} /> Missing
-                          </span>
-                        ) : (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#16A34A", background: "#DCFCE7", padding: "2px 8px", borderRadius: 4 }}>
-                            <Check size={13} /> Matched
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
+            {/* Row: Strengths */}
+            <tr style={{ verticalAlign: "top" }}>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.paper,
+                padding: "14px 20px",
+                fontWeight: 700,
+                color: "#16A34A",
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                ⭐ Key Strengths
+              </td>
+              {selectedCandidates.map((c) => (
+                <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, fontSize: 12 }}>
+                  <ul style={{ margin: 0, paddingLeft: 16, color: C.sub, lineHeight: 1.6 }}>
+                    {(c.result?.strengths || ["No strengths noted"]).map((st, i) => (
+                      <li key={i}>{st}</li>
+                    ))}
+                  </ul>
+                </td>
               ))}
+            </tr>
 
-              {/* Row: Strengths */}
-              <tr style={{ borderBottom: `1px solid ${C.line}`, verticalAlign: "top" }}>
-                <td style={{ padding: "14px 20px", fontWeight: 700, color: "#16A34A" }}>
-                  ⭐ Key Strengths
+            {/* Row: Gaps & Penalties */}
+            <tr style={{ verticalAlign: "top" }}>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.paper,
+                padding: "14px 20px",
+                fontWeight: 700,
+                color: "#DC2626",
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                ⚠️ Critical Gaps
+              </td>
+              {selectedCandidates.map((c) => (
+                <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, fontSize: 12 }}>
+                  <ul style={{ margin: 0, paddingLeft: 16, color: "#B91C1C", lineHeight: 1.6 }}>
+                    {(c.result?.gaps || ["No critical gaps noted"]).map((gp, i) => (
+                      <li key={i}>{gp}</li>
+                    ))}
+                  </ul>
                 </td>
-                {selectedCandidates.map((c) => (
-                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, fontSize: 12 }}>
-                    <ul style={{ margin: 0, paddingLeft: 16, color: C.sub, lineHeight: 1.6 }}>
-                      {(c.result?.strengths || ["No strengths noted"]).map((st, i) => (
-                        <li key={i}>{st}</li>
-                      ))}
-                    </ul>
-                  </td>
-                ))}
-              </tr>
+              ))}
+            </tr>
 
-              {/* Row: Gaps & Penalties */}
-              <tr style={{ borderBottom: `1px solid ${C.line}`, verticalAlign: "top" }}>
-                <td style={{ padding: "14px 20px", fontWeight: 700, color: "#DC2626" }}>
-                  ⚠️ Critical Gaps
+            {/* Row: AI Evaluation Summary */}
+            <tr style={{ verticalAlign: "top", background: C.bg }}>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.bg,
+                padding: "14px 20px",
+                fontWeight: 700,
+                color: C.ink,
+                borderRight: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                📝 AI Summary
+              </td>
+              {selectedCandidates.map((c) => (
+                <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, fontSize: 12, color: C.sub, lineHeight: 1.6, fontStyle: "italic", background: C.bg }}>
+                  "{c.result?.summary || "No summary available."}"
                 </td>
-                {selectedCandidates.map((c) => (
-                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, fontSize: 12 }}>
-                    <ul style={{ margin: 0, paddingLeft: 16, color: "#B91C1C", lineHeight: 1.6 }}>
-                      {(c.result?.gaps || ["No critical gaps noted"]).map((gp, i) => (
-                        <li key={i}>{gp}</li>
-                      ))}
-                    </ul>
-                  </td>
-                ))}
-              </tr>
-
-              {/* Row: AI Evaluation Summary */}
-              <tr style={{ verticalAlign: "top", background: C.bg }}>
-                <td style={{ padding: "14px 20px", fontWeight: 700, color: C.ink }}>
-                  📝 AI Summary
-                </td>
-                {selectedCandidates.map((c) => (
-                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, fontSize: 12, color: C.sub, lineHeight: 1.6, fontStyle: "italic" }}>
-                    "{c.result?.summary || "No summary available."}"
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
+              ))}
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );
