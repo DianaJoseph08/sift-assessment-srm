@@ -115,71 +115,32 @@ const BODY = "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
 
 const BrandLogo = ({ collapsed = false, theme = "dark" }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 12, userSelect: "none" }}>
-    {/* Animated Modern AI Emblem */}
-    <div style={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
-      {/* Outer ambient pulsing glow */}
-      <div style={{
-        position: "absolute",
-        inset: -2,
-        borderRadius: 14,
-        background: "linear-gradient(135deg, #0284C7, #6366F1, #38BDF8)",
-        animation: "logoPulseGlow 3s ease-in-out infinite",
-        zIndex: 0
-      }} />
-
-      {/* Main icon container */}
-      <div style={{
-        position: "relative",
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        background: "linear-gradient(145deg, #0F172A 0%, #1E293B 100%)",
-        border: "1.5px solid rgba(56, 189, 248, 0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
-        zIndex: 1
-      }}>
-        {/* Rotating gradient background beam */}
-        <div style={{
-          position: "absolute",
-          width: 64,
-          height: 64,
-          background: "conic-gradient(from 0deg, transparent 0deg, rgba(56,189,248,0.3) 90deg, transparent 180deg)",
-          animation: "logoSpinSlow 7s linear infinite"
-        }} />
-
-        {/* Center SVG Emblem */}
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ zIndex: 2 }}>
-          <defs>
-            <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#38BDF8" />
-              <stop offset="100%" stopColor="#818CF8" />
-            </linearGradient>
-          </defs>
-          {/* Hexagonal Shield / AI Node */}
-          <path
-            d="M12 2.5L19.5 6.8V17.2L12 21.5L4.5 17.2V6.8L12 2.5Z"
-            stroke="url(#brandGrad)"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {/* Internal connection lines */}
-          <path
-            d="M12 2.5V12M19.5 17.2L12 12M4.5 17.2L12 12"
-            stroke="url(#brandGrad)"
-            strokeWidth="1.2"
-            strokeOpacity="0.65"
-            strokeLinecap="round"
-          />
-          {/* Central Pulsing AI Node */}
-          <circle cx="12" cy="12" r="3.2" fill="url(#brandGrad)" style={{ animation: "logoSparkle 2s ease-in-out infinite" }} />
-          <circle cx="12" cy="12" r="1.3" fill="#FFFFFF" />
-        </svg>
-      </div>
+    {/* Motherson Corporate Brand Logo */}
+    <div style={{
+      position: "relative",
+      height: 42,
+      width: collapsed ? 42 : "auto",
+      padding: collapsed ? "0" : "0 10px",
+      borderRadius: 10,
+      background: "#FFFFFF",
+      border: "1.5px solid rgba(255, 255, 255, 0.2)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
+      flexShrink: 0
+    }}>
+      <img
+        src={collapsed ? "/motherson-mark.png" : "/motherson-logo-cropped.png"}
+        alt="Motherson"
+        style={{
+          height: collapsed ? 26 : 22,
+          width: "auto",
+          maxWidth: "100%",
+          objectFit: "contain",
+          display: "block"
+        }}
+      />
     </div>
 
     {!collapsed && (
