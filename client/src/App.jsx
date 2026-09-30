@@ -10,7 +10,7 @@ import {
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
   Mail, Send, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
   ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen, Scale,
-  HelpCircle, CheckCircle2, Clock
+  HelpCircle, CheckCircle2, Clock, Edit2
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
 import VideoInterview from "./VideoInterview.jsx";
@@ -434,7 +434,7 @@ const List = ({ items, color, icon, C }) => (
 );
 
 /* ============================== STEP 1: ROLE DEFINITION ============================== */
-function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelete, C }) {
+function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelete, onEditCompany, onCreateCompany, C }) {
   const ready = (job.title || "").trim() && (job.description || "").trim();
   const selectedComp = companies.find(c => c.id === job.companyId) || companies[0];
   const companyDefaultSender = selectedComp?.senderName || (selectedComp?.name ? `${selectedComp.name} Talent Team` : "Client Talent Team");
@@ -501,18 +501,72 @@ function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelet
         }
       >
         <Field label="Target Client Company" C={C}>
-          <select
-            style={inputStyle(C)}
-            value={job.companyId || ""}
-            onChange={(e) => {
-              const comp = companies.find(c => c.id === e.target.value);
-              setJob({ ...job, companyId: e.target.value, companyName: comp ? comp.name : "" });
-            }}
-          >
-            {companies.map(c => (
-              <option key={c.id} value={c.id}>🏢 {c.name} ({c.industry})</option>
-            ))}
-          </select>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <select
+              style={{ ...inputStyle(C), flex: 1 }}
+              value={job.companyId || ""}
+              onChange={(e) => {
+                const comp = companies.find(c => c.id === e.target.value);
+                setJob({ ...job, companyId: e.target.value, companyName: comp ? comp.name : "" });
+              }}
+            >
+              {companies.map(c => (
+                <option key={c.id} value={c.id}>🏢 {c.name} ({c.industry})</option>
+              ))}
+            </select>
+
+            {onEditCompany && selectedComp && (
+              <button
+                type="button"
+                onClick={() => onEditCompany(selectedComp)}
+                title="Edit client company name, reply-to email ID, and sender details"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "9px 12px",
+                  background: C.paper,
+                  color: C.ink,
+                  border: `1.5px solid ${C.line}`,
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  fontFamily: BODY,
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <Edit2 size={13} color={C.accent} /> Edit Company
+              </button>
+            )}
+
+            {onCreateCompany && (
+              <button
+                type="button"
+                onClick={onCreateCompany}
+                title="Register a new client company"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "9px 12px",
+                  background: C.accentSoft,
+                  color: C.accent,
+                  border: `1.5px solid ${C.accent}`,
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  fontFamily: BODY,
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <Plus size={13} /> + New
+              </button>
+            )}
+          </div>
         </Field>
 
         <Field label="Job title" C={C}>
@@ -3007,7 +3061,7 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
 }
 
 /* ============================== CLIENT COMPANIES MANAGEMENT ============================== */
-function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onSelectCompanyJobs, C }) {
+function CompanyManager({ companies, jobs, onCreateCompany, onEditCompany, onDeleteCompany, onSelectCompanyJobs, C }) {
   const [searchTerm, setSearchTerm] = useState("");
 
   const filtered = useMemo(() => {
@@ -3019,7 +3073,7 @@ function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onS
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>Client Companies Management</h2>
-          <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Manage client organizations that send job openings and receive candidate recommendations</p>
+          <p style={{ fontSize: 13, color: C.sub, margin: "4px 0 0" }}>Manage client organizations, update contact email IDs, and configure team sender identities</p>
         </div>
         <button
           onClick={onCreateCompany}
@@ -3064,7 +3118,33 @@ function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onS
                   <div style={{ width: 40, height: 40, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Building2 size={20} color={C.accent} />
                   </div>
-                  <Trash2 size={16} color={C.faint} style={{ cursor: "pointer" }} onClick={() => onDeleteCompany(comp.id)} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {onEditCompany && (
+                      <button
+                        type="button"
+                        onClick={() => onEditCompany(comp)}
+                        title="Edit company profile, email ID, and sender details"
+                        style={{
+                          padding: "5px 10px",
+                          background: C.paper,
+                          color: C.accent,
+                          border: `1px solid ${C.line}`,
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontFamily: BODY,
+                          transition: "all 0.15s ease"
+                        }}
+                      >
+                        <Edit2 size={12} color={C.accent} /> Edit
+                      </button>
+                    )}
+                    <Trash2 size={16} color={C.faint} style={{ cursor: "pointer", marginLeft: 4 }} title="Delete Company" onClick={() => onDeleteCompany(comp.id)} />
+                  </div>
                 </div>
                 <h3 style={{ fontSize: 17, fontWeight: 700, color: C.ink, margin: "12px 0 4px", fontFamily: DISPLAY }}>{comp.name}</h3>
                 <div style={{ fontSize: 12, color: C.sub }}>Industry: {comp.industry}</div>
@@ -3086,22 +3166,46 @@ function CompanyManager({ companies, jobs, onCreateCompany, onDeleteCompany, onS
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{compJobs.length} Openings</div>
                   <div style={{ fontSize: 11, color: C.sub }}>{totalScreened} Candidates</div>
                 </div>
-                <button
-                  onClick={() => onSelectCompanyJobs(comp)}
-                  style={{
-                    padding: "6px 12px",
-                    background: C.accentSoft,
-                    color: C.accent,
-                    border: `1px solid ${C.accent}`,
-                    borderRadius: 6,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: BODY,
-                  }}
-                >
-                  View Openings →
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {onEditCompany && (
+                    <button
+                      onClick={() => onEditCompany(comp)}
+                      title="Edit company email and details"
+                      style={{
+                        padding: "6px 12px",
+                        background: C.paper,
+                        color: C.ink,
+                        border: `1px solid ${C.line}`,
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: BODY,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4
+                      }}
+                    >
+                      <Edit2 size={12} /> Edit Details
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onSelectCompanyJobs(comp)}
+                    style={{
+                      padding: "6px 12px",
+                      background: C.accentSoft,
+                      color: C.accent,
+                      border: `1px solid ${C.accent}`,
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: BODY,
+                    }}
+                  >
+                    View Openings →
+                  </button>
+                </div>
               </div>
             </Panel>
           );
@@ -3943,7 +4047,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [llmProvider, setLlmProvider] = useState("claude");
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
-  const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
+  const [companyModalOpen, setCompanyModalOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState(null);
   const [savedJobNotice, setSavedJobNotice] = useState(false);
   const [resultsFilter, setResultsFilter] = useState("all");
 
@@ -4046,17 +4151,61 @@ export default function App() {
     } catch (e) {}
   };
 
-  const handleAddCompany = (newComp) => {
-    const updated = [newComp, ...companies];
-    setCompanies(updated);
-    saveCompaniesToServer(updated);
+  const handleOpenAddCompany = () => {
+    setEditingCompany(null);
+    setCompanyModalOpen(true);
   };
 
-  const handleDeleteCompany = (comp) => {
-    const updated = companies.filter(c => c.id !== comp);
+  const handleOpenEditCompany = (comp) => {
+    setEditingCompany(comp);
+    setCompanyModalOpen(true);
+  };
+
+  const handleSaveCompany = (compData) => {
+    if (editingCompany) {
+      // Editing existing company
+      const updated = companies.map(c => c.id === compData.id ? { ...c, ...compData } : c);
+      setCompanies(updated);
+      saveCompaniesToServer(updated);
+
+      // If company name was updated, synchronize any jobs referencing this company
+      if (editingCompany.name !== compData.name) {
+        setJobs(prevJobs => {
+          const revised = prevJobs.map(j => (j.companyId === compData.id || j.companyName === editingCompany.name)
+            ? { ...j, companyName: compData.name }
+            : j
+          );
+          saveJobsToServer(revised);
+          return revised;
+        });
+      }
+
+      // If activeCompany is this company, update activeCompany
+      if (activeCompany?.id === compData.id) {
+        setActiveCompany({ ...activeCompany, ...compData });
+      }
+    } else {
+      // Adding new company
+      const updated = [compData, ...companies];
+      setCompanies(updated);
+      saveCompaniesToServer(updated);
+    }
+    setCompanyModalOpen(false);
+    setEditingCompany(null);
+  };
+
+  const handleDeleteCompany = (compId) => {
+    const updated = companies.filter(c => c.id !== compId);
     setCompanies(updated);
     saveCompaniesToServer(updated);
+    if (activeCompany?.id === compId) {
+      setActiveCompany(null);
+    }
+    setCompanyModalOpen(false);
+    setEditingCompany(null);
   };
+
+  const handleAddCompany = (newComp) => handleSaveCompany(newComp);
 
   const handleCreateJobForCompany = () => {
     const targetComp = activeCompany || companies[0] || SAMPLE_COMPANIES[0];
@@ -4258,7 +4407,7 @@ export default function App() {
                 jobs={jobs}
                 activeCompany={activeCompany}
                 setActiveCompany={setActiveCompany}
-                onCreateCompany={() => setShowAddCompanyModal(true)}
+                onCreateCompany={handleOpenAddCompany}
                 onCreateJob={handleCreateJobForCompany}
                 onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); setStep(3); setMaxReached(4); }}
                 onNavigateTab={(tab, options = {}) => {
@@ -4294,7 +4443,8 @@ export default function App() {
               <CompanyManager
                 companies={companies}
                 jobs={jobs}
-                onCreateCompany={() => setShowAddCompanyModal(true)}
+                onCreateCompany={handleOpenAddCompany}
+                onEditCompany={handleOpenEditCompany}
                 onDeleteCompany={handleDeleteCompany}
                 onSelectCompanyJobs={(comp) => { setActiveCompany(comp); setActiveTab("jobs"); }}
                 C={C}
@@ -4363,9 +4513,32 @@ export default function App() {
                     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", flex: 1, minWidth: 320 }}>
                       {/* Dropdown 1: Client Company */}
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 230, flex: "1 1 230px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 800, color: C.sub, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                          <Building2 size={13} color={C.accent} />
-                          <span>1. Client Company</span>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 800, color: C.sub, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                            <Building2 size={13} color={C.accent} />
+                            <span>1. Client Company</span>
+                          </div>
+                          {activeCompany && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditCompany(activeCompany)}
+                              title={`Edit ${activeCompany.name} email ID, sender name, and profile`}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: C.accent,
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 3,
+                                padding: 0
+                              }}
+                            >
+                              <Edit2 size={11} /> Edit Company
+                            </button>
+                          )}
                         </div>
                         <div style={{ position: "relative" }}>
                           <select
@@ -4539,6 +4712,8 @@ export default function App() {
                             onSave={handleSaveJobExplicitly}
                             onDelete={() => handleDeleteJob(activeJob.id)}
                             savedNotice={savedJobNotice}
+                            onEditCompany={handleOpenEditCompany}
+                            onCreateCompany={handleOpenAddCompany}
                             C={C}
                           />
                         )}
@@ -4594,58 +4769,18 @@ export default function App() {
         )}
       </main>
 
-      {/* Add Company Modal */}
-      {showAddCompanyModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: C.paper, borderRadius: 14, padding: 24, width: 440, maxWidth: "90%", border: `1px solid ${C.cardBorder}` }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 16px", color: C.ink, fontFamily: DISPLAY }}>Add New Client Company</h3>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const form = e.target;
-              const newC = {
-                id: `comp_${Date.now()}`,
-                name: form.name.value,
-                industry: form.industry.value || "General",
-                contactEmail: form.email.value || "",
-                senderName: form.senderName.value || "",
-                notes: form.notes.value || "",
-                createdAt: new Date().toISOString()
-              };
-              handleAddCompany(newC);
-              setShowAddCompanyModal(false);
-            }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Company Name *</label>
-                  <input name="name" required placeholder="e.g. Motherson Group" style={inputStyle(C)} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Industry</label>
-                  <input name="industry" placeholder="e.g. Automotive & Manufacturing" style={inputStyle(C)} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Default Hiring / Reply-To Email</label>
-                  <input name="email" type="email" placeholder="e.g. hr@motherson.com" style={inputStyle(C)} />
-                  <span style={{ fontSize: 11, color: C.faint }}>Candidate replies will route directly here</span>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Default Sender / Team Display Name</label>
-                  <input name="senderName" placeholder="e.g. Motherson Talent Acquisition" style={inputStyle(C)} />
-                  <span style={{ fontSize: 11, color: C.faint }}>Shows as "Sender via CogniHire"</span>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Notes / Guidelines</label>
-                  <textarea name="notes" placeholder="Specific hiring guidelines for this company..." style={{ ...inputStyle(C), minHeight: 60 }} />
-                </div>
-                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
-                  <button type="button" onClick={() => setShowAddCompanyModal(false)} style={btn("ghost", C)}>Cancel</button>
-                  <button type="submit" style={btn("primary", C)}>Save Company</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Client Company Add / Edit Modal */}
+      <CompanyModal
+        isOpen={companyModalOpen}
+        company={editingCompany}
+        onClose={() => {
+          setCompanyModalOpen(false);
+          setEditingCompany(null);
+        }}
+        onSave={handleSaveCompany}
+        onDelete={handleDeleteCompany}
+        C={C}
+      />
 
       {/* AI Interview Modal */}
       {activeInterviewCandidate && (
@@ -4656,6 +4791,174 @@ export default function App() {
           C={C}
         />
       )}
+    </div>
+  );
+}
+
+/* ============================== CLIENT COMPANY ADD / EDIT MODAL ============================== */
+function CompanyModal({ isOpen, company, onClose, onSave, onDelete, C }) {
+  if (!isOpen) return null;
+  const isEdit = !!company;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
+      <div
+        key={company ? company.id : "new_comp"}
+        style={{
+          background: C.paper,
+          borderRadius: 14,
+          padding: 24,
+          width: 480,
+          maxWidth: "92%",
+          border: `1px solid ${C.cardBorder}`,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.25)"
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {isEdit ? <Edit2 size={20} color={C.accent} /> : <Building2 size={20} color={C.accent} />}
+            </div>
+            <div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: C.ink, fontFamily: DISPLAY }}>
+                {isEdit ? `Edit Client: ${company.name}` : "Add New Client Company"}
+              </h3>
+              <p style={{ fontSize: 12, color: C.sub, margin: "2px 0 0" }}>
+                {isEdit ? "Update client organization details, hiring email ID, and sender identity" : "Register a new client company for job postings and candidate shortlists"}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: C.faint, padding: 4 }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const form = e.target;
+          const compData = {
+            id: isEdit ? company.id : `comp_${Date.now()}`,
+            name: form.name.value.trim(),
+            industry: form.industry.value.trim() || "General",
+            contactEmail: form.email.value.trim() || "",
+            senderName: form.senderName.value.trim() || "",
+            notes: form.notes.value.trim() || "",
+            createdAt: isEdit ? company.createdAt : new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          onSave(compData);
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+                Company Name <span style={{ color: "#DC2626" }}>*</span>
+              </label>
+              <input
+                name="name"
+                required
+                defaultValue={company?.name || ""}
+                placeholder="e.g. Motherson Group"
+                style={inputStyle(C)}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+                Industry / Business Domain
+              </label>
+              <input
+                name="industry"
+                defaultValue={company?.industry || ""}
+                placeholder="e.g. Automotive & Manufacturing"
+                style={inputStyle(C)}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+                Default Hiring / Reply-To Email ID
+              </label>
+              <input
+                name="email"
+                type="email"
+                defaultValue={company?.contactEmail || ""}
+                placeholder="e.g. hr@motherson.com"
+                style={inputStyle(C)}
+              />
+              <span style={{ fontSize: 11, color: C.faint, display: "block", marginTop: 3 }}>
+                ✉️ Candidate invitation email replies and inquiries will automatically route directly here.
+              </span>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+                Default Sender / Team Display Name
+              </label>
+              <input
+                name="senderName"
+                defaultValue={company?.senderName || ""}
+                placeholder="e.g. Motherson Talent Acquisition"
+                style={inputStyle(C)}
+              />
+              <span style={{ fontSize: 11, color: C.faint, display: "block", marginTop: 3 }}>
+                👤 Shows in candidate invitation emails as the sending team (via CogniHire).
+              </span>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, display: "block", marginBottom: 4 }}>
+                Notes / Client Hiring Guidelines
+              </label>
+              <textarea
+                name="notes"
+                defaultValue={company?.notes || ""}
+                placeholder="Specific hiring preferences, portal URLs, or guidelines for this client..."
+                style={{ ...inputStyle(C), minHeight: 65, resize: "vertical" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+              {isEdit && onDelete ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete "${company.name}"? This action cannot be undone.`)) {
+                      onDelete(company.id);
+                    }
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    background: "#FEE2E2",
+                    color: "#DC2626",
+                    border: "1px solid #FCA5A5",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4
+                  }}
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              ) : <div />}
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={onClose} style={btn("ghost", C)}>
+                  Cancel
+                </button>
+                <button type="submit" style={btn("primary", C)}>
+                  {isEdit ? "💾 Save Changes" : "➕ Add Company"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

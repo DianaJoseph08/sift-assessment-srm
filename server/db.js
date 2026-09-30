@@ -118,10 +118,16 @@ db.exec(`
     name TEXT NOT NULL,
     industry TEXT,
     contact_email TEXT,
+    sender_name TEXT,
     notes TEXT,
     created_at TEXT
   );
 `);
+
+// Migration safeguard for existing DBs without sender_name
+try {
+  db.exec("ALTER TABLE companies ADD COLUMN sender_name TEXT");
+} catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS jobs (
@@ -224,6 +230,7 @@ export function getCompanies() {
     name: r.name,
     industry: r.industry || "General",
     contactEmail: r.contact_email || "",
+    senderName: r.sender_name || "",
     notes: r.notes || "",
     createdAt: r.created_at || new Date().toISOString()
   }));
@@ -234,11 +241,19 @@ export function saveCompanies(companies) {
   try {
     db.exec("DELETE FROM companies");
     const insert = db.prepare(`
-      INSERT INTO companies (id, name, industry, contact_email, notes, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO companies (id, name, industry, contact_email, sender_name, notes, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     for (const c of companies) {
-      insert.run(c.id, c.name, c.industry || "", c.contactEmail || "", c.notes || "", c.createdAt || new Date().toISOString());
+      insert.run(
+        c.id,
+        c.name,
+        c.industry || "",
+        c.contactEmail || "",
+        c.senderName || "",
+        c.notes || "",
+        c.createdAt || new Date().toISOString()
+      );
     }
     db.exec("COMMIT");
     syncToPersistentStorage(true);
