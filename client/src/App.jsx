@@ -563,7 +563,7 @@ function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelet
                   transition: "all 0.15s ease"
                 }}
               >
-                <Plus size={13} /> + New
+                <Plus size={13} /> New
               </button>
             )}
           </div>
