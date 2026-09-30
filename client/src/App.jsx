@@ -10,7 +10,7 @@ import {
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
   Mail, Send, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
   ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen, Scale,
-  HelpCircle, CheckCircle2, Clock, Edit2
+  HelpCircle, CheckCircle2, Clock, Edit2, GitBranch, Tag, History
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
 import VideoInterview from "./VideoInterview.jsx";
@@ -188,6 +188,113 @@ const BrandLogo = ({ collapsed = false, theme = "dark" }) => (
     )}
   </div>
 );
+
+/* ============================== VERSION CONTROL & RELEASE CHANGELOG ============================== */
+const APP_VERSION = "v1.3.0";
+
+const CHANGELOG_DATA = [
+  {
+    version: "v1.3.0",
+    title: "Client Company Profile Editing & Workflow Refinements",
+    date: "September 30, 2026",
+    badge: "Current Production",
+    tagColor: "#10B981",
+    highlights: [
+      {
+        icon: "🏢",
+        title: "Full Client Company Editing",
+        description: "Recruiters can update existing client organization profiles: Default Reply-To Email ID, Sender Display Name, Industry, and hiring guidelines."
+      },
+      {
+        icon: "✏️",
+        title: "Direct Job Setup Actions",
+        description: "Added '[Edit Company]' and '[+ New]' buttons directly beside the Target Client Company dropdown in Step 1 (Define Job Criteria)."
+      },
+      {
+        icon: "🧹",
+        title: "Toolbar & UI Decluttering",
+        description: "Streamlined company card actions with a single top-right Edit button, cleaned up navigation toolbar, and eliminated duplicate plus symbols."
+      }
+    ]
+  },
+  {
+    version: "v1.2.0",
+    title: "AI Resume Authenticity & Video Interview Teleprompter Detection",
+    date: "September 30, 2026",
+    badge: "Major Security Update",
+    tagColor: "#3B82F6",
+    highlights: [
+      {
+        icon: "🛡️",
+        title: "Resume Authenticity Engine",
+        description: "Adversarial prompt-injection sanitization, 5-word n-gram verbatim JD echo detection, and career timeline chronology checks."
+      },
+      {
+        icon: "📱",
+        title: "Anti-Teleprompter & Phone Cheating Detection",
+        description: "Monitors candidate typing cadence (WPM > 80, <3% backspaces) and sustained downward gaze tracking (>3.5s) to catch smartphone transcription."
+      },
+      {
+        icon: "🤖",
+        title: "ChatGPT Stylometry Evaluator",
+        description: "Audits candidate answers for AI linguistic signatures (conversational signposts, rigid enumeration, unnatural balance) with an AI Content Risk % score."
+      },
+      {
+        icon: "📊",
+        title: "Recruiter Integrity Visibility",
+        description: "Added color-coded Authenticity Badges to candidate cards, comparison table, and downloadable CSV reports."
+      }
+    ]
+  },
+  {
+    version: "v1.1.0",
+    title: "Side-by-Side Candidate Comparison Matrix & Claude Executive Memos",
+    date: "September 29, 2026",
+    badge: "Feature Release",
+    tagColor: "#8B5CF6",
+    highlights: [
+      {
+        icon: "⚖️",
+        title: "Head-to-Head Comparison Matrix",
+        description: "Side-by-side evaluation of top 2–5 candidates with frozen column and row headers for effortless multi-candidate reviewing."
+      },
+      {
+        icon: "🧠",
+        title: "Automated Score Justification & Claude Memos",
+        description: "Rule-based delta justification cards and one-click 'Ask Claude to Compare' comparative executive memos."
+      },
+      {
+        icon: "🔗",
+        title: "Two-Connected Dropdowns Toolbar",
+        description: "Synchronized Client Company and Job Opening selectors with live screened candidate counters."
+      }
+    ]
+  },
+  {
+    version: "v1.0.0",
+    title: "CogniHire Foundation & Proctored AI Video Interview",
+    date: "September 2026",
+    badge: "Initial Release",
+    tagColor: "#64748B",
+    highlights: [
+      {
+        icon: "📄",
+        title: "Automated Multi-Format Parsing",
+        description: "Instant parsing of PDF, DOCX, and TXT resumes with LLM-powered candidate profile extraction."
+      },
+      {
+        icon: "🎯",
+        title: "4-Pillar Weighted Scoring",
+        description: "Skills Fit (40%), Experience Fit (25%), Domain Relevance (20%), and Academic Discipline (15%)."
+      },
+      {
+        icon: "🎥",
+        title: "MediaPipe Vision AI Proctoring",
+        description: "Real-time webcam telemetry for face presence, multi-person detection, looking away, and tab switching."
+      }
+    ]
+  }
+];
 
 const SAMPLE_COMPANIES = [
   { id: "comp_motherson", name: "Motherson Group", industry: "Automotive & Manufacturing", contactEmail: "hr@motherson.com", senderName: "Motherson Talent Acquisition", notes: "Key OEM partner for CAE simulation & mechanical roles", createdAt: new Date().toISOString() },
@@ -2652,7 +2759,7 @@ function CandidateComparisonView({ candidates, job, onBack, onStartInterview, ll
 }
 
 /* ============================== SIDEBAR NAVIGATION ============================== */
-function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, activeCompany, setActiveCompany, C }) {
+function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, activeCompany, setActiveCompany, onOpenChangelog, C }) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
     { id: "companies", label: "Client Companies", icon: Building2, badge: companies.length },
@@ -2785,6 +2892,39 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
           ))}
         </div>
       </div>
+
+      {/* Version & Release Changelog Badge */}
+      <div style={{ paddingTop: 12, borderTop: `1px solid ${C.lineDark}`, marginTop: 12 }}>
+        <button
+          onClick={onOpenChangelog}
+          title="Click to view release changelog and version history"
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 10px",
+            background: "rgba(255, 255, 255, 0.05)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            borderRadius: 8,
+            color: "#94A3B8",
+            fontSize: 11.5,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+            fontFamily: BODY,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)"; e.currentTarget.style.color = "#FFFFFF"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"; e.currentTarget.style.color = "#94A3B8"; }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#10B981" }} />
+            <span style={{ fontWeight: 700, color: "#F8FAFC" }}>{APP_VERSION}</span>
+            <span style={{ fontSize: 10, background: "#334155", color: "#CBD5E1", padding: "1px 5px", borderRadius: 4 }}>Prod</span>
+          </div>
+          <span style={{ fontSize: 10.5, color: C.accent, fontWeight: 700 }}>What's New →</span>
+        </button>
+      </div>
     </aside>
   );
 }
@@ -2800,7 +2940,7 @@ const isMatchForComp = (j, comp) => {
 };
 
 /* ============================== WELCOME & AGENCY DASHBOARD ============================== */
-function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, onNavigateTab, C }) {
+function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, onNavigateTab, onOpenChangelog, C }) {
   const filteredJobs = useMemo(() => {
     if (!activeCompany) return jobs;
     return jobs.filter(j => isMatchForComp(j, activeCompany));
@@ -2833,8 +2973,34 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
         gap: 20
       }}>
         <div style={{ maxWidth: 560 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
-            <Sparkles size={14} /> CogniHire AI Interview &amp; Screening Hub
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+              <Sparkles size={14} /> CogniHire AI Interview &amp; Screening Hub
+            </div>
+            <button
+              onClick={onOpenChangelog}
+              title="Click to view release changelog and version history"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "rgba(255,255,255,0.22)",
+                border: "1px solid rgba(255,255,255,0.45)",
+                color: "#FFFFFF",
+                padding: "3px 10px",
+                borderRadius: 20,
+                fontSize: 11.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "background 0.15s ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.35)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.22)"; }}
+            >
+              <GitBranch size={12} />
+              <span>{APP_VERSION}</span>
+              <span style={{ opacity: 0.85, fontSize: 10.5 }}>· What's New</span>
+            </button>
           </div>
           <h2 style={{ fontSize: 26, fontWeight: 800, margin: 0, fontFamily: DISPLAY, lineHeight: 1.2 }}>
             Candidate Screening &amp; Client Recommendation Portal
@@ -3248,7 +3414,7 @@ function ActivityLogsView({ logs, C }) {
 }
 
 /* ============================== SETTINGS VIEW ============================== */
-function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, C }) {
+function SettingsView({ llmProvider, setLlmProvider, currentTheme, setTheme, onOpenChangelog, C }) {
   const [anthropicKey, setAnthropicKey] = useState(localStorage.getItem("ANTHROPIC_API_KEY") || "");
   const [geminiKey, setGeminiKey] = useState(localStorage.getItem("GEMINI_API_KEY") || "");
   const [groqKey, setGroqKey] = useState(localStorage.getItem("GROQ_API_KEY") || "");
@@ -3392,6 +3558,43 @@ SCORING CRITERIA:
 4. Recommendation: Actionable hiring decision and constructive technical feedback.`}
             </pre>
           </details>
+        </div>
+      </Panel>
+
+      <Panel title="Platform Version Control &amp; Releases" sub="Inspect the deployed build version, branch, and release updates" C={C}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 14, borderRadius: 10, background: C.card, border: `1px solid ${C.line}`, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: "#10B98118", border: "1px solid #10B98133", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <GitBranch size={20} color="#10B981" />
+              </div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: C.ink }}>CogniHire {APP_VERSION}</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#10B981", color: "#FFFFFF" }}>STABLE PRODUCTION</span>
+                </div>
+                <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>
+                  Branch: <code style={{ fontWeight: 600 }}>main</code> · Released September 30, 2026 · Cloud Run Ready
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={onOpenChangelog}
+              style={{
+                ...btn("primary", C),
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12.5,
+                padding: "8px 14px",
+              }}
+            >
+              <History size={14} /> View Changelog
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.5 }}>
+            Every production release follows Semantic Versioning (SemVer <code>MAJOR.MINOR.PATCH</code>). Inspect the complete What's New changelog modal for feature timelines and security enhancements.
+          </div>
         </div>
       </Panel>
     </div>
@@ -4027,6 +4230,7 @@ export default function App() {
   const [editingCompany, setEditingCompany] = useState(null);
   const [savedJobNotice, setSavedJobNotice] = useState(false);
   const [resultsFilter, setResultsFilter] = useState("all");
+  const [showChangelogModal, setShowChangelogModal] = useState(false);
 
   const handleSaveJobExplicitly = () => {
     saveJobsToServer(jobs);
@@ -4366,6 +4570,7 @@ export default function App() {
         companies={companies}
         activeCompany={activeCompany}
         setActiveCompany={setActiveCompany}
+        onOpenChangelog={() => setShowChangelogModal(true)}
         C={C}
       />
 
@@ -4386,6 +4591,7 @@ export default function App() {
                 onCreateCompany={handleOpenAddCompany}
                 onCreateJob={handleCreateJobForCompany}
                 onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); setStep(3); setMaxReached(4); }}
+                onOpenChangelog={() => setShowChangelogModal(true)}
                 onNavigateTab={(tab, options = {}) => {
                   if (options.jobId) {
                     setActiveJobId(options.jobId);
@@ -4437,6 +4643,7 @@ export default function App() {
                 setLlmProvider={setLlmProvider}
                 currentTheme={themeKey}
                 setTheme={setThemeKey}
+                onOpenChangelog={() => setShowChangelogModal(true)}
                 C={C}
               />
             )}
@@ -4758,6 +4965,13 @@ export default function App() {
         C={C}
       />
 
+      {/* Release Changelog Modal */}
+      <ChangelogModal
+        isOpen={showChangelogModal}
+        onClose={() => setShowChangelogModal(false)}
+        C={C}
+      />
+
       {/* AI Interview Modal */}
       {activeInterviewCandidate && (
         <InterviewModal
@@ -4934,6 +5148,206 @@ function CompanyModal({ isOpen, company, onClose, onSave, onDelete, C }) {
             </div>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/* ============================== RELEASE CHANGELOG MODAL ============================== */
+function ChangelogModal({ isOpen, onClose, C }) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.65)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1200,
+        backdropFilter: "blur(4px)",
+        padding: 20
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: C.paper,
+          borderRadius: 16,
+          width: 720,
+          maxWidth: "100%",
+          maxHeight: "88vh",
+          display: "flex",
+          flexDirection: "column",
+          border: `1px solid ${C.cardBorder}`,
+          boxShadow: "0 20px 45px rgba(0, 0, 0, 0.3)",
+          overflow: "hidden"
+        }}
+      >
+        {/* Modal Header */}
+        <div style={{
+          padding: "20px 24px",
+          borderBottom: `1px solid ${C.line}`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: C.card
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: `linear-gradient(135deg, ${C.accentDeep} 0%, ${C.accent} 100%)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 4px 10px rgba(3, 77, 161, 0.25)"
+            }}>
+              <History size={22} color="#FFFFFF" />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>
+                  CogniHire Release Changelog
+                </h3>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#FFFFFF",
+                  background: "#10B981",
+                  padding: "2px 8px",
+                  borderRadius: 12
+                }}>
+                  {APP_VERSION}
+                </span>
+              </div>
+              <p style={{ fontSize: 12, color: C.sub, margin: "2px 0 0" }}>
+                Platform release history, security patches, and feature updates
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: C.sub,
+              padding: 6,
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Modal Scrollable Body */}
+        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 24 }}>
+          {CHANGELOG_DATA.map((rel, idx) => (
+            <div
+              key={rel.version}
+              style={{
+                position: "relative",
+                paddingLeft: 28,
+                borderLeft: `2px solid ${idx === 0 ? C.accent : C.line}`,
+              }}
+            >
+              {/* Timeline dot */}
+              <div style={{
+                position: "absolute",
+                left: -7,
+                top: 2,
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                background: idx === 0 ? C.accent : C.card,
+                border: `2px solid ${idx === 0 ? "#FFFFFF" : C.sub}`
+              }} />
+
+              {/* Version title row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>
+                    {rel.version} — {rel.title}
+                  </span>
+                  <span style={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: 10,
+                    background: `${rel.tagColor}1A`,
+                    color: rel.tagColor,
+                    border: `1px solid ${rel.tagColor}40`
+                  }}>
+                    {rel.badge}
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: C.faint, fontWeight: 500 }}>
+                  {rel.date}
+                </span>
+              </div>
+
+              {/* Highlights cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, marginTop: 10 }}>
+                {rel.highlights.map((h, hIdx) => (
+                  <div
+                    key={hIdx}
+                    style={{
+                      background: C.card,
+                      border: `1px solid ${C.line}`,
+                      borderRadius: 10,
+                      padding: "10px 14px",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12
+                    }}
+                  >
+                    <span style={{ fontSize: 18, lineHeight: 1 }}>{h.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+                        {h.title}
+                      </div>
+                      <div style={{ fontSize: 12, color: C.sub, marginTop: 2, lineHeight: 1.45 }}>
+                        {h.description}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Modal Footer */}
+        <div style={{
+          padding: "14px 24px",
+          borderTop: `1px solid ${C.line}`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: C.card
+        }}>
+          <div style={{ fontSize: 11.5, color: C.faint }}>
+            Semantic Versioning <code>SemVer 2.0</code> · Built with React, Vite &amp; Express
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              ...btn("primary", C),
+              padding: "7px 18px",
+              fontSize: 12.5,
+            }}
+          >
+            Got it, Close
+          </button>
+        </div>
       </div>
     </div>
   );

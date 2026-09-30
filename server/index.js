@@ -63,6 +63,17 @@ app.post("/api/settings", (req, res) => {
   }
 });
 
+// Version & System Info
+app.get("/api/version", (_req, res) => {
+  res.json({
+    version: "1.3.0",
+    name: "CogniHire AI Shortlisting & Recommendation Agent",
+    releaseDate: "2026-09-30",
+    gitBranch: "main",
+    status: "healthy"
+  });
+});
+
 // Fetch companies
 app.get("/api/companies", (_req, res) => {
   try {
