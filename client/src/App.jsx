@@ -3166,46 +3166,22 @@ function CompanyManager({ companies, jobs, onCreateCompany, onEditCompany, onDel
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{compJobs.length} Openings</div>
                   <div style={{ fontSize: 11, color: C.sub }}>{totalScreened} Candidates</div>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {onEditCompany && (
-                    <button
-                      onClick={() => onEditCompany(comp)}
-                      title="Edit company email and details"
-                      style={{
-                        padding: "6px 12px",
-                        background: C.paper,
-                        color: C.ink,
-                        border: `1px solid ${C.line}`,
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        fontFamily: BODY,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4
-                      }}
-                    >
-                      <Edit2 size={12} /> Edit Details
-                    </button>
-                  )}
-                  <button
-                    onClick={() => onSelectCompanyJobs(comp)}
-                    style={{
-                      padding: "6px 12px",
-                      background: C.accentSoft,
-                      color: C.accent,
-                      border: `1px solid ${C.accent}`,
-                      borderRadius: 6,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontFamily: BODY,
-                    }}
-                  >
-                    View Openings →
-                  </button>
-                </div>
+                <button
+                  onClick={() => onSelectCompanyJobs(comp)}
+                  style={{
+                    padding: "6px 12px",
+                    background: C.accentSoft,
+                    color: C.accent,
+                    border: `1px solid ${C.accent}`,
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: BODY,
+                  }}
+                >
+                  View Openings →
+                </button>
               </div>
             </Panel>
           );
