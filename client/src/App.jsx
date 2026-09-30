@@ -1251,6 +1251,26 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }
               </div>
               <div style={{ fontSize: 9, color: C.faint, fontWeight: 700, letterSpacing: ".04em" }}>RESUME FIT</div>
             </div>
+
+            <div style={{ paddingRight: 16, borderRight: `1px solid ${C.line}` }}>
+              <div style={{
+                fontFamily: DISPLAY,
+                fontSize: 26,
+                fontWeight: 700,
+                color: (r.authenticityScore ?? 100) >= 80 ? "#16A34A" : ((r.authenticityScore ?? 100) >= 60 ? "#EAB308" : "#DC2626"),
+                lineHeight: 1
+              }}>
+                {r.authenticityScore !== undefined ? `${r.authenticityScore}%` : "100%"}
+              </div>
+              <div style={{
+                fontSize: 9,
+                color: (r.authenticityScore ?? 100) >= 80 ? "#16A34A" : ((r.authenticityScore ?? 100) >= 60 ? "#D97706" : "#DC2626"),
+                fontWeight: 800,
+                letterSpacing: ".04em"
+              }}>
+                {(r.authenticityScore ?? 100) >= 80 ? "🛡️ AUTHENTIC" : ((r.authenticityScore ?? 100) >= 60 ? "⚠️ AI SUSPECT" : "🚨 AI RISK")}
+              </div>
+            </div>
             
             {r.interview?.score !== undefined ? (
               <div style={{ paddingRight: 8 }}>
@@ -1344,6 +1364,38 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }
             <ol style={{ margin: "4px 0 0", paddingLeft: 18, color: C.ink, fontSize: 12.8, lineHeight: 1.6 }}>
                {(r.interviewQuestions || []).map((q, i) => <li key={i} style={{ marginBottom: 3 }}>{q}</li>)}
             </ol>
+
+            {/* Resume Authenticity & Anti-Cheat Audit */}
+            <div style={{
+              marginTop: 14,
+              padding: "11px 13px",
+              borderRadius: 8,
+              background: (r.authenticityScore ?? 100) >= 80 ? "#F0FDF4" : ((r.authenticityScore ?? 100) >= 60 ? "#FEFCE8" : "#FEF2F2"),
+              border: `1px solid ${(r.authenticityScore ?? 100) >= 80 ? "#BBF7D0" : ((r.authenticityScore ?? 100) >= 60 ? "#FEF08A" : "#FECACA")}`
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 6 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: (r.authenticityScore ?? 100) >= 80 ? "#15803D" : ((r.authenticityScore ?? 100) >= 60 ? "#A16207" : "#B91C1C"), letterSpacing: ".04em", display: "flex", alignItems: "center", gap: 5 }}>
+                  🛡️ RESUME AUTHENTICITY AUDIT
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: (r.authenticityScore ?? 100) >= 80 ? "#15803D" : ((r.authenticityScore ?? 100) >= 60 ? "#A16207" : "#B91C1C"), background: (r.authenticityScore ?? 100) >= 80 ? "#DCFCE7" : ((r.authenticityScore ?? 100) >= 60 ? "#FEF9C3" : "#FEE2E2"), padding: "2px 7px", borderRadius: 4 }}>
+                  {r.authenticityStatus || ((r.authenticityScore ?? 100) >= 80 ? "Authentic" : "AI Suspect")} ({r.authenticityScore ?? 100}%)
+                </span>
+              </div>
+              {r.manipulationFlags && r.manipulationFlags.length > 0 ? (
+                <div style={{ fontSize: 12, color: "#991B1B", marginTop: 4 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 2 }}>⚠️ Detected Manipulation &amp; AI Flags:</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.5 }}>
+                    {r.manipulationFlags.map((flag, fi) => (
+                      <li key={fi}>{flag}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: "#166534", lineHeight: 1.4 }}>
+                  ✓ Passed AI Prompt-Injection Sanitization, JD Keyword Echo Check, and Career Timeline Chronology verification.
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
@@ -1374,7 +1426,7 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }
             AI Interview Assessment
           </SubHead>
           
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
             <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, textAlign: "center" }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: r.interview.score >= 75 ? "#16A34A" : (r.interview.score >= 50 ? "#EAB308" : "#DC2626") }}>{r.interview.score}%</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Technical Score</div>
@@ -1383,15 +1435,34 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }
               <div style={{ fontSize: 22, fontWeight: 800, color: Math.max(30, 100 - Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7) >= 85 ? "#16A34A" : (Math.max(30, 100 - Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7) >= 60 ? "#EAB308" : "#DC2626") }}>
                 {Math.max(30, 100 - Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7)}%
               </div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Integrity Score</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Proctor Integrity</div>
             </div>
             <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, textAlign: "center" }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0) === 0 ? "#16A34A" : "#DC2626" }}>
                 {Object.values(r.interview.proctoring || {}).reduce((a,b)=>a+b,0) === 0 ? "Clean ✓" : "Flagged ⚠️"}
               </div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Proctoring</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Visual Proctoring</div>
+            </div>
+            <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, textAlign: "center" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: (r.interview.aiContentProbability ?? 10) <= 25 ? "#16A34A" : ((r.interview.aiContentProbability ?? 10) <= 55 ? "#EAB308" : "#DC2626") }}>
+                {r.interview.aiContentProbability !== undefined ? `${r.interview.aiContentProbability}%` : "Low"}
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>AI Answer Risk</div>
             </div>
           </div>
+
+          {r.interview.aiSignaturesDetected && r.interview.aiSignaturesDetected.length > 0 && (
+            <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "11px 14px", marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#991B1B", textTransform: "uppercase", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                🚨 AI / Teleprompter Signatures Detected — {r.interview.answerAuthenticity || "High AI Likelihood"}
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "#7F1D1D", lineHeight: 1.5 }}>
+                {r.interview.aiSignaturesDetected.map((sig, sidx) => (
+                  <li key={sidx}>{sig}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase", marginBottom: 6 }}>AI Assessment Summary</div>
@@ -1472,10 +1543,15 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
       OverallScore: c.result.overallScore,
       Recommendation: c.result.recommendation,
       Shortlisted: c.result.overallScore >= threshold ? "YES" : "NO",
+      AuthenticityScore: c.result.authenticityScore ?? 100,
+      AuthenticityStatus: c.result.authenticityStatus || "Authentic",
       Email: c.result.email || "N/A",
       CurrentTitle: c.result.currentTitle,
       YearsExperience: c.result.yearsExperience,
       Education: c.result.education,
+      InterviewScore: c.result.interview?.score ?? "N/A",
+      InterviewIntegrity: c.result.interview ? `${Math.max(30, 100 - Object.values(c.result.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7)}%` : "N/A",
+      AIContentRisk: c.result.interview?.aiContentProbability !== undefined ? `${c.result.interview.aiContentProbability}%` : "N/A",
       Summary: c.result.summary,
     }));
     downloadCSV(rows, `${(job.title || "shortlist").replace(/\s+/g, "_")}_recommendations.csv`);
@@ -2165,6 +2241,42 @@ function CandidateComparisonView({ candidates, job, onBack, onStartInterview, ll
               })}
             </tr>
 
+            {/* Row: Resume Authenticity & Anti-Manipulation */}
+            <tr>
+              <td style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                background: C.paper,
+                padding: "12px 20px",
+                fontWeight: 600,
+                color: C.ink,
+                borderRight: `1px solid ${C.line}`,
+                borderBottom: `1px solid ${C.line}`,
+                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
+              }}>
+                🛡️ Resume Authenticity
+              </td>
+              {selectedCandidates.map((c) => {
+                const authScore = c.result?.authenticityScore ?? 100;
+                const authStatus = c.result?.authenticityStatus || (authScore >= 80 ? "Authentic" : "AI Suspect");
+                const color = authScore >= 80 ? "#16A34A" : (authScore >= 60 ? "#EAB308" : "#DC2626");
+                return (
+                  <td key={c.id} style={{ padding: "12px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontWeight: 800, color }}>{authScore}%</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color, background: `${color}15`, padding: "1px 6px", borderRadius: 4 }}>
+                        {authStatus}
+                      </span>
+                    </div>
+                    <div style={{ height: 5, background: C.lineSoft, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${authScore}%`, height: "100%", background: color, borderRadius: 3 }} />
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+
             {/* Row 2: Skills Fit */}
             <tr>
               <td style={{
@@ -2327,6 +2439,11 @@ function CandidateComparisonView({ candidates, job, onBack, onStartInterview, ll
                         <div style={{ fontSize: 11.5, color: C.sub }}>
                           Integrity: <strong>{iv.proctoring?.integrityScore ?? 100}%</strong>
                         </div>
+                        {iv.aiContentProbability !== undefined && (
+                          <div style={{ fontSize: 11, fontWeight: 700, color: iv.aiContentProbability > 40 ? "#DC2626" : "#16A34A", marginTop: 2 }}>
+                            AI Content Risk: {iv.aiContentProbability}%
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div style={{ fontSize: 12, color: C.faint, fontStyle: "italic" }}>

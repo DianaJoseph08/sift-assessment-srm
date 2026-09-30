@@ -71,6 +71,13 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
   const lastVideoTimeRef = useRef(-1);
   const lastTypingTimeRef = useRef(0); // tracks keyboard input to suppress false gaze-down events while typing
   const isTypingFocusedRef = useRef(false); // tracks if textarea is currently focused
+  const downGazeFramesRef = useRef(0);
+  const typingStatsRef = useRef({
+    startTime: 0,
+    totalKeys: 0,
+    backspaces: 0,
+    history: []
+  });
   const faceMissingRef = useRef(false);
   useEffect(() => { faceMissingRef.current = faceMissing; }, [faceMissing]);
   const userTextRef = useRef(userText);
@@ -108,6 +115,13 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
     const onCtxMenu = (e) => { e.preventDefault(); logMalpractice("Right-click menu blocked", "copyPastes"); };
     const onKeyDown = (e) => {
       lastTypingTimeRef.current = Date.now();
+      if (!typingStatsRef.current.startTime) {
+        typingStatsRef.current.startTime = Date.now();
+      }
+      typingStatsRef.current.totalKeys++;
+      if (e.key === "Backspace" || e.key === "Delete") {
+        typingStatsRef.current.backspaces++;
+      }
       const forbidden = (e.ctrlKey || e.metaKey) && ["c","v","t","w","r","u","a"].includes(e.key.toLowerCase());
       const altTab = e.altKey && e.key === "Tab";
       if (forbidden || altTab || e.key === "F12") {
@@ -228,10 +242,9 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
               // 1. Horizontal gaze away from screen (reading from a secondary screen or another person)
               const isLookingAwayHorizontally = gazeOffset > 0.15;
 
-              // 2. Downward glance
-              // NOTE: Looking down at keyboard or textarea is completely expected while typing!
+              // 2. Downward glance / reading off an external device or phone
               let isLookingDownExcessively = false;
-              if (!isMobile && !isTypingActive) {
+              if (!isMobile) {
                 const upperFace = Math.abs(lm[1].y - lm[10].y);
                 const lowerFace = Math.abs(lm[152].y - lm[1].y);
                 const pitchRatio = lowerFace / (upperFace || 1);
@@ -244,9 +257,25 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
                     blendshapes.find(c => c.categoryName === "eyeLookDownRight")?.score || 0
                   );
                 }
-                // Only flag if candidate is completely inactive/not typing AND head is deeply tilted down
-                if (pitchRatio < 0.60 || lookDownScore > 0.70) {
+                
+                const isDownGaze = pitchRatio < 0.62 || lookDownScore > 0.68;
+
+                if (isDownGaze) {
+                  downGazeFramesRef.current = (downGazeFramesRef.current || 0) + 1;
+                  // Sustained downward gaze for > 5 consecutive frames (~3.5 seconds)
+                  // even while typing, indicates reading off-screen notes or a phone
+                  if (downGazeFramesRef.current >= 5) {
+                    isLookingDownExcessively = true;
+                    downGazeFramesRef.current = 0;
+                  }
+                } else {
+                  downGazeFramesRef.current = Math.max(0, (downGazeFramesRef.current || 0) - 1);
+                }
+
+                // If candidate is NOT typing at all and looks down for 3 frames (~2s)
+                if (!isTypingActive && isDownGaze && downGazeFramesRef.current >= 3) {
                   isLookingDownExcessively = true;
+                  downGazeFramesRef.current = 0;
                 }
               }
 
@@ -363,8 +392,20 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
       if (malpractice.copyPastes > 0) {
         remarksList.push(`Candidate pasted text into answer box ${malpractice.copyPastes} time(s).`);
       }
+      const history = typingStatsRef.current.history || [];
+      const avgWpm = history.length > 0 
+        ? Math.round(history.reduce((acc, h) => acc + h.wpm, 0) / history.length) 
+        : 45;
+      const anyTranscribing = history.some(h => h.isTranscribing);
+
+      if (anyTranscribing) {
+        remarksList.push(`Unusual transcription typing detected: average speed was ${avgWpm} WPM with almost zero conceptual corrections.`);
+      }
+
       const proctoringPayload = {
         ...malpractice,
+        wpm: avgWpm,
+        transcriptionSuspected: anyTranscribing,
         remarks: remarksList.join(" ") || "Clean session; candidate remained focused on the screen."
       };
 
@@ -405,6 +446,34 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
     } else if (!answer) {
       answer = "[No response provided]";
     }
+
+    // Calculate typing cadence and WPM for this answer
+    const elapsedSeconds = typingStatsRef.current.startTime 
+      ? Math.max(1, (Date.now() - typingStatsRef.current.startTime) / 1000)
+      : 30;
+    const words = answer.split(/\s+/).filter(Boolean).length;
+    const qWpm = Math.round((words / (elapsedSeconds / 60)));
+    const backspaces = typingStatsRef.current.backspaces;
+    const totalKeys = typingStatsRef.current.totalKeys;
+    const backspaceRatio = totalKeys > 0 ? (backspaces / totalKeys) : 0.05;
+
+    // Detect if answer was rapidly transcribed from an external screen/phone
+    // (High WPM >= 80 on substantive answers >= 40 words with minimal corrections < 3%)
+    const isTranscribing = words >= 40 && qWpm >= 80 && backspaceRatio < 0.03;
+
+    if (!typingStatsRef.current.history) typingStatsRef.current.history = [];
+    typingStatsRef.current.history.push({
+      words,
+      wpm: qWpm,
+      elapsedSeconds,
+      backspaceRatio,
+      isTranscribing
+    });
+
+    // Reset stats for next question
+    typingStatsRef.current.startTime = 0;
+    typingStatsRef.current.totalKeys = 0;
+    typingStatsRef.current.backspaces = 0;
 
     // Reset input box
     setUserText("");
@@ -607,18 +676,47 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
             <h2 style={{ fontSize: 24, fontWeight: 800, color: "#F8FAFC", margin: "0 0 4px" }}>Interview Completed!</h2>
             <p style={{ color: "#94A3B8", fontSize: 14 }}>{candidateName} · {job?.title}</p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
             {[
               { label: "Technical Score", value: `${finalReport.technicalScore ?? 85}%`, color: "#3B82F6" },
               { label: "Communication", value: `${finalReport.communicationScore ?? 82}%`, color: "#8B5CF6" },
-              { label: "Integrity Score", value: `${integrityPct}%`, color: integrityColor },
+              { label: "Integrity Score", value: `${finalReport.integrityScore ?? integrityPct}%`, color: integrityColor },
+              { 
+                label: "AI Content Risk", 
+                value: `${finalReport.aiContentProbability ?? 15}%`, 
+                color: (finalReport.aiContentProbability ?? 15) <= 35 ? "#22C55E" : ((finalReport.aiContentProbability ?? 15) <= 65 ? "#F59E0B" : "#EF4444") 
+              },
             ].map(({ label, value, color }) => (
-              <div key={label} style={{ background: "#0F172A", borderRadius: 12, padding: 16, textAlign: "center", border: `1px solid ${color}44` }}>
-                <div style={{ fontSize: 26, fontWeight: 800, color }}>{value}</div>
-                <div style={{ fontSize: 11, color: "#64748B", fontWeight: 700, marginTop: 4 }}>{label}</div>
+              <div key={label} style={{ background: "#0F172A", borderRadius: 12, padding: 14, textAlign: "center", border: `1px solid ${color}44` }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color }}>{value}</div>
+                <div style={{ fontSize: 10.5, color: "#64748B", fontWeight: 700, marginTop: 4 }}>{label}</div>
               </div>
             ))}
           </div>
+
+          {/* AI Content & Teleprompter Alert if detected */}
+          {finalReport.answerAuthenticity && finalReport.answerAuthenticity !== "Authentic Human Response" && (
+            <div style={{
+              background: (finalReport.aiContentProbability ?? 0) >= 65 ? "#450A0A" : "#451A03",
+              border: `1px solid ${(finalReport.aiContentProbability ?? 0) >= 65 ? "#DC2626" : "#D97706"}`,
+              borderRadius: 12,
+              padding: "12px 16px",
+              marginBottom: 20
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: (finalReport.aiContentProbability ?? 0) >= 65 ? "#FCA5A5" : "#FCD34D", fontWeight: 700, fontSize: 13 }}>
+                <span>{(finalReport.aiContentProbability ?? 0) >= 65 ? "🚨" : "⚠️"}</span>
+                <span>{finalReport.answerAuthenticity} (AI Generated Probability: {finalReport.aiContentProbability}%)</span>
+              </div>
+              {finalReport.aiSignaturesDetected && finalReport.aiSignaturesDetected.length > 0 && (
+                <ul style={{ margin: "6px 0 0 20px", padding: 0, color: "#CBD5E1", fontSize: 12 }}>
+                  {finalReport.aiSignaturesDetected.map((sig, i) => (
+                    <li key={i}>{sig}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           <div style={{ background: "#0F172A", borderRadius: 12, padding: 16, marginBottom: 20, border: "1px solid #334155" }}>
             <div style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>AI Assessment Summary</div>
             <p style={{ color: "#CBD5E1", fontSize: 13.5, lineHeight: 1.7, margin: 0 }}>{finalReport.summary}</p>
