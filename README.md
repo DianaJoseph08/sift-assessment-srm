@@ -1,128 +1,111 @@
-# SIFT — Resume Shortlisting & Recommendation Agent
+# CogniHire (SIFT) — AI Resume Screening, Candidate Ranking & Interview Agent
 
-An AI-powered web app that screens resumes against a job description, scores
-candidate fit, ranks the pool, and recommends a shortlist — with interview
-questions tailored to each candidate.
+> **Production Version:** `v1.3.0`  
+> **Enterprise Edition:** Google Cloud Run + GCS Persistent Storage  
+> **Repository:** `https://github.com/DianaJoseph08/sift-assessment-srm.git`
 
-It is a full-stack project: a React (Vite) frontend and an Express backend.
-The backend holds your Anthropic API key and proxies every screening request
-to the Claude API, so the key is never exposed to the browser.
+An enterprise-grade, AI-powered recruitment intelligence platform that screens candidate resumes against client company requirements, audits resume authenticity, conducts head-to-head candidate evaluations, and runs proctored AI technical video interviews.
 
 ---
 
-## What it does (the pipeline)
+## 🚀 Key Platform Capabilities
 
-1. **Define the role** — job title, seniority, minimum experience, description,
-   and must-have / nice-to-have skills.
-2. **Add candidates** — upload resumes (PDF, DOCX, TXT) or paste text.
-3. **AI screening** — for each resume, the agent extracts a structured profile
-   and scores fit (overall + skills / experience / education / domain).
-4. **Rank & shortlist** — a ranked chart, an adjustable shortlist cutoff,
-   and per-candidate detail (strengths, gaps, missing must-haves, interview
-   questions, sub-score radar).
-5. **Export** — download the shortlist as CSV.
+1. **Multi-Tenant Client Company Cockpit**
+   - Manage discrete corporate client entities (e.g., Motherson Group, SRM Group of Institutions, Apex Technologies).
+   - In-place editing of client reply-to email IDs, sender display names, industries, and hiring guidelines.
+   - Quick-action shortcuts directly inside role setup (`[✏️ Edit Company]` & `[+ New]`).
+
+2. **Multimodal Resume Parsing & 4-Pillar Algorithmic Scoring**
+   - Concurrent parsing of PDF, Word (.docx), and Plain Text resumes.
+   - Deterministic weighted formula:
+     $$\text{Overall Fit} = (\text{Skills} \times 0.40) + (\text{Experience} \times 0.25) + (\text{Domain} \times 0.20) + (\text{Education} \times 0.15)$$
+   - Strict -15 point mathematical penalty per missing mandatory skill.
+   - Strict Academic Discipline Enforcer for faculty/research positions vs. practical skill-first evaluation for engineering roles.
+
+3. **Dual-Tier AI Resume Authenticity & Fraud Defense**
+   - **Adversarial Prompt-Injection Sanitizer**: Strips hidden instructions, zero-width tricks, and model override commands.
+   - **5-Word N-Gram JD Echo Engine**: Calculates verbatim overlap against the target job description ($N=5$) to catch ChatGPT-tailored resumes.
+   - **Career Timeline Validator**: Scans for graduation-to-tenure discrepancies and impossible dates.
+   - **Authenticity Badges**: Color-coded recruiter badges (`Verified Clean`, `Suspected AI Tailoring`, `High AI Risk`) across cards, drawers, and export files.
+
+4. **Head-to-Head Candidate Comparison Matrix**
+   - Side-by-side comparative analysis of 2 to 5 top candidates.
+   - 2D frozen grid navigation: sticky top candidate row and sticky left metric column.
+   - Automated mathematical score delta justification against the #1 ranked candidate.
+   - "Ask Claude to Compare": One-click synthesis of a 4-part executive memorandum (Verdict, Winner Deep-Dive, Key Differentiating Factors, Recruiter Advice).
+
+5. **Proctored AI Video Interview & Anti-Teleprompter Detection**
+   - 30-minute global countdown timer across 5 technical questions (self-paced, low-stress).
+   - Dynamic conversational probing powered by Anthropic Claude.
+   - **Google MediaPipe Vision AI**: 468-point 3D facial mesh, iris gaze offset, head yaw, face presence, and multi-person detection.
+   - **Keystroke Cadence Analysis (`transcriptionSuspected`)**: Flags sustained bursts ($\ge 80\text{ WPM}$ with $<3\%$ backspaces) indicating a candidate copying answers from a smartphone placed in front of the screen.
+   - **Sustained Downward Gaze Tracking ($>3.5\text{s}$)**: Flags reading from an off-screen phone or desk notes.
+   - **ChatGPT Stylometry Evaluator**: Audits completed answers for AI writing signatures and calculates an `AI Content Risk %`.
+
+6. **In-App Version Control & Release Changelog (`v1.3.0`)**
+   - Real-time version badges on the sidebar navigation, welcome banner, and settings panel.
+   - Slide-in `ChangelogModal` showcasing the complete release history from `v1.0.0` through `v1.3.0`.
+   - Backend health and version endpoint: `GET /api/version`.
+
+7. **Zero-Data-Loss Cloud Storage Architecture**
+   - Deployed on Google Cloud Run serverless in `asia-south1` (Mumbai).
+   - SQLite backed by persistent Google Cloud Storage bucket (`gs://cognihire-app-data`) via Cloud Storage FUSE.
+   - WAL-checkpointed atomic synchronization (`syncToPersistentStorage`) ensuring 100% data durability across scale-to-zero cycles.
 
 ---
 
-## Prerequisites
+## 🛠️ Tech Stack
 
-- **Node.js 20 or newer** (`node --version` to check)
-- An **Anthropic API key** — create one at https://console.anthropic.com/
-  under *Settings → API Keys*
+- **Frontend**: React 18, Vite 5, Recharts 2, Lucide React, Google MediaPipe (`@mediapipe/tasks-vision`).
+- **Backend**: Node.js (v20+ LTS), Express.js 4, `pdf-parse`, `mammoth`, `json5`.
+- **Database**: Node.js Native SQLite (`node:sqlite` / SQLite3) + GCS FUSE persistent sync.
+- **AI Providers**: Anthropic Claude 3.5 Sonnet / Haiku (Primary), Google Gemini 1.5 Flash, Groq Llama 3.1 8B, Local Heuristic Rule Engine.
 
 ---
 
-## Setup
+## ⚡ Quick Start
 
+### 1. Local Development
 ```bash
-# 1. Install dependencies (frontend + backend share one package.json)
+# Clone the repository
+git clone https://github.com/DianaJoseph08/sift-assessment-srm.git
+cd sift-assessment-srm
+
+# Install dependencies (frontend & backend)
 npm install
 
-# 2. Create your .env file and add your key
+# Configure API keys (optional: can also be configured via UI settings)
 cp .env.example .env
-#   then edit .env and set ANTHROPIC_API_KEY=sk-ant-...
 
-# 3. Start both the backend and the frontend (dev mode)
+# Run both backend (:8787) and frontend (:5173) in development mode
 npm run dev
 ```
+Open **`http://localhost:5173`** in your browser.
 
-Then open **http://localhost:5173** in your browser.
-
-In the app: click *Load sample role*, then *Load 4 sample resumes*, then
-*Run AI screening* to see it work end to end.
-
----
-
-## Available scripts
-
-| Command            | What it does                                              |
-| ------------------ | --------------------------------------------------------- |
-| `npm run dev`      | Runs backend (`:8787`) and frontend (`:5173`) together     |
-| `npm run build`    | Builds the frontend into `dist/`                           |
-| `npm start`        | Production: serves the built frontend from the backend     |
-| `npm run dev:server` | Backend only                                             |
-| `npm run dev:client` | Frontend only                                            |
-
-**Production run:** `npm run build && npm start`, then open
-http://localhost:8787 (the backend serves the built frontend).
-
----
-
-## Project structure
-
+### 2. Production Build & Run
+```bash
+npm run build
+npm start
+# Server listens on port 8787 and serves the built client
 ```
-sift-resume-agent/
-├── server/
-│   ├── index.js        Express server + /api/analyze route
-│   └── analyze.js      Prompt construction + Claude API call + JSON parsing
-├── client/
-│   ├── index.html
-│   └── src/
-│       ├── main.jsx    React entry point
-│       ├── App.jsx     Full UI: wizard, screening orchestration, results
-│       ├── api.js      Calls the backend /api/analyze endpoint
-│       └── index.css   Fonts, keyframes, base styles
-├── vite.config.js      Frontend config + dev proxy to the backend
-├── .env.example        Template for ANTHROPIC_API_KEY
-├── CLAUDE.md           Context for working on this project in Claude Code
-└── package.json
+
+### 3. Deploy to Google Cloud Run
+```bash
+gcloud run deploy cognihire \
+  --source . \
+  --region asia-south1 \
+  --allow-unauthenticated
 ```
 
 ---
 
-## How the AI agent works
+## 📖 Complete Documentation & Study Materials
 
-The "agent" is a structured-output call to the Claude API, one per resume:
-
-- `server/analyze.js` builds a prompt containing the job spec and the resume.
-  PDFs are passed to the model as a document block; DOCX is converted to text
-  with `mammoth`; plain text is used directly.
-- The model is instructed to return **only JSON** matching a fixed schema
-  (scores, recommendation, strengths, gaps, interview questions, etc.).
-- The frontend runs candidates through a concurrency-limited pool (3 at a time)
-  and updates the UI as each result arrives.
-
-The model defaults to `claude-sonnet-4-6`; override it with the `MODEL`
-variable in `.env`.
+For full architectural deep-dives, enterprise presentation decks, and technical scoring specifications, consult:
+- **[CLIENT_STUDY_MATERIAL.md](file:///D:/AI_Resume_Shortlisting/sift-resume-agent/sift-resume-agent/CLIENT_STUDY_MATERIAL.md)** — Master Enterprise Presentation & Architecture Guide (v1.3.0).
+- **[TECHNICAL_ARCHITECTURE_DOCUMENT.md](file:///D:/AI_Resume_Shortlisting/sift-resume-agent/sift-resume-agent/TECHNICAL_ARCHITECTURE_DOCUMENT.md)** — Comprehensive Technical Architecture Reference.
+- **[PROJECT_CONTEXT_OVERVIEW.md](file:///D:/AI_Resume_Shortlisting/sift-resume-agent/sift-resume-agent/PROJECT_CONTEXT_OVERVIEW.md)** — Master Context Document for Engineering Handoff.
 
 ---
 
-## Troubleshooting
-
-- **"ANTHROPIC_API_KEY is not set"** — create `.env` from `.env.example` and add
-  your key, then restart `npm run dev`.
-- **Screening fails for every candidate** — check the backend terminal for the
-  error. A 401 means the key is invalid; a 429 means you hit a rate limit.
-- **Port already in use** — change `PORT` in `.env` (and the proxy target in
-  `vite.config.js` if you change the backend port).
-- **DOCX won't parse** — only `.docx` is supported, not the older `.doc`.
-
----
-
-## Ideas to extend (good Claude Code tasks)
-
-- Bias mitigation: strip names / gender cues before scoring.
-- Batch upload of a whole folder of resumes.
-- Persist screenings to a database (SQLite / Postgres).
-- A vector pre-filter so the LLM only scores plausible candidates.
-- Compare two candidates side by side.
+*CogniHire by SRM & Motherson Innovation Lab. All rights reserved.*
