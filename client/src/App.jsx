@@ -4,15 +4,13 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar,
 } from "recharts";
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import {
   Upload, FileText, Briefcase, Sparkles, ChevronDown, ChevronRight, X, Check,
   Plus, Download, RotateCcw, ArrowRight, ArrowLeft, AlertCircle, Users, Star,
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
   Mail, Send, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
   ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen, Scale,
-  HelpCircle, CheckCircle2, Clock, Edit2, GitBranch, Tag, History,
-  UserCheck, UserX, FileSpreadsheet
+  HelpCircle, CheckCircle2, Clock, Edit2, GitBranch, Tag, History
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
 import VideoInterview from "./VideoInterview.jsx";
@@ -192,44 +190,15 @@ const BrandLogo = ({ collapsed = false, theme = "dark" }) => (
 );
 
 /* ============================== VERSION CONTROL & RELEASE CHANGELOG ============================== */
-const APP_VERSION = "v1.4.0";
+const APP_VERSION = "v1.3.0";
 
 const CHANGELOG_DATA = [
-  {
-    version: "v1.4.0",
-    title: "Executive Hiring Cockpit, Vacancies Tracking, Editable HR Decisions & Excel Export",
-    date: "October 7, 2026",
-    badge: "Current Production",
-    tagColor: "#10B981",
-    highlights: [
-      {
-        icon: "📊",
-        title: "Executive Recruitment Cockpit",
-        description: "Overview dashboard displaying Available Vacancies, Resumes Screened, Cutoff Score threshold, HR Selected Candidates, and a visual Vacancy Fulfillment Progress Bar."
-      },
-      {
-        icon: "🎯",
-        title: "Job Vacancies & Cutoff Configuration",
-        description: "Role setup (Step 1) now allows recruiters to define target vacancies available and customize the shortlist benchmark cutoff percentage for every opening."
-      },
-      {
-        icon: "⭐",
-        title: "Editable HR Selection Controls",
-        description: "HR can mark candidates as Selected or Not Selected with one-click reversibility—switch between states or reset to pending review at any time."
-      },
-      {
-        icon: "📑",
-        title: "Native Multi-Sheet Excel (.xlsx) Reports",
-        description: "One-click Excel report export per client company featuring Sheet 1 (Openings & Vacancies Pipeline) and Sheet 2 (Candidate Screening Roster with 4-pillar subscores and HR decisions)."
-      }
-    ]
-  },
   {
     version: "v1.3.0",
     title: "Client Company Profile Editing & Workflow Refinements",
     date: "September 30, 2026",
-    badge: "Stable Release",
-    tagColor: "#64748B",
+    badge: "Current Production",
+    tagColor: "#10B981",
     highlights: [
       {
         icon: "🏢",
@@ -403,95 +372,6 @@ function downloadCSV(rows, filename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-
-function exportClientExcel(company, companyJobs = []) {
-  if (!company) return;
-  const wb = XLSX.utils.book_new();
-
-  // Sheet 1: Job Openings & Vacancy Pipeline
-  const jobRows = (companyJobs || []).map((j, idx) => {
-    const cands = j.candidates || [];
-    const valid = cands.filter(c => c.status === "done" && c.result);
-    const cutoff = j.cutoff ?? 70;
-    const vacancies = j.vacancies ?? 1;
-    const screened = valid.length;
-    const metCutoff = valid.filter(c => (c.result?.overallScore ?? 0) >= cutoff).length;
-    const selected = valid.filter(c => c.hrDecision === "selected" || c.result?.hrDecision === "selected").length;
-    const rejected = valid.filter(c => c.hrDecision === "rejected" || c.result?.hrDecision === "rejected").length;
-    const pending = valid.filter(c => !c.hrDecision && !c.result?.hrDecision).length;
-    const remaining = Math.max(0, vacancies - selected);
-    const status = selected >= vacancies ? "FILLED" : (selected > 0 ? "PARTIALLY FILLED" : "OPEN");
-
-    return {
-      "S.No": idx + 1,
-      "Client Company": company.name,
-      "Job Opening Title": j.title || "Untitled Role",
-      "Seniority Level": j.seniority || "Senior",
-      "Min Experience (Years)": j.minYears ?? 0,
-      "Target Vacancies": vacancies,
-      "Shortlist Cutoff (%)": `${cutoff}%`,
-      "Resumes Screened": screened,
-      "Qualified (>= Cutoff)": metCutoff,
-      "HR Selected Candidates": selected,
-      "HR Not Selected": rejected,
-      "Pending Review": pending,
-      "Remaining Openings": remaining,
-      "Pipeline Status": status,
-    };
-  });
-
-  const wsJobs = XLSX.utils.json_to_sheet(jobRows.length > 0 ? jobRows : [{
-    "Client Company": company.name,
-    "Status": "No active job openings created yet"
-  }]);
-  XLSX.utils.book_append_sheet(wb, wsJobs, "Job Vacancies & Pipeline");
-
-  // Sheet 2: Screened Candidates Roster
-  const candRows = [];
-  let candSeq = 1;
-  (companyJobs || []).forEach((j) => {
-    const valid = (j.candidates || []).filter(c => c.status === "done" && c.result);
-    valid.forEach((c) => {
-      const res = c.result || {};
-      const cutoff = j.cutoff ?? 70;
-      const score = res.overallScore ?? 0;
-      const decision = c.hrDecision || res.hrDecision;
-      const decisionText = decision === "selected" ? "SELECTED" : (decision === "rejected" ? "NOT SELECTED" : "PENDING");
-
-      candRows.push({
-        "S.No": candSeq++,
-        "Client Company": company.name,
-        "Job Opening Title": j.title || "Untitled Role",
-        "Candidate Name": res.candidateName || c.label || "Candidate",
-        "HR Decision": decisionText,
-        "Match Score (%)": score,
-        "Met Cutoff": score >= cutoff ? "YES" : "NO",
-        "AI Recommendation": res.recommendation || "N/A",
-        "Authenticity Score (%)": res.authenticityScore !== undefined ? `${res.authenticityScore}%` : "100%",
-        "Current Title": res.currentTitle || "N/A",
-        "Experience (Years)": res.yearsExperience ?? "N/A",
-        "Education": res.education || "N/A",
-        "Skills Subscore (%)": res.subScores?.skills ?? "N/A",
-        "Experience Subscore (%)": res.subScores?.experience ?? "N/A",
-        "Education Subscore (%)": res.subScores?.education ?? "N/A",
-        "Domain Subscore (%)": res.subScores?.domain ?? "N/A",
-        "AI Interview Score (%)": res.interview?.score !== undefined ? `${res.interview.score}%` : "Not Conducted",
-        "Contact Email": (res.email && res.email !== "N/A" && !res.email.includes("candidate.edu")) ? res.email : "Not Provided",
-        "AI Executive Summary": (res.summary || "").replace(/\r?\n+/g, " "),
-      });
-    });
-  });
-
-  const wsCands = XLSX.utils.json_to_sheet(candRows.length > 0 ? candRows : [{
-    "Client Company": company.name,
-    "Status": "No candidates screened yet"
-  }]);
-  XLSX.utils.book_append_sheet(wb, wsCands, "Candidates Roster");
-
-  const cleanName = (company.name || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const fileName = `${cleanName}_Recruitment_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
-  XLSX.writeFile(wb, fileName);
 }
 
 const btn = (type, C) => {
@@ -802,8 +682,8 @@ function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelet
             onChange={(e) => setJob({ ...job, title: e.target.value })} />
         </Field>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr", gap: 12 }}>
-          <div>
+        <div style={{ display: "flex", gap: 14 }}>
+          <div style={{ flex: 1 }}>
             <Field label="Seniority" C={C}>
               <select style={inputStyle(C)} value={job.seniority || "Senior"}
                 onChange={(e) => setJob({ ...job, seniority: e.target.value })}>
@@ -812,22 +692,10 @@ function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelet
               </select>
             </Field>
           </div>
-          <div>
-            <Field label="Min. years" hint="Experience" C={C}>
+          <div style={{ width: 120 }}>
+            <Field label="Min. years" C={C}>
               <input type="number" min={0} style={inputStyle(C)} value={job.minYears || 0}
-                onChange={(e) => setJob({ ...job, minYears: Math.max(0, Number(e.target.value) || 0) })} />
-            </Field>
-          </div>
-          <div>
-            <Field label="Vacancies" hint="Openings" C={C}>
-              <input type="number" min={1} style={inputStyle(C)} value={job.vacancies ?? 1}
-                onChange={(e) => setJob({ ...job, vacancies: Math.max(1, Number(e.target.value) || 1) })} />
-            </Field>
-          </div>
-          <div>
-            <Field label="Cutoff %" hint="Benchmark" C={C}>
-              <input type="number" min={30} max={95} style={inputStyle(C)} value={job.cutoff ?? 70}
-                onChange={(e) => setJob({ ...job, cutoff: Math.max(30, Math.min(95, Number(e.target.value) || 70)) })} />
+                onChange={(e) => setJob({ ...job, minYears: Number(e.target.value) })} />
             </Field>
           </div>
         </div>
@@ -1474,7 +1342,7 @@ ${companyName}`;
 }
 
 /* ============================== STEP 3b: RESULTS & RECOMMENDATIONS ============================== */
-function CandidateCard({ rank, c, threshold, job, company, onStartInterview, onUpdateDecision, C }) {
+function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }) {
   const [open, setOpen] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const r = c.result;
@@ -1503,7 +1371,6 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, onU
     );
   }
 
-  const hrDecision = c.hrDecision || r?.hrDecision || null;
   const m = recMeta(r.recommendation);
   const shortlisted = r.overallScore >= threshold;
   const radar = [
@@ -1515,14 +1382,8 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, onU
 
   const candidateEmail = r?.email && r.email !== "N/A" && !r.email.includes("candidate.edu") ? r.email : "No email listed in resume";
 
-  const cardBorder = hrDecision === "selected"
-    ? "2px solid #16A34A"
-    : hrDecision === "rejected"
-    ? "1.5px solid #FCA5A5"
-    : (shortlisted ? `1.5px solid ${m.dot}` : `1px solid ${C.line}`);
-
   return (
-    <div style={{ background: C.panel, border: cardBorder, borderRadius: 12, overflow: "hidden", marginBottom: 12, boxShadow: hrDecision === "selected" ? "0 4px 12px rgba(22, 163, 74, 0.12)" : "none" }}>
+    <div style={{ background: C.panel, border: `1px solid ${shortlisted ? m.dot : C.line}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 17px", cursor: "pointer" }} onClick={() => setOpen(!open)}>
         <div style={{ fontFamily: DISPLAY, fontSize: 22, fontWeight: 600, color: C.faint, width: 30 }}>
           {rank}
@@ -1535,16 +1396,6 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, onU
                 <Star size={11} /> SHORTLISTED
               </span>
             )}
-            {hrDecision === "selected" && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: "#FFFFFF", background: "#16A34A", padding: "3px 8px", borderRadius: 5 }}>
-                <UserCheck size={12} /> HR SELECTED
-              </span>
-            )}
-            {hrDecision === "rejected" && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: "#FFFFFF", background: "#DC2626", padding: "3px 8px", borderRadius: 5 }}>
-                <UserX size={12} /> NOT SELECTED
-              </span>
-            )}
           </div>
           <div style={{ fontSize: 12.5, color: C.sub, marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span>{r.currentTitle} · {r.yearsExperience} yrs exp</span>
@@ -1553,7 +1404,7 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, onU
           </div>
         </div>
         
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ textAlign: "right", marginRight: 4, display: "flex", gap: 16 }}>
             <div style={{ paddingRight: 16, borderRight: `1px solid ${C.line}` }}>
               <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: m.dot, lineHeight: 1 }}>
@@ -1595,150 +1446,6 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, onU
                   --
                 </div>
                 <div style={{ fontSize: 9, color: C.faint, fontWeight: 700, letterSpacing: ".04em" }}>NO INTERVIEW</div>
-              </div>
-            )}
-          </div>
-
-          {/* Editable HR Candidate Selection Action Group */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
-            {hrDecision === "selected" ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#DCFCE7", border: "1.5px solid #86EFAC", padding: "4px 7px", borderRadius: 8 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "#15803D", padding: "2px 4px" }}>
-                  <UserCheck size={14} /> Selected
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onUpdateDecision?.(c.id, "rejected"); }}
-                  title="Change decision: Mark candidate as Not Selected"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 3,
-                    padding: "4px 8px",
-                    background: "#FFFFFF",
-                    color: "#DC2626",
-                    border: "1px solid #FCA5A5",
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: BODY,
-                  }}
-                >
-                  <UserX size={12} /> Switch to Not Selected
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onUpdateDecision?.(c.id, null); }}
-                  title="Clear decision: Reset to pending review"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "4px 6px",
-                    background: "#FFFFFF",
-                    color: C.sub,
-                    border: `1px solid ${C.line}`,
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  <RotateCcw size={12} />
-                </button>
-              </div>
-            ) : hrDecision === "rejected" ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#FEE2E2", border: "1.5px solid #FCA5A5", padding: "4px 7px", borderRadius: 8 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "#DC2626", padding: "2px 4px" }}>
-                  <UserX size={14} /> Not Selected
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onUpdateDecision?.(c.id, "selected"); }}
-                  title="Change decision: Mark candidate as Selected"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 3,
-                    padding: "4px 8px",
-                    background: "#FFFFFF",
-                    color: "#16A34A",
-                    border: "1px solid #86EFAC",
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: BODY,
-                  }}
-                >
-                  <UserCheck size={12} /> Switch to Selected
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onUpdateDecision?.(c.id, null); }}
-                  title="Clear decision: Reset to pending review"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "4px 6px",
-                    background: "#FFFFFF",
-                    color: C.sub,
-                    border: `1px solid ${C.line}`,
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  <RotateCcw size={12} />
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onUpdateDecision?.(c.id, "selected"); }}
-                  title="Mark this candidate as Selected by HR"
-                  style={{
-                    padding: "7px 11px",
-                    background: "#DCFCE7",
-                    color: "#15803D",
-                    border: "1px solid #86EFAC",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    fontFamily: BODY,
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <UserCheck size={14} /> Select
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onUpdateDecision?.(c.id, "rejected"); }}
-                  title="Mark this candidate as Not Selected by HR"
-                  style={{
-                    padding: "7px 11px",
-                    background: "#FEE2E2",
-                    color: "#DC2626",
-                    border: "1px solid #FCA5A5",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    fontFamily: BODY,
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <UserX size={14} /> Not Select
-                </button>
               </div>
             )}
           </div>
@@ -1954,14 +1661,10 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, onU
   );
 }
 
-function Results({ candidates, job, companies = [], onReRun, onRestart, onStartInterview, onCompare, onUpdateCandidateDecision, filterMode = "all", setFilterMode, C }) {
-  const [threshold, setThreshold] = useState(job?.cutoff ?? 70);
+function Results({ candidates, job, companies = [], onReRun, onRestart, onStartInterview, onCompare, filterMode = "all", setFilterMode, C }) {
+  const [threshold, setThreshold] = useState(70);
   const [sortKey, setSortKey] = useState("score");
   const [localFilter, setLocalFilter] = useState(filterMode);
-
-  useEffect(() => {
-    if (job?.cutoff) setThreshold(job.cutoff);
-  }, [job?.cutoff]);
 
   useEffect(() => {
     setLocalFilter(filterMode);
@@ -1983,57 +1686,36 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
     return arr;
   }, [valid, sortKey]);
 
-  const vacancies = Math.max(1, job?.vacancies ?? 1);
-  const selectedCount = valid.filter(c => c.hrDecision === "selected" || c.result?.hrDecision === "selected").length;
-  const rejectedCount = valid.filter(c => c.hrDecision === "rejected" || c.result?.hrDecision === "rejected").length;
   const shortlistedCount = sorted.filter((c) => c.result.overallScore >= threshold).length;
-  const remainingVacancies = Math.max(0, vacancies - selectedCount);
-  const fillPercentage = Math.min(100, Math.round((selectedCount / vacancies) * 100));
   const avgScore = valid.length ? Math.round(valid.reduce((s, c) => s + c.result.overallScore, 0) / valid.length) : 0;
 
   const displayed = useMemo(() => {
     if (activeFilter === "shortlisted") {
       return sorted.filter((c) => c.result.overallScore >= threshold);
     }
-    if (activeFilter === "selected") {
-      return sorted.filter((c) => c.hrDecision === "selected" || c.result?.hrDecision === "selected");
-    }
-    if (activeFilter === "rejected") {
-      return sorted.filter((c) => c.hrDecision === "rejected" || c.result?.hrDecision === "rejected");
-    }
     return sorted;
   }, [sorted, activeFilter, threshold]);
 
-  const targetComp = companies.find(comp => comp.id === job?.companyId) || { name: job?.companyName || "Client", contactEmail: "" };
-
   const handleExportCSV = () => {
-    const rows = sorted.map((c, i) => {
-      const decision = c.hrDecision || c.result?.hrDecision;
-      return {
-        Rank: i + 1,
-        ClientCompany: job.companyName || "Client",
-        CandidateName: c.result.candidateName || c.label,
-        HRDecision: decision === "selected" ? "SELECTED" : (decision === "rejected" ? "NOT SELECTED" : "PENDING"),
-        OverallScore: c.result.overallScore,
-        Recommendation: c.result.recommendation,
-        Shortlisted: c.result.overallScore >= threshold ? "YES" : "NO",
-        AuthenticityScore: c.result.authenticityScore ?? 100,
-        AuthenticityStatus: c.result.authenticityStatus || "Authentic",
-        Email: c.result.email || "N/A",
-        CurrentTitle: c.result.currentTitle,
-        YearsExperience: c.result.yearsExperience,
-        Education: c.result.education,
-        InterviewScore: c.result.interview?.score ?? "N/A",
-        InterviewIntegrity: c.result.interview ? `${Math.max(30, 100 - Object.values(c.result.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7)}%` : "N/A",
-        AIContentRisk: c.result.interview?.aiContentProbability !== undefined ? `${c.result.interview.aiContentProbability}%` : "N/A",
-        Summary: c.result.summary,
-      };
-    });
+    const rows = sorted.map((c, i) => ({
+      Rank: i + 1,
+      ClientCompany: job.companyName || "Client",
+      CandidateName: c.result.candidateName || c.label,
+      OverallScore: c.result.overallScore,
+      Recommendation: c.result.recommendation,
+      Shortlisted: c.result.overallScore >= threshold ? "YES" : "NO",
+      AuthenticityScore: c.result.authenticityScore ?? 100,
+      AuthenticityStatus: c.result.authenticityStatus || "Authentic",
+      Email: c.result.email || "N/A",
+      CurrentTitle: c.result.currentTitle,
+      YearsExperience: c.result.yearsExperience,
+      Education: c.result.education,
+      InterviewScore: c.result.interview?.score ?? "N/A",
+      InterviewIntegrity: c.result.interview ? `${Math.max(30, 100 - Object.values(c.result.interview.proctoring || {}).reduce((a,b)=>a+b,0)*7)}%` : "N/A",
+      AIContentRisk: c.result.interview?.aiContentProbability !== undefined ? `${c.result.interview.aiContentProbability}%` : "N/A",
+      Summary: c.result.summary,
+    }));
     downloadCSV(rows, `${(job.title || "shortlist").replace(/\s+/g, "_")}_recommendations.csv`);
-  };
-
-  const handleExportExcel = () => {
-    exportClientExcel(targetComp, [job]);
   };
 
   return (
@@ -2097,82 +1779,12 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
         )}
       </div>
 
-      {/* Vacancy Pipeline Fulfillment Progress Banner */}
-      <div style={{
-        background: C.paper,
-        border: `1.5px solid ${selectedCount >= vacancies ? "#86EFAC" : C.line}`,
-        borderRadius: 14,
-        padding: "16px 20px",
-        marginBottom: 18,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 16,
-        boxShadow: selectedCount >= vacancies ? "0 4px 14px rgba(22, 163, 74, 0.08)" : "none"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
-            background: selectedCount >= vacancies ? "#DCFCE7" : C.accentSoft,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}>
-            <Target size={22} color={selectedCount >= vacancies ? "#16A34A" : C.accent} />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>
-                Role Vacancies: {selectedCount} of {vacancies} Selected
-              </span>
-              <span style={{
-                fontSize: 11,
-                fontWeight: 800,
-                padding: "2px 8px",
-                borderRadius: 5,
-                background: selectedCount >= vacancies ? "#DCFCE7" : (selectedCount > 0 ? "#FEF9C3" : C.bg),
-                color: selectedCount >= vacancies ? "#166534" : (selectedCount > 0 ? "#854D0E" : C.sub),
-                border: `1px solid ${selectedCount >= vacancies ? "#86EFAC" : C.line}`
-              }}>
-                {selectedCount >= vacancies ? "✓ FULLY FILLED" : (selectedCount > 0 ? "PARTIALLY FILLED" : "OPENINGS ACTIVE")}
-              </span>
-            </div>
-            <div style={{ fontSize: 12.5, color: C.sub, marginTop: 3 }}>
-              {remainingVacancies === 0
-                ? "All available target openings for this job have been filled by HR."
-                : `${remainingVacancies} open slot(s) remaining to meet client vacancy target of ${vacancies}. Mark candidates as Selected below.`}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Fulfillment Rate</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: selectedCount >= vacancies ? "#16A34A" : C.accent, fontFamily: DISPLAY }}>
-              {fillPercentage}%
-            </div>
-          </div>
-          <div style={{ width: 120, height: 10, background: C.bg, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.line}` }}>
-            <div style={{
-              width: `${fillPercentage}%`,
-              height: "100%",
-              background: selectedCount >= vacancies ? "#16A34A" : C.accent,
-              borderRadius: 10,
-              transition: "width 0.3s ease"
-            }} />
-          </div>
-        </div>
-      </div>
-
-      {/* Metrics Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 20 }}>
-        {/* Total Screened */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
         <div
           onClick={() => changeFilter("all")}
           style={{
+            flex: 1,
+            minWidth: 150,
             background: C.paper,
             border: activeFilter === "all" ? `2px solid ${C.accent}` : `1px solid ${C.line}`,
             borderRadius: 12,
@@ -2184,16 +1796,17 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
           title="Click to view all screened candidates"
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: activeFilter === "all" ? C.accent : C.sub, textTransform: "uppercase" }}>Resumes Screened</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: activeFilter === "all" ? C.accent : C.sub, textTransform: "uppercase" }}>Candidates Screened</div>
             {activeFilter === "all" && <span style={{ fontSize: 10, fontWeight: 800, color: C.accent, background: C.accentSoft, padding: "2px 6px", borderRadius: 4 }}>ACTIVE</span>}
           </div>
           <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: C.ink, marginTop: 4 }}>{valid.length}</div>
         </div>
 
-        {/* Shortlisted Cutoff */}
         <div
           onClick={() => changeFilter("shortlisted")}
           style={{
+            flex: 1,
+            minWidth: 150,
             background: C.paper,
             border: activeFilter === "shortlisted" ? "2px solid #16A34A" : `1px solid ${C.line}`,
             borderRadius: 12,
@@ -2202,7 +1815,7 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
             transition: "all 0.15s ease",
             boxShadow: activeFilter === "shortlisted" ? "0 4px 14px rgba(22, 163, 74, 0.2)" : "none",
           }}
-          title="Click to view shortlisted candidates meeting cutoff"
+          title="Click to view shortlisted candidates only"
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: activeFilter === "shortlisted" ? "#16A34A" : C.sub, textTransform: "uppercase" }}>Shortlisted (≥{threshold}%)</div>
@@ -2211,37 +1824,12 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
           <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: "#16A34A", marginTop: 4 }}>{shortlistedCount}</div>
         </div>
 
-        {/* HR Selected */}
-        <div
-          onClick={() => changeFilter("selected")}
-          style={{
-            background: C.paper,
-            border: activeFilter === "selected" ? "2px solid #15803D" : `1px solid ${C.line}`,
-            borderRadius: 12,
-            padding: "15px 16px",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-            boxShadow: activeFilter === "selected" ? "0 4px 14px rgba(22, 163, 74, 0.2)" : "none",
-          }}
-          title="Click to view candidates marked Selected by HR"
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: activeFilter === "selected" ? "#15803D" : C.sub, textTransform: "uppercase" }}>HR Selected</div>
-            {activeFilter === "selected" && <span style={{ fontSize: 10, fontWeight: 800, color: "#15803D", background: "#DCFCE7", padding: "2px 6px", borderRadius: 4 }}>FILTERED</span>}
-          </div>
-          <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: "#15803D", marginTop: 4 }}>
-            {selectedCount} <span style={{ fontSize: 14, color: C.sub }}>/ {vacancies}</span>
-          </div>
-        </div>
-
-        {/* Average Fit Score */}
-        <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
+        <div style={{ flex: 1, minWidth: 150, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Average Fit Score</div>
           <div style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 600, color: gradeColor(avgScore), marginTop: 4 }}>{avgScore}%</div>
         </div>
       </div>
 
-      {/* Control Bar: Cutoff Slider, Filter Pills, and Export Actions */}
       <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2251,7 +1839,7 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
           </div>
 
           {/* Quick Filter Pill Buttons */}
-          <div style={{ display: "flex", background: C.bg, border: `1px solid ${C.line}`, borderRadius: 8, padding: 3, gap: 4, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", background: C.bg, border: `1px solid ${C.line}`, borderRadius: 8, padding: 3, gap: 4 }}>
             <button
               onClick={() => changeFilter("all")}
               style={{
@@ -2282,71 +1870,16 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
                 transition: "all 0.15s ease",
               }}
             >
-              Shortlisted ({shortlistedCount})
+              Shortlisted Only ({shortlistedCount})
             </button>
-            <button
-              onClick={() => changeFilter("selected")}
-              style={{
-                padding: "4px 10px",
-                border: "none",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                background: activeFilter === "selected" ? "#15803D" : "transparent",
-                color: activeFilter === "selected" ? "#FFFFFF" : C.sub,
-                transition: "all 0.15s ease",
-              }}
-            >
-              ✓ Selected ({selectedCount})
-            </button>
-            {rejectedCount > 0 && (
-              <button
-                onClick={() => changeFilter("rejected")}
-                style={{
-                  padding: "4px 10px",
-                  border: "none",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  background: activeFilter === "rejected" ? "#DC2626" : "transparent",
-                  color: activeFilter === "rejected" ? "#FFFFFF" : C.sub,
-                  transition: "all 0.15s ease",
-                }}
-              >
-                ✕ Not Selected ({rejectedCount})
-              </button>
-            )}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button
-            style={{
-              padding: "7px 13px",
-              background: "#DCFCE7",
-              color: "#166534",
-              border: "1px solid #86EFAC",
-              borderRadius: 7,
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontFamily: BODY,
-              transition: "all 0.15s ease",
-            }}
-            onClick={handleExportExcel}
-            title="Download multi-sheet client Excel (.xlsx) report"
-          >
-            <FileSpreadsheet size={15} /> Download Excel Report
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={btn("soft", C)} onClick={handleExportCSV}>
+            <Download size={15} /> Export Recommendation CSV
           </button>
-          <button style={btn("soft", C)} onClick={handleExportCSV} title="Export CSV summary">
-            <Download size={15} /> CSV
-          </button>
-          <button style={btn("ghost", C)} onClick={onReRun} title="Re-screen all candidates">
+          <button style={btn("ghost", C)} onClick={onReRun}>
             <RotateCcw size={15} /> Re-screen All
           </button>
         </div>
@@ -2356,15 +1889,9 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
         {displayed.length === 0 ? (
           <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 12, padding: "36px 20px", textAlign: "center" }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, marginBottom: 6 }}>
-              {activeFilter === "shortlisted"
-                ? `No candidates scored above the ${threshold}% cutoff threshold.`
-                : activeFilter === "selected"
-                ? "No candidates have been marked as Selected yet. Review candidates below and mark them Selected."
-                : activeFilter === "rejected"
-                ? "No candidates have been marked as Not Selected."
-                : "No candidates have been screened yet."}
+              {activeFilter === "shortlisted" ? `No candidates scored above the ${threshold}% cutoff threshold.` : "No candidates have been screened yet."}
             </div>
-            {activeFilter !== "all" && (
+            {activeFilter === "shortlisted" && (
               <button
                 onClick={() => changeFilter("all")}
                 style={{ ...btn("primary", C), marginTop: 10, display: "inline-flex" }}
@@ -2381,9 +1908,8 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
               c={c}
               threshold={threshold}
               job={job}
-              company={targetComp}
+              company={companies.find(comp => comp.id === job?.companyId) || { name: job?.companyName, contactEmail: "" }}
               onStartInterview={onStartInterview}
-              onUpdateDecision={onUpdateCandidateDecision}
               C={C}
             />
           ))
@@ -2394,7 +1920,7 @@ function Results({ candidates, job, companies = [], onReRun, onRestart, onStartI
 }
 
 /* ============================== STEP 4: CANDIDATE COMPARISON MATRIX ============================== */
-function CandidateComparisonView({ candidates, job, onBack, onStartInterview, onUpdateCandidateDecision, llmProvider, C }) {
+function CandidateComparisonView({ candidates, job, onBack, onStartInterview, llmProvider, C }) {
   const valid = useMemo(() => {
     return (candidates || [])
       .filter((c) => c.status === "done" && c.result)
@@ -2831,175 +2357,6 @@ function CandidateComparisonView({ candidates, job, onBack, onStartInterview, on
             </tr>
           </thead>
           <tbody>
-            {/* Row 0: HR Hiring Decision & Selection Controls */}
-            <tr style={{ background: C.paper }}>
-              <td style={{
-                position: "sticky",
-                left: 0,
-                zIndex: 10,
-                background: C.paper,
-                padding: "14px 20px",
-                fontWeight: 800,
-                color: C.ink,
-                borderRight: `1px solid ${C.line}`,
-                borderBottom: `1px solid ${C.line}`,
-                boxShadow: "2px 0 4px rgba(0,0,0,0.03)"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <UserCheck size={16} color={C.accent} />
-                  <span>HR Hiring Decision</span>
-                </div>
-                <div style={{ fontSize: 11, color: C.sub, fontWeight: 400, marginTop: 2 }}>
-                  Editable candidate selection status
-                </div>
-              </td>
-              {selectedCandidates.map((c) => {
-                const decision = c.hrDecision || c.result?.hrDecision;
-                return (
-                  <td key={c.id} style={{ padding: "14px 20px", borderLeft: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, verticalAlign: "middle" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {decision === "selected" ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#DCFCE7", color: "#166534", border: "1.5px solid #86EFAC", padding: "4px 8px", borderRadius: 6, fontSize: 11.5, fontWeight: 800 }}>
-                            <UserCheck size={13} /> SELECTED
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateCandidateDecision?.(c.id, "rejected")}
-                            title="Switch candidate to Not Selected"
-                            style={{
-                              padding: "4px 7px",
-                              background: "#FFFFFF",
-                              color: "#DC2626",
-                              border: "1px solid #FCA5A5",
-                              borderRadius: 5,
-                              fontSize: 10.5,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 3,
-                              fontFamily: BODY,
-                            }}
-                          >
-                            <UserX size={11} /> Switch
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateCandidateDecision?.(c.id, null)}
-                            title="Reset candidate to pending review"
-                            style={{
-                              padding: "4px 6px",
-                              background: "#FFFFFF",
-                              color: C.sub,
-                              border: `1px solid ${C.line}`,
-                              borderRadius: 5,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                            }}
-                          >
-                            <RotateCcw size={11} />
-                          </button>
-                        </div>
-                      ) : decision === "rejected" ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#FEE2E2", color: "#991B1B", border: "1.5px solid #FCA5A5", padding: "4px 8px", borderRadius: 6, fontSize: 11.5, fontWeight: 800 }}>
-                            <UserX size={13} /> NOT SELECTED
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateCandidateDecision?.(c.id, "selected")}
-                            title="Switch candidate to Selected"
-                            style={{
-                              padding: "4px 7px",
-                              background: "#FFFFFF",
-                              color: "#166534",
-                              border: "1px solid #86EFAC",
-                              borderRadius: 5,
-                              fontSize: 10.5,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 3,
-                              fontFamily: BODY,
-                            }}
-                          >
-                            <UserCheck size={11} /> Switch
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateCandidateDecision?.(c.id, null)}
-                            title="Reset candidate to pending review"
-                            style={{
-                              padding: "4px 6px",
-                              background: "#FFFFFF",
-                              color: C.sub,
-                              border: `1px solid ${C.line}`,
-                              borderRadius: 5,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                            }}
-                          >
-                            <RotateCcw size={11} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateCandidateDecision?.(c.id, "selected")}
-                            style={{
-                              flex: 1,
-                              padding: "6px 8px",
-                              background: "#DCFCE7",
-                              color: "#166534",
-                              border: "1px solid #86EFAC",
-                              borderRadius: 6,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: 4,
-                              fontFamily: BODY,
-                            }}
-                          >
-                            <UserCheck size={12} /> Select
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateCandidateDecision?.(c.id, "rejected")}
-                            style={{
-                              flex: 1,
-                              padding: "6px 8px",
-                              background: "#FEE2E2",
-                              color: "#991B1B",
-                              border: "1px solid #FCA5A5",
-                              borderRadius: 6,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: 4,
-                              fontFamily: BODY,
-                            }}
-                          >
-                            <UserX size={12} /> Not Select
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-
             {/* Row 1: Overall Match Score */}
             <tr style={{ background: C.bg }}>
               <td style={{
@@ -3583,47 +2940,22 @@ const isMatchForComp = (j, comp) => {
 };
 
 /* ============================== WELCOME & AGENCY DASHBOARD ============================== */
-/* ============================== WELCOME & AGENCY DASHBOARD ============================== */
-function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, onNavigateTab, onOpenChangelog, onExportClientExcel, C }) {
+function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, onNavigateTab, onOpenChangelog, C }) {
   const filteredJobs = useMemo(() => {
     if (!activeCompany) return jobs;
     return jobs.filter(j => isMatchForComp(j, activeCompany));
   }, [jobs, activeCompany]);
 
-  const totalVacancies = useMemo(() => {
-    return filteredJobs.reduce((acc, j) => acc + Math.max(1, Number(j.vacancies || 1)), 0);
-  }, [filteredJobs]);
-
-  const totalScreened = useMemo(() => {
-    return filteredJobs.reduce((acc, j) => {
-      const valid = (j.candidates || []).filter(c => c.status === "done" && c.result);
-      return acc + valid.length;
-    }, 0);
-  }, [filteredJobs]);
-
-  const totalSelected = useMemo(() => {
-    return filteredJobs.reduce((acc, j) => {
-      const sel = (j.candidates || []).filter(c => c.hrDecision === "selected" || c.result?.hrDecision === "selected");
-      return acc + sel.length;
-    }, 0);
+  const totalCandidates = useMemo(() => {
+    return filteredJobs.reduce((acc, j) => acc + (j.candidates ? j.candidates.length : 0), 0);
   }, [filteredJobs]);
 
   const totalShortlisted = useMemo(() => {
     return filteredJobs.reduce((acc, j) => {
-      const cutoff = j.cutoff ?? 70;
-      const sh = (j.candidates || []).filter(c => c.status === "done" && c.result && c.result.overallScore >= cutoff);
-      return acc + sh.length;
+      const shortlisted = (j.candidates || []).filter(c => c.status === "done" && c.result && c.result.overallScore >= 70);
+      return acc + shortlisted.length;
     }, 0);
   }, [filteredJobs]);
-
-  const avgCutoff = useMemo(() => {
-    if (filteredJobs.length === 0) return 70;
-    const sum = filteredJobs.reduce((acc, j) => acc + (j.cutoff ?? 70), 0);
-    return Math.round(sum / filteredJobs.length);
-  }, [filteredJobs]);
-
-  const overallFillRate = totalVacancies > 0 ? Math.min(100, Math.round((totalSelected / totalVacancies) * 100)) : 0;
-  const remainingVacancies = Math.max(0, totalVacancies - totalSelected);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -3643,7 +2975,7 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
         <div style={{ maxWidth: 560 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
-              <Sparkles size={14} /> CogniHire Executive Recruitment Cockpit
+              <Sparkles size={14} /> CogniHire AI Interview &amp; Screening Hub
             </div>
             <button
               onClick={onOpenChangelog}
@@ -3671,10 +3003,10 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
             </button>
           </div>
           <h2 style={{ fontSize: 26, fontWeight: 800, margin: 0, fontFamily: DISPLAY, lineHeight: 1.2 }}>
-            Hiring Pipeline &amp; Vacancy Management
+            Candidate Screening &amp; Client Recommendation Portal
           </h2>
           <p style={{ fontSize: 14, margin: "10px 0 0", opacity: 0.9, lineHeight: 1.5 }}>
-            Monitor live vacancies across clients, track candidate screening volumes against benchmark cutoffs, record HR selection decisions, and generate exportable client reports.
+            Screen candidate resumes against client company requirements, score fit, conduct AI interviews, and export formal recommendation reports back to client companies.
           </p>
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -3720,64 +3052,22 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
         </div>
       </div>
 
-      {/* Client Filter Pill Bar */}
-      {companies.length > 1 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: C.paper, padding: "10px 16px", borderRadius: 12, border: `1px solid ${C.line}` }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>Filter by Client:</span>
-          <button
-            onClick={() => setActiveCompany(null)}
-            style={{
-              padding: "5px 12px",
-              borderRadius: 20,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              border: `1px solid ${!activeCompany ? C.accent : C.line}`,
-              background: !activeCompany ? C.accentSoft : "transparent",
-              color: !activeCompany ? C.accent : C.ink,
-              transition: "all 0.15s ease",
-            }}
-          >
-            All Clients ({companies.length})
-          </button>
-          {companies.map(c => {
-            const isSelected = activeCompany?.id === c.id;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setActiveCompany(isSelected ? null : c)}
-                style={{
-                  padding: "5px 12px",
-                  borderRadius: 20,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  border: `1px solid ${isSelected ? C.accent : C.line}`,
-                  background: isSelected ? C.accentSoft : "transparent",
-                  color: isSelected ? C.accent : C.ink,
-                  transition: "all 0.15s ease",
-                }}
-              >
-                🏢 {c.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 4 Core Executive Dashboard Metrics */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16 }}>
-        {/* Metric 1: Total Vacancies */}
+      {/* Metrics Row - Interactive Navigation Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+        {/* Card 1: Client Companies */}
         <div
-          onClick={() => onNavigateTab("jobs", { step: 1 })}
+          onClick={() => onNavigateTab("companies")}
           style={{
             background: C.paper,
             borderRadius: 14,
             border: `1px solid ${C.line}`,
-            padding: "20px 22px",
+            padding: "18px 20px",
             cursor: "pointer",
             transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             userSelect: "none",
           }}
           onMouseEnter={(e) => {
@@ -3790,132 +3080,120 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
             e.currentTarget.style.borderColor = C.line;
             e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
           }}
-          title="Click to view Job Openings & Vacancy Details"
+          title="Click to view Client Companies"
+          role="button"
+          tabIndex={0}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Target size={24} color={C.accent} />
+              <Building2 size={24} color={C.accent} />
             </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: C.accentSoft, padding: "3px 8px", borderRadius: 12 }}>
-              {filteredJobs.length} {filteredJobs.length === 1 ? "Role" : "Roles"}
-            </span>
-          </div>
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, color: C.sub, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Available Vacancies
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 4 }}>
-              {totalVacancies}
-            </div>
-            <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
-              Target openings across client pipelines
+            <div>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Client Companies</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{companies.length}</div>
             </div>
           </div>
+          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
         </div>
 
-        {/* Metric 2: Resumes Screened */}
+        {/* Card 2: Active Opening Jobs */}
+        <div
+          onClick={() => onNavigateTab("jobs", { step: 1 })}
+          style={{
+            background: C.paper,
+            borderRadius: 14,
+            border: `1px solid ${C.line}`,
+            padding: "18px 20px",
+            cursor: "pointer",
+            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-3px)";
+            e.currentTarget.style.borderColor = C.accent;
+            e.currentTarget.style.boxShadow = `0 8px 20px -4px ${C.accentSoft}`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.borderColor = C.line;
+            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+          }}
+          title="Click to view Active Opening Jobs"
+          role="button"
+          tabIndex={0}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Briefcase size={24} color={C.accent} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Active Opening Jobs</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{filteredJobs.length}</div>
+            </div>
+          </div>
+          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
+        </div>
+
+        {/* Card 3: Total Resumes Screened */}
         <div
           onClick={() => onNavigateTab("jobs", { step: 3 })}
           style={{
             background: C.paper,
             borderRadius: 14,
             border: `1px solid ${C.line}`,
-            padding: "20px 22px",
+            padding: "18px 20px",
             cursor: "pointer",
             transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             userSelect: "none",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = "translateY(-3px)";
-            e.currentTarget.style.borderColor = "#2563EB";
-            e.currentTarget.style.boxShadow = "0 8px 20px -4px rgba(37, 99, 235, 0.2)";
+            e.currentTarget.style.borderColor = C.accent;
+            e.currentTarget.style.boxShadow = `0 8px 20px -4px ${C.accentSoft}`;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.borderColor = C.line;
             e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
           }}
-          title="Click to view Resumes Screened & Results"
+          title="Click to view Total Resumes Screened & Results"
+          role="button"
+          tabIndex={0}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(37, 99, 235, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Users size={24} color="#2563EB" />
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Users size={24} color={C.accent} />
             </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB", background: "rgba(37, 99, 235, 0.1)", padding: "3px 8px", borderRadius: 12 }}>
-              Screened
-            </span>
-          </div>
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, color: C.sub, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Resumes Screened
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 4 }}>
-              {totalScreened}
-            </div>
-            <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
-              {totalShortlisted} candidates met quality cutoffs
+            <div>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Total Resumes Screened</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{totalCandidates}</div>
             </div>
           </div>
+          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
         </div>
 
-        {/* Metric 3: Cutoff Threshold */}
+        {/* Card 4: Shortlisted Candidates */}
         <div
           onClick={() => onNavigateTab("jobs", { step: 3, filter: "shortlisted" })}
           style={{
             background: C.paper,
             borderRadius: 14,
             border: `1px solid ${C.line}`,
-            padding: "20px 22px",
+            padding: "18px 20px",
             cursor: "pointer",
             transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            userSelect: "none",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-3px)";
-            e.currentTarget.style.borderColor = "#D97706";
-            e.currentTarget.style.boxShadow = "0 8px 20px -4px rgba(217, 119, 6, 0.2)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.borderColor = C.line;
-            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-          }}
-          title="Click to view candidates meeting cutoff score"
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: "#FEF3C7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Scale size={24} color="#D97706" />
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#B45309", background: "#FEF3C7", padding: "3px 8px", borderRadius: 12 }}>
-              Benchmark
-            </span>
-          </div>
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, color: C.sub, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Cutoff Threshold
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: "#D97706", fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 4 }}>
-              ≥{avgCutoff}%
-            </div>
-            <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
-              Active quality benchmark threshold
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 4: HR Selected Candidates */}
-        <div
-          onClick={() => onNavigateTab("jobs", { step: 3, filter: "selected" })}
-          style={{
-            background: C.paper,
-            borderRadius: 14,
-            border: `1.5px solid ${totalSelected >= totalVacancies && totalVacancies > 0 ? "#86EFAC" : C.line}`,
-            padding: "20px 22px",
-            cursor: "pointer",
-            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             userSelect: "none",
           }}
           onMouseEnter={(e) => {
@@ -3925,268 +3203,24 @@ function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, on
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.borderColor = totalSelected >= totalVacancies && totalVacancies > 0 ? "#86EFAC" : C.line;
+            e.currentTarget.style.borderColor = C.line;
             e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
           }}
-          title="Click to view HR Selected Candidates"
+          title="Click to view Shortlisted Candidates"
+          role="button"
+          tabIndex={0}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ width: 48, height: 48, borderRadius: 12, background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <UserCheck size={24} color="#16A34A" />
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 800, color: "#166534", background: "#DCFCE7", padding: "3px 8px", borderRadius: 12 }}>
-              {totalSelected} / {totalVacancies}
-            </span>
-          </div>
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, color: C.sub, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              HR Selected
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: "#16A34A", fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 4 }}>
-              {totalSelected}
-            </div>
-            <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
-              {remainingVacancies === 0 ? "All vacancies filled" : `${remainingVacancies} openings remaining`}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Vacancy Fulfillment Progress Card */}
-      <div style={{
-        background: C.paper,
-        border: `1px solid ${C.line}`,
-        borderRadius: 16,
-        padding: "20px 24px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Target size={18} color={C.accent} />
+              <Star size={24} color="#16A34A" />
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: C.ink, fontFamily: DISPLAY }}>
-                Overall Vacancy Pipeline Fulfillment
-              </div>
-              <div style={{ fontSize: 12, color: C.sub }}>
-                {totalSelected} of {totalVacancies} positions filled across {filteredJobs.length} active job {filteredJobs.length === 1 ? "opening" : "openings"}
-              </div>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Shortlisted Candidates</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#16A34A", fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{totalShortlisted}</div>
             </div>
           </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{
-              fontSize: 12,
-              fontWeight: 800,
-              padding: "4px 10px",
-              borderRadius: 6,
-              background: overallFillRate >= 100 ? "#DCFCE7" : (overallFillRate > 0 ? "#FEF9C3" : C.bg),
-              color: overallFillRate >= 100 ? "#166534" : (overallFillRate > 0 ? "#854D0E" : C.sub),
-              border: `1px solid ${overallFillRate >= 100 ? "#86EFAC" : C.line}`
-            }}>
-              {overallFillRate >= 100 ? "✓ 100% FULLY STAFFED" : `${overallFillRate}% FULFILLED (${remainingVacancies} OPEN)`}
-            </span>
-          </div>
+          <div style={{ color: "#16A34A", fontSize: 20, fontWeight: 700, opacity: 0.8 }}>›</div>
         </div>
-
-        {/* Progress Bar */}
-        <div style={{ width: "100%", height: 12, background: C.bg, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.line}` }}>
-          <div style={{
-            width: `${overallFillRate}%`,
-            height: "100%",
-            background: overallFillRate >= 100 ? "#16A34A" : `linear-gradient(90deg, ${C.accent} 0%, #2563EB 100%)`,
-            borderRadius: 10,
-            transition: "width 0.4s ease"
-          }} />
-        </div>
-      </div>
-
-      {/* Per-Job Recruitment & Vacancy Pipeline Table */}
-      <div style={{
-        background: C.paper,
-        border: `1px solid ${C.line}`,
-        borderRadius: 16,
-        padding: "22px 24px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: C.ink, fontFamily: DISPLAY }}>
-              Client Job Openings &amp; Recruitment Pipeline
-            </h3>
-            <p style={{ fontSize: 12.5, color: C.sub, margin: "3px 0 0" }}>
-              Real-time breakdown of vacancies, screening volume, cutoffs, and HR selections per role
-            </p>
-          </div>
-          <button
-            onClick={onCreateJob}
-            style={{
-              padding: "8px 14px",
-              background: C.accent,
-              color: "#FFFFFF",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontFamily: BODY,
-            }}
-          >
-            <Plus size={14} /> New Job Opening
-          </button>
-        </div>
-
-        {filteredJobs.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 20px", color: C.sub, background: C.bg, borderRadius: 12, border: `1px dashed ${C.line}` }}>
-            <Briefcase size={32} color={C.faint} style={{ marginBottom: 10 }} />
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>No job openings found</div>
-            <div style={{ fontSize: 12.5, marginTop: 4 }}>Post your first job opening to start screening candidates and tracking vacancies.</div>
-            <button onClick={onCreateJob} style={{ ...btn("primary", C), marginTop: 14 }}>
-              + Post New Opening Job
-            </button>
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: C.bg, textAlign: "left" }}>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}`, borderRadius: "8px 0 0 0" }}>Client Company</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}` }}>Job Opening</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}`, textAlign: "center" }}>Vacancies</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}`, textAlign: "center" }}>Screened</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}`, textAlign: "center" }}>Cutoff</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}`, textAlign: "center" }}>Qualified</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}`, textAlign: "center" }}>HR Selected</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}`, textAlign: "center" }}>Status</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 800, color: C.sub, fontSize: 11, textTransform: "uppercase", borderBottom: `2px solid ${C.line}`, textAlign: "right", borderRadius: "0 8px 0 0" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredJobs.map((j) => {
-                  const valid = (j.candidates || []).filter(c => c.status === "done" && c.result);
-                  const cutoff = j.cutoff ?? 70;
-                  const vacancies = Math.max(1, Number(j.vacancies || 1));
-                  const metCutoff = valid.filter(c => (c.result?.overallScore ?? 0) >= cutoff).length;
-                  const selected = valid.filter(c => c.hrDecision === "selected" || c.result?.hrDecision === "selected").length;
-                  const isFilled = selected >= vacancies;
-                  const compObj = companies.find(c => c.id === j.companyId) || { name: j.companyName || "Client" };
-
-                  return (
-                    <tr key={j.id} style={{ borderBottom: `1px solid ${C.line}`, transition: "background 0.15s ease" }}>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}` }}>
-                        <span style={{ fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 5 }}>
-                          🏢 {j.companyName || compObj.name || "Client"}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}` }}>
-                        <div style={{ fontWeight: 800, color: C.ink }}>
-                          {j.title || "Untitled Role"}
-                        </div>
-                        <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>
-                          {j.seniority || "Senior"} · {j.minYears || 0}+ yrs exp · {j.location || "Remote/Hybrid"}
-                        </div>
-                      </td>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}`, textAlign: "center" }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: C.ink, background: C.bg, padding: "4px 10px", borderRadius: 8, border: `1px solid ${C.line}` }}>
-                          🎯 {vacancies}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}`, textAlign: "center" }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
-                          👥 {valid.length}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}`, textAlign: "center" }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 800, color: "#D97706" }}>
-                          ≥{cutoff}%
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}`, textAlign: "center" }}>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: metCutoff > 0 ? "#16A34A" : C.sub }}>
-                          {metCutoff}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}`, textAlign: "center" }}>
-                        <span style={{
-                          fontSize: 13,
-                          fontWeight: 800,
-                          color: selected > 0 ? "#15803D" : C.faint,
-                          background: selected > 0 ? "#DCFCE7" : "transparent",
-                          padding: selected > 0 ? "3px 8px" : "0",
-                          borderRadius: 6
-                        }}>
-                          ⭐ {selected} / {vacancies}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}`, textAlign: "center" }}>
-                        <span style={{
-                          fontSize: 11,
-                          fontWeight: 800,
-                          padding: "3px 8px",
-                          borderRadius: 6,
-                          background: isFilled ? "#DCFCE7" : (selected > 0 ? "#FEF9C3" : C.bg),
-                          color: isFilled ? "#166534" : (selected > 0 ? "#854D0E" : C.sub),
-                          border: `1px solid ${isFilled ? "#86EFAC" : C.line}`
-                        }}>
-                          {isFilled ? "✓ FILLED" : (selected > 0 ? "PARTIAL" : "OPEN")}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 14px", borderBottom: `1px solid ${C.line}`, textAlign: "right" }}>
-                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
-                          <button
-                            onClick={() => onSelectJob(j.id)}
-                            style={{
-                              padding: "6px 11px",
-                              background: C.accentSoft,
-                              color: C.accent,
-                              border: `1px solid ${C.accent}`,
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                              fontFamily: BODY,
-                              transition: "all 0.15s ease"
-                            }}
-                            title="Open candidate screening results for this job opening"
-                          >
-                            Review ({valid.length}) →
-                          </button>
-                          <button
-                            onClick={() => exportClientExcel(compObj, [j])}
-                            style={{
-                              padding: "6px 9px",
-                              background: "#DCFCE7",
-                              color: "#166534",
-                              border: "1px solid #86EFAC",
-                              borderRadius: 6,
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                              fontFamily: BODY,
-                            }}
-                            title={`Export Excel report for ${j.title}`}
-                          >
-                            <FileSpreadsheet size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -4293,50 +3327,27 @@ function CompanyManager({ companies, jobs, onCreateCompany, onEditCompany, onDel
                 {comp.notes && <p style={{ fontSize: 12, color: C.sub, marginTop: 8, lineHeight: 1.4 }}>{comp.notes}</p>}
               </div>
 
-              <div style={{ marginTop: 20, paddingTop: 14, borderTop: `1px solid ${C.line}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div style={{ marginTop: 20, paddingTop: 14, borderTop: `1px solid ${C.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{compJobs.length} Openings</div>
                   <div style={{ fontSize: 11, color: C.sub }}>{totalScreened} Candidates</div>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <button
-                    onClick={() => exportClientExcel(comp, compJobs)}
-                    title={`Download complete multi-sheet Excel recruitment report for ${comp.name}`}
-                    style={{
-                      padding: "6px 11px",
-                      background: "#DCFCE7",
-                      color: "#166534",
-                      border: "1px solid #86EFAC",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 5,
-                      fontFamily: BODY,
-                      transition: "all 0.15s ease"
-                    }}
-                  >
-                    <FileSpreadsheet size={13} /> Excel
-                  </button>
-                  <button
-                    onClick={() => onSelectCompanyJobs(comp)}
-                    style={{
-                      padding: "6px 12px",
-                      background: C.accentSoft,
-                      color: C.accent,
-                      border: `1px solid ${C.accent}`,
-                      borderRadius: 6,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontFamily: BODY,
-                    }}
-                  >
-                    View Openings →
-                  </button>
-                </div>
+                <button
+                  onClick={() => onSelectCompanyJobs(comp)}
+                  style={{
+                    padding: "6px 12px",
+                    background: C.accentSoft,
+                    color: C.accent,
+                    border: `1px solid ${C.accent}`,
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: BODY,
+                  }}
+                >
+                  View Openings →
+                </button>
               </div>
             </Panel>
           );
@@ -5386,8 +4397,6 @@ export default function App() {
       title: "",
       seniority: "Senior",
       minYears: 3,
-      vacancies: 1,
-      cutoff: 70,
       location: "Chennai / Hybrid",
       senderName: "",
       senderEmail: "",
@@ -5437,21 +4446,6 @@ export default function App() {
     updateActiveJob((j) => ({
       ...j,
       candidates: typeof updatedCandidates === "function" ? updatedCandidates(j.candidates || []) : updatedCandidates
-    }));
-  };
-
-  const handleUpdateCandidateDecision = (candidateId, newDecision) => {
-    updateActiveJob((j) => ({
-      ...j,
-      candidates: (j.candidates || []).map((c) =>
-        c.id === candidateId
-          ? {
-              ...c,
-              hrDecision: newDecision,
-              result: c.result ? { ...c.result, hrDecision: newDecision } : c.result,
-            }
-          : c
-      ),
     }));
   };
 
@@ -5623,7 +4617,6 @@ export default function App() {
                   }
                   setActiveTab(tab);
                 }}
-                onExportClientExcel={exportClientExcel}
                 C={C}
               />
             )}
@@ -5935,7 +4928,6 @@ export default function App() {
                             onRestart={() => goto(1)}
                             onStartInterview={(cand) => setActiveInterviewCandidate(cand)}
                             onCompare={() => goto(4)}
-                            onUpdateCandidateDecision={handleUpdateCandidateDecision}
                             filterMode={resultsFilter}
                             setFilterMode={setResultsFilter}
                             C={C}
@@ -5946,7 +4938,6 @@ export default function App() {
                             job={activeJob}
                             onBack={() => goto(3)}
                             onStartInterview={(cand) => setActiveInterviewCandidate(cand)}
-                            onUpdateCandidateDecision={handleUpdateCandidateDecision}
                             llmProvider={llmProvider}
                             C={C}
                           />

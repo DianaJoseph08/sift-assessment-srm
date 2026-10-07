@@ -152,12 +152,6 @@ try {
 try {
   db.exec("ALTER TABLE jobs ADD COLUMN company_name TEXT");
 } catch (e) {}
-try {
-  db.exec("ALTER TABLE jobs ADD COLUMN vacancies INTEGER DEFAULT 1");
-} catch (e) {}
-try {
-  db.exec("ALTER TABLE jobs ADD COLUMN cutoff INTEGER DEFAULT 70");
-} catch (e) {}
 
 // ONE-TIME FIX: Restore orphaned jobs to their correct UI companies
 try {
@@ -180,15 +174,9 @@ db.exec(`
     status TEXT,
     result TEXT, -- JSON stringified object
     error TEXT,
-    hr_decision TEXT,
     FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
   );
 `);
-
-// Migration safeguard for existing DBs without hr_decision
-try {
-  db.exec("ALTER TABLE candidates ADD COLUMN hr_decision TEXT");
-} catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS activity_logs (
@@ -317,25 +305,17 @@ export function getJobs() {
   
   return jobsList.map((job) => {
     const dbCandidates = candidatesQuery.all(job.id);
-    const parsedCandidates = dbCandidates.map((c) => {
-      let parsedResult = null;
-      try {
-        if (c.result) parsedResult = JSON.parse(c.result);
-      } catch (e) {}
-
-      return {
-        id: c.id,
-        kind: c.kind,
-        filename: c.filename || undefined,
-        base64: null, // Omit base64 content when sending to client to keep payload lightweight
-        text: c.text || undefined,
-        label: c.label,
-        status: c.status,
-        hrDecision: c.hr_decision || (parsedResult && parsedResult.hrDecision) || null,
-        result: parsedResult,
-        error: c.error || null,
-      };
-    });
+    const parsedCandidates = dbCandidates.map((c) => ({
+      id: c.id,
+      kind: c.kind,
+      filename: c.filename || undefined,
+      base64: null, // Omit base64 content when sending to client to keep payload lightweight
+      text: c.text || undefined,
+      label: c.label,
+      status: c.status,
+      result: c.result ? JSON.parse(c.result) : null,
+      error: c.error || null,
+    }));
     
     let resolvedCompId = job.company_id;
     let resolvedCompName = job.company_name;
@@ -347,8 +327,6 @@ export function getJobs() {
       title: job.title || "",
       seniority: job.seniority || "Senior",
       minYears: Number(job.minYears || 0),
-      vacancies: Math.max(1, Number(job.vacancies || 1)),
-      cutoff: Math.max(30, Number(job.cutoff || 70)),
       location: job.location || "",
       description: job.description || "",
       mustHave: job.mustHave ? JSON.parse(job.mustHave) : [],
@@ -383,13 +361,13 @@ export function saveJobs(jobs) {
     db.exec("DELETE FROM jobs");
     
     const insertJob = db.prepare(`
-      INSERT INTO jobs (id, company_id, company_name, title, seniority, minYears, location, description, mustHave, niceToHave, screening, vacancies, cutoff)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO jobs (id, company_id, company_name, title, seniority, minYears, location, description, mustHave, niceToHave, screening)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertCandidate = db.prepare(`
-      INSERT INTO candidates (id, job_id, kind, filename, base64, text, label, status, result, error, hr_decision)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO candidates (id, job_id, kind, filename, base64, text, label, status, result, error)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     for (const job of jobs) {
@@ -404,15 +382,12 @@ export function saveJobs(jobs) {
         job.description || "",
         JSON.stringify(job.mustHave || []),
         JSON.stringify(job.niceToHave || []),
-        job.screening || "idle",
-        Math.max(1, Number(job.vacancies || 1)),
-        Math.max(30, Number(job.cutoff || 70))
+        job.screening || "idle"
       );
       
       if (job.candidates && Array.isArray(job.candidates)) {
         for (const c of job.candidates) {
           const b64 = c.base64 || existingBase64[c.id] || null;
-          const decision = c.hrDecision || (c.result && c.result.hrDecision) || null;
           insertCandidate.run(
             c.id,
             job.id,
@@ -423,8 +398,7 @@ export function saveJobs(jobs) {
             c.label || "",
             c.status || "idle",
             c.result ? JSON.stringify(c.result) : null,
-            c.error || null,
-            decision
+            c.error || null
           );
         }
       }
