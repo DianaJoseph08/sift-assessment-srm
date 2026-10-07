@@ -1,6 +1,6 @@
 {
   "name": "sift-resume-agent",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "SIFT — AI-powered resume shortlisting and recommendation agent (React + Express + Claude API)",
   "type": "module",
@@ -28,7 +28,8 @@
     "pdf-parse": "^1.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.15.0"
+    "recharts": "^2.15.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
