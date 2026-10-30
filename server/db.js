@@ -619,6 +619,10 @@ export function getUserByEmail(email) {
       const q = db.prepare("SELECT * FROM users WHERE LOWER(email) = 'admin@motherson.com' OR role = 'super_admin' ORDER BY CASE WHEN LOWER(email) = 'admin@motherson.com' THEN 0 ELSE 1 END LIMIT 1");
       return q.get() || null;
     }
+    if (raw === 'praveen' || raw === 'praveen.ambrose' || raw === 'praveen ambrose') {
+      const q = db.prepare("SELECT * FROM users WHERE LOWER(email) = 'praveen.ambrose@motherson.com' LIMIT 1");
+      return q.get() || null;
+    }
     const q = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)");
     return q.get(raw) || null;
   } catch (e) {
