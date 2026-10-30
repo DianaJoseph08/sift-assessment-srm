@@ -8,6 +8,7 @@ export default defineConfig({
   root: "client",
   plugins: [react()],
   server: {
+    host: "0.0.0.0",
     port: 5173,
     allowedHosts: true,
     proxy: {

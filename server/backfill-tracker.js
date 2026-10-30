@@ -1,0 +1,12 @@
+import {backup} from 'node:sqlite';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {database,getUsers} from './db.js';
+import {synchronizeScreeningWorkflow} from './workflow.js';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const actor=getUsers().find(u=>u.role==='super_admin'&&u.email.toLowerCase()==='praveen.ambrose@motherson.com');
+if(!actor)throw new Error('Designated Super Admin account must exist before backfill');
+const backupDir=path.join(root,'scratch','tracker-backups');await fs.mkdir(backupDir,{recursive:true});
+const target=path.join(backupDir,`before-backfill-${Date.now()}.db`);await backup(database,target);
+console.log(JSON.stringify({backup:target,...synchronizeScreeningWorkflow(actor)}));

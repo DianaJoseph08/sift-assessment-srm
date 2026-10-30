@@ -1,3 +1,7 @@
+import JobMonitor from './JobMonitor.jsx';
+import {useNavigation} from './useNavigation.jsx';
+import CustomerDashboard from './CustomerDashboard.jsx';
+import WorkflowWorkspace from "./WorkflowWorkspace.jsx";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer, Tooltip,
@@ -10,10 +14,24 @@ import {
   Target, GraduationCap, Lightbulb, Search, Loader2, FileWarning, Trash2, Home,
   Mail, Send, MessageSquare, Play, Building2, Activity, Settings, Moon, Sun, Layers,
   ShieldCheck, ExternalLink, Filter, Copy, RefreshCw, ChevronUp, Cpu, Save, BookOpen, Scale,
-  HelpCircle, CheckCircle2, Clock, Edit2, GitBranch, Tag, History
+  HelpCircle, CheckCircle2, Clock, Edit2, GitBranch, Tag, History,
+  Lock, LogIn, LogOut, UserCheck, UserPlus, Shield, Compass, Network, Award, CheckSquare, Eye, Key,
+  PieChart, TrendingUp
 } from "lucide-react";
 import { analyzeCandidate, fileToBase64, sendInterviewChat, evaluateInterview } from "./api.js";
 import VideoInterview from "./VideoInterview.jsx";
+import {
+  LoginView,
+  AdminDashboard,
+  ManagerDashboard,
+  RecruiterDashboard,
+  WelcomeDashboard,
+  ClustersView,
+  ManagersView,
+  RecruitersView,
+  ClusterModal,
+  UserModal
+} from "./RoleViews.jsx";
 
 
 /* ============================== THEME SYSTEM ============================== */
@@ -477,7 +495,7 @@ function SkillEditor({ skills, onChange, placeholder, C }) {
 }
 
 function Stepper({ step, maxReached, go, C }) {
-  const steps = ["Define Job Criteria", "Add Resumes", "Review Shortlist & Recommend", "Compare Candidates"];
+  const steps = ["View posted job", "Upload resumes", "Screening & AI interviews", "Compile results"];
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 20 }}>
       {steps.map((label, i) => {
@@ -541,20 +559,118 @@ const List = ({ items, color, icon, C }) => (
 );
 
 /* ============================== STEP 1: ROLE DEFINITION ============================== */
-function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelete, onEditCompany, onCreateCompany, C }) {
+function RoleStep({ job, setJob, companies, clusters, currentUser, onUpdateJobStatus, onNext, onSave, savedNotice, onDelete, onEditCompany, onCreateCompany, C }) {
   const ready = (job.title || "").trim() && (job.description || "").trim();
   const selectedComp = companies.find(c => c.id === job.companyId) || companies[0];
   const companyDefaultSender = selectedComp?.senderName || (selectedComp?.name ? `${selectedComp.name} Talent Team` : "Client Talent Team");
   const companyDefaultEmail = selectedComp?.contactEmail || "hr@client.com";
 
+  const isManagerOrAdmin = currentUser?.role === "manager";
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.05fr .95fr", gap: 22 }}>
       <Panel
         title="Define Job Criteria"
-        sub="Specify the role requirements and select target client company"
+        sub="Specify the role requirements, hiring manager, and client company"
         C={C}
         action={
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {/* Status Badge */}
+            <span style={{
+              fontSize: 11,
+              fontWeight: 800,
+              padding: "4px 8px",
+              borderRadius: 6,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+              background: job.status === "posted" ? "#DCFCE7" : (job.status === "closed" ? "#F1F5F9" : "#FEF3C7"),
+              color: job.status === "posted" ? "#15803D" : (job.status === "closed" ? "#475569" : "#B45309"),
+              border: `1px solid ${job.status === "posted" ? "#86EFAC" : (job.status === "closed" ? "#CBD5E1" : "#FCD34D")}`
+            }}>
+              {job.status === "posted" ? "● Open to Recruiters" : (job.status === "closed" ? "● Closed" : "○ Draft")}
+            </span>
+
+            {/* Post / Close Job Action for Managers */}
+            {isManagerOrAdmin && onUpdateJobStatus && job.id && (
+              <>
+                {job.status === "draft" && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateJobStatus(job.id, "posted")}
+                    title="Publish job to recruiters so they can begin screening resumes"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      padding: "6px 12px",
+                      background: "#10B981",
+                      color: "#FFFFFF",
+                      border: "none",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: BODY,
+                      boxShadow: "0 2px 5px rgba(16, 185, 129, 0.25)"
+                    }}
+                  >
+                    <Send size={13} />
+                    <span>Post to Recruiters</span>
+                  </button>
+                )}
+
+                {job.status === "posted" && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateJobStatus(job.id, "closed")}
+                    title="Close this opening when vacancies are filled"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      padding: "6px 12px",
+                      background: "#F1F5F9",
+                      color: "#475569",
+                      border: "1px solid #CBD5E1",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: BODY
+                    }}
+                  >
+                    <Lock size={13} />
+                    <span>Close Job</span>
+                  </button>
+                )}
+
+                {job.status === "closed" && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateJobStatus(job.id, "posted")}
+                    title="Re-open this job opening for recruiters"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      padding: "6px 12px",
+                      background: "#E0F2FE",
+                      color: "#0284C7",
+                      border: "1px solid #7DD3FC",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: BODY
+                    }}
+                  >
+                    <RotateCcw size={13} />
+                    <span>Re-open Job</span>
+                  </button>
+                )}
+              </>
+            )}
+
             <button
               type="button"
               onClick={onSave}
@@ -675,6 +791,33 @@ function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelet
             )}
           </div>
         </Field>
+
+        {/* Cluster & Client Manager Name */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 4 }}>
+          <Field label="Target Cluster" hint="Customer business unit / domain" C={C}>
+            <select
+              style={inputStyle(C)}
+              value={job.clusterId || ""}
+              onChange={(e) => setJob({ ...job, clusterId: e.target.value })}
+            >
+              <option value="">Select Cluster...</option>
+              {(clusters || [])
+                .filter(cl => !job.companyId || cl.customerId === job.companyId)
+                .map(cl => (
+                  <option key={cl.id} value={cl.id}>🌐 {cl.name}</option>
+                ))}
+            </select>
+          </Field>
+
+          <Field label="Client Manager Name" hint="Direct hiring manager name at client" C={C}>
+            <input
+              style={inputStyle(C)}
+              value={job.clientManagerName || ""}
+              placeholder="e.g. Dr. Markus Weber"
+              onChange={(e) => setJob({ ...job, clientManagerName: e.target.value })}
+            />
+          </Field>
+        </div>
 
         <Field label="Job title" C={C}>
           <input style={inputStyle(C)} value={job.title || ""}
@@ -805,7 +948,7 @@ function RoleStep({ job, setJob, companies, onNext, onSave, savedNotice, onDelet
             style={{ ...btn("primary", C), opacity: ready ? 1 : 0.45, cursor: ready ? "pointer" : "not-allowed", marginLeft: "auto" }}
             onClick={() => ready && onNext()}
           >
-            Next: Add Resumes <ArrowRight size={16} />
+            Review candidates <ArrowRight size={16} />
           </button>
         </div>
       </div>
@@ -1127,7 +1270,7 @@ function InviteCandidateModal({ c, job, company, onClose, C }) {
   const [replyToEmail, setReplyToEmail] = useState(defaultReplyTo);
   const [subject, setSubject] = useState(`AI Technical Interview Invitation — ${job?.title || 'Position'} at ${companyName}`);
 
-  const interviewLink = `${window.location.origin}/interview?cand=${c.id}`;
+  const interviewLink = `${window.location.origin}/interview?cand=${c.id}&token=${encodeURIComponent(c.interviewToken||'')}`;
 
   const defaultBody = 
 `Dear ${r?.candidateName || 'Candidate'},
@@ -1168,6 +1311,8 @@ ${companyName}`;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          jobId:job?.id,
+          candidateId:c.id,
           candidateName: r?.candidateName || c.label,
           email: recipientEmail,
           phone: r?.phone || "",
@@ -1351,7 +1496,7 @@ function CandidateCard({ rank, c, threshold, job, company, onStartInterview, C }
 
   const handleCopyLink = async (e) => {
     e.stopPropagation();
-    const interviewLink = `${window.location.origin}/interview?cand=${c.id}`;
+    const interviewLink = `${window.location.origin}/interview?cand=${c.id}&token=${encodeURIComponent(c.interviewToken||'')}`;
     try {
       await navigator.clipboard.writeText(interviewLink);
     } catch (err) {}
@@ -2021,7 +2166,7 @@ function CandidateComparisonView({ candidates, job, onBack, onStartInterview, ll
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          job: { title: job?.title, seniority: job?.seniority, minYears: job?.minYears, mustHave: job?.mustHave, description: job?.description },
+          job: { id:job?.id,title: job?.title, seniority: job?.seniority, minYears: job?.minYears, mustHave: job?.mustHave, description: job?.description },
           candidates: selectedCandidates,
           provider: effectiveProvider,
           apiKey
@@ -2759,15 +2904,73 @@ function CandidateComparisonView({ candidates, job, onBack, onStartInterview, ll
 }
 
 /* ============================== SIDEBAR NAVIGATION ============================== */
-function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, activeCompany, setActiveCompany, onOpenChangelog, C }) {
-  const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: Home },
-    { id: "companies", label: "Client Companies", icon: Building2, badge: companies.length },
-    { id: "jobs", label: "Job Openings & Screening", icon: Briefcase },
-    { id: "logs", label: "Activity & Audit Logs", icon: Activity },
-    { id: "settings", label: "Settings & AI Keys", icon: Settings },
-    { id: "guide", label: "User Guide & Manual", icon: BookOpen },
-  ];
+function Sidebar({
+  activeTab,
+  setActiveTab,
+  currentTheme,
+  setTheme,
+  companies,
+  activeCompany,
+  setActiveCompany,
+  clusters = [],
+  users = [],
+  jobs = [],
+  currentUser,
+  onLogout,
+  onOpenChangelog,
+  onOpenAddCustomer,
+  onOpenAddCluster,
+  onOpenAddManager,
+  onOpenAddRecruiter,
+  onOpenCreateJob,
+  C
+}) {
+  const role = currentUser?.role || "super_admin";
+
+  // Build assigned context string
+  let assignedContext = "";
+  if (role !== "super_admin") {
+    const comp = companies.find(c => c.id === currentUser?.customerId);
+    const cluster = clusters.find(cl => cl.id === currentUser?.clusterId);
+    const compName = comp ? comp.name : (currentUser?.customerId || "Client");
+    const clusterName = cluster ? `${cluster.name} Cluster` : (currentUser?.clusterId || "Cluster");
+    assignedContext = `${compName} • ${clusterName}`;
+  }
+
+  // Build optimal doodle-style navigation items based on role
+  let navItems = [];
+  if (role === "super_admin") {
+    navItems = [
+      { id: "dashboard", label: "Overview", icon: Home },
+      { id: "companies", label: "Customers", icon: Building2, badge: companies.length },
+      { id: "clusters", label: "Clusters", icon: Network, badge: clusters.length },
+      { id: "managers", label: "Managers", icon: Users, badge: users.filter(u => u.role === "manager").length },
+      { id: "jobs", label: "Jobs & candidate results", icon: Briefcase, badge: jobs.length },
+      { id: "logs", label: "Audit Logs", icon: Activity },
+      { id: "settings", label: "Settings", icon: Settings },
+      { id: "guide", label: "Guide", icon: BookOpen },
+    ];
+  } else if (role === "manager") {
+    const myJobs = jobs;
+    const myRecruiters = users.filter(u => u.role === "recruiter");
+    navItems = [
+      { id: "dashboard", label: "Overview", icon: Home },
+      { id: "jobs", label: "Job Postings", icon: Briefcase, badge: myJobs.length },
+      { id: "recruiters", label: "Recruiters", icon: UserCheck, badge: myRecruiters.length },
+      { id: "settings", label: "Settings", icon: Settings },
+      { id: "guide", label: "Guide", icon: BookOpen },
+    ];
+  } else {
+    // Recruiter
+    const openJobs = jobs.filter(j => j.status === "posted" && (!currentUser?.clusterId || j.clusterId === currentUser.clusterId));
+    navItems = [
+      { id: "dashboard", label: "Overview", icon: Home },
+      { id: "jobs", label: "Open Jobs", icon: Briefcase, badge: openJobs.length },
+      { id: "guide", label: "Guide", icon: BookOpen },
+    ];
+  }
+
+  navItems.splice(1,0,{id:"workflow",label:role==="super_admin"?"System monitoring":role==="manager"?"Vacancies & candidate status":"Pipeline & follow-up",icon:Briefcase});
 
   return (
     <aside style={{
@@ -2785,40 +2988,201 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
       top: 0,
     }}>
       {/* Brand Header */}
-      <div style={{ padding: "0 4px 20px", borderBottom: `1px solid ${C.lineDark}` }}>
+      <div style={{ padding: "0 4px 16px", borderBottom: `1px solid ${C.lineDark}` }}>
         <BrandLogo theme="dark" />
       </div>
 
-      {/* Client Company Quick Selector */}
-      <div style={{ margin: "18px 0", padding: "12px 10px", background: "rgba(255,255,255,0.04)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ fontSize: 10.5, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-          Target Client Company
+      {/* User Profile Card & Role Indicator */}
+      {currentUser && (
+        <div style={{
+          margin: "14px 0 10px",
+          padding: "10px 12px",
+          background: "rgba(255, 255, 255, 0.05)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          borderRadius: 10,
+          display: "flex",
+          flexDirection: "column",
+          gap: 6
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <div style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: role === "super_admin" ? "linear-gradient(135deg, #6366F1, #8B5CF6)" : (role === "manager" ? "linear-gradient(135deg, #0284C7, #38BDF8)" : "linear-gradient(135deg, #10B981, #34D399)"),
+                color: "#FFFFFF",
+                fontSize: 12.5,
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 2px 5px rgba(0,0,0,0.3)"
+              }}>
+                {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : "U"}
+              </div>
+              <div style={{ overflow: "hidden" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#F8FAFC", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {currentUser.name}
+                </div>
+                <div style={{ fontSize: 10.5, color: "#94A3B8", display: "flex", alignItems: "center", gap: 4 }}>
+                  <span>{role === "super_admin" ? "👑 Motherson Admin" : (role === "manager" ? "👔 Cluster Manager" : "🎯 Recruiter")}</span>
+                </div>
+              </div>
+            </div>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                title="Log out of session"
+                style={{
+                  background: "rgba(239, 68, 68, 0.15)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  color: "#F87171",
+                  borderRadius: 6,
+                  padding: "5px 7px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <LogOut size={13} />
+              </button>
+            )}
+          </div>
+          {assignedContext && (
+            <div style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "#38BDF8",
+              background: "rgba(56, 189, 248, 0.1)",
+              border: "1px solid rgba(56, 189, 248, 0.2)",
+              padding: "3px 6px",
+              borderRadius: 4,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }}>
+              📍 {assignedContext}
+            </div>
+          )}
         </div>
-        <select
-          value={activeCompany?.id || "all"}
-          onChange={(e) => {
-            const selected = companies.find(c => c.id === e.target.value);
-            setActiveCompany(selected || null);
-          }}
-          style={{
-            width: "100%",
-            background: "#1E293B",
-            color: "#F8FAFC",
-            border: "1px solid #334155",
-            borderRadius: 6,
-            padding: "6px 8px",
-            fontSize: 12.5,
-            outline: "none",
-            cursor: "pointer",
-            fontFamily: BODY,
-          }}
-        >
-          <option value="all">🌐 All Client Companies</option>
-          {companies.map(comp => (
-            <option key={comp.id} value={comp.id}>🏢 {comp.name}</option>
-          ))}
-        </select>
+      )}
+
+      {/* Quick Add Action Button */}
+      <div style={{ margin: "4px 0 12px" }}>
+        {role === "super_admin" && onOpenAddCustomer && (
+          <button
+            type="button"
+            onClick={onOpenAddCustomer}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 12px",
+              background: "linear-gradient(135deg, #034DA1, #2563EB)",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 6px rgba(3, 77, 161, 0.35)",
+              fontFamily: BODY
+            }}
+          >
+            <Plus size={14} /> Add Customer
+          </button>
+        )}
+        {role === "manager" && onOpenCreateJob && (
+          <button
+            type="button"
+            onClick={onOpenCreateJob}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 12px",
+              background: "linear-gradient(135deg, #0284C7, #0369A1)",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 6px rgba(2, 132, 199, 0.35)",
+              fontFamily: BODY
+            }}
+          >
+            <Plus size={14} /> Post New Job
+          </button>
+        )}
+        {role === "recruiter" && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("jobs")}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 12px",
+              background: "linear-gradient(135deg, #10B981, #059669)",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 6px rgba(16, 185, 129, 0.35)",
+              fontFamily: BODY
+            }}
+          >
+            <Search size={14} /> Screen Resumes
+          </button>
+        )}
       </div>
+
+      {/* Client Company Quick Selector (Super Admin Only) */}
+      {role === "super_admin" && (
+        <div style={{ marginBottom: 14, padding: "10px", background: "rgba(255,255,255,0.04)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>
+            Filter by Customer
+          </div>
+          <select
+            value={activeCompany?.id || "all"}
+            onChange={(e) => {
+              const selected = companies.find(c => c.id === e.target.value);
+              setActiveCompany(selected || null);
+              setActiveTab(selected?"customer-dashboard":"companies");
+            }}
+            style={{
+              width: "100%",
+              background: "#1E293B",
+              color: "#F8FAFC",
+              border: "1px solid #334155",
+              borderRadius: 6,
+              padding: "6px 8px",
+              fontSize: 12,
+              outline: "none",
+              cursor: "pointer",
+              fontFamily: BODY,
+            }}
+          >
+            <option value="all">🌐 All Customers</option>
+            {companies.map(comp => (
+              <option key={comp.id} value={comp.id}>🏢 {comp.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Nav Menu */}
       <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -2833,28 +3197,28 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                padding: "10px 12px",
+                padding: "9px 12px",
                 borderRadius: 8,
                 border: "none",
                 background: isActive ? C.sidebarActiveBg : "transparent",
                 color: isActive ? C.sidebarActive : C.sidebarText,
                 fontWeight: isActive ? 700 : 500,
-                fontSize: 13.5,
+                fontSize: 13,
                 textAlign: "left",
                 cursor: "pointer",
                 transition: "all 0.15s ease",
                 fontFamily: BODY,
               }}
             >
-              <Icon size={18} color={isActive ? C.sidebarActive : C.sidebarText} />
+              <Icon size={17} color={isActive ? C.sidebarActive : C.sidebarText} />
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.badge !== undefined && (
                 <span style={{
-                  fontSize: 11,
+                  fontSize: 10.5,
                   background: isActive ? C.accent : "#334155",
                   color: "#FFFFFF",
-                  padding: "2px 7px",
-                  borderRadius: 10,
+                  padding: "2px 6px",
+                  borderRadius: 8,
                   fontWeight: 700,
                 }}>
                   {item.badge}
@@ -2866,9 +3230,9 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
       </nav>
 
       {/* Theme Switcher Footer */}
-      <div style={{ paddingTop: 16, borderTop: `1px solid ${C.lineDark}`, display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Appearance Theme
+      <div style={{ paddingTop: 14, borderTop: `1px solid ${C.lineDark}`, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ fontSize: 10.5, color: "#64748B", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Appearance
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
           {Object.keys(THEMES).map((tKey) => (
@@ -2876,7 +3240,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
               key={tKey}
               onClick={() => setTheme(tKey)}
               style={{
-                padding: "6px 8px",
+                padding: "5px 8px",
                 borderRadius: 6,
                 fontSize: 11,
                 border: currentTheme === tKey ? `1.5px solid ${C.accent}` : "1px solid #334155",
@@ -2894,7 +3258,7 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
       </div>
 
       {/* Version & Release Changelog Badge */}
-      <div style={{ paddingTop: 12, borderTop: `1px solid ${C.lineDark}`, marginTop: 12 }}>
+      <div style={{ paddingTop: 12, borderTop: `1px solid ${C.lineDark}`, marginTop: 10 }}>
         <button
           onClick={onOpenChangelog}
           title="Click to view release changelog and version history"
@@ -2903,12 +3267,12 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "8px 10px",
+            padding: "7px 9px",
             background: "rgba(255, 255, 255, 0.05)",
             border: "1px solid rgba(255, 255, 255, 0.1)",
             borderRadius: 8,
             color: "#94A3B8",
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: 600,
             cursor: "pointer",
             transition: "all 0.15s ease",
@@ -2920,9 +3284,9 @@ function Sidebar({ activeTab, setActiveTab, currentTheme, setTheme, companies, a
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#10B981" }} />
             <span style={{ fontWeight: 700, color: "#F8FAFC" }}>{APP_VERSION}</span>
-            <span style={{ fontSize: 10, background: "#334155", color: "#CBD5E1", padding: "1px 5px", borderRadius: 4 }}>Prod</span>
+            <span style={{ fontSize: 9.5, background: "#334155", color: "#CBD5E1", padding: "1px 5px", borderRadius: 4 }}>Prod</span>
           </div>
-          <span style={{ fontSize: 10.5, color: C.accent, fontWeight: 700 }}>What's New →</span>
+          <span style={{ fontSize: 10, color: C.accent, fontWeight: 700 }}>What's New →</span>
         </button>
       </div>
     </aside>
@@ -2939,292 +3303,7 @@ const isMatchForComp = (j, comp) => {
   );
 };
 
-/* ============================== WELCOME & AGENCY DASHBOARD ============================== */
-function WelcomeDashboard({ companies, jobs, activeCompany, setActiveCompany, onCreateCompany, onCreateJob, onSelectJob, onNavigateTab, onOpenChangelog, C }) {
-  const filteredJobs = useMemo(() => {
-    if (!activeCompany) return jobs;
-    return jobs.filter(j => isMatchForComp(j, activeCompany));
-  }, [jobs, activeCompany]);
-
-  const totalCandidates = useMemo(() => {
-    return filteredJobs.reduce((acc, j) => acc + (j.candidates ? j.candidates.length : 0), 0);
-  }, [filteredJobs]);
-
-  const totalShortlisted = useMemo(() => {
-    return filteredJobs.reduce((acc, j) => {
-      const shortlisted = (j.candidates || []).filter(c => c.status === "done" && c.result && c.result.overallScore >= 70);
-      return acc + shortlisted.length;
-    }, 0);
-  }, [filteredJobs]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Welcome Hero Banner */}
-      <div style={{
-        background: `linear-gradient(135deg, ${C.accentDeep} 0%, ${C.accent} 100%)`,
-        borderRadius: 16,
-        padding: "28px 32px",
-        color: "#FFFFFF",
-        boxShadow: "0 10px 25px -5px rgba(3, 77, 161, 0.3)",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 20
-      }}>
-        <div style={{ maxWidth: 560 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
-              <Sparkles size={14} /> CogniHire AI Interview &amp; Screening Hub
-            </div>
-            <button
-              onClick={onOpenChangelog}
-              title="Click to view release changelog and version history"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                background: "rgba(255,255,255,0.22)",
-                border: "1px solid rgba(255,255,255,0.45)",
-                color: "#FFFFFF",
-                padding: "3px 10px",
-                borderRadius: 20,
-                fontSize: 11.5,
-                fontWeight: 700,
-                cursor: "pointer",
-                transition: "background 0.15s ease",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.35)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.22)"; }}
-            >
-              <GitBranch size={12} />
-              <span>{APP_VERSION}</span>
-              <span style={{ opacity: 0.85, fontSize: 10.5 }}>· What's New</span>
-            </button>
-          </div>
-          <h2 style={{ fontSize: 26, fontWeight: 800, margin: 0, fontFamily: DISPLAY, lineHeight: 1.2 }}>
-            Candidate Screening &amp; Client Recommendation Portal
-          </h2>
-          <p style={{ fontSize: 14, margin: "10px 0 0", opacity: 0.9, lineHeight: 1.5 }}>
-            Screen candidate resumes against client company requirements, score fit, conduct AI interviews, and export formal recommendation reports back to client companies.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <button
-            onClick={onCreateCompany}
-            style={{
-              padding: "10px 18px",
-              background: "#FFFFFF",
-              color: C.accentDeep,
-              border: "none",
-              borderRadius: 8,
-              fontWeight: 700,
-              fontSize: 13.5,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontFamily: BODY,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-            }}
-          >
-            <Building2 size={16} /> Add Client Company
-          </button>
-          <button
-            onClick={onCreateJob}
-            style={{
-              padding: "10px 18px",
-              background: "rgba(255,255,255,0.2)",
-              color: "#FFFFFF",
-              border: "1px solid rgba(255,255,255,0.4)",
-              borderRadius: 8,
-              fontWeight: 700,
-              fontSize: 13.5,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontFamily: BODY,
-            }}
-          >
-            <Plus size={16} /> Post Opening Job
-          </button>
-        </div>
-      </div>
-
-      {/* Metrics Row - Interactive Navigation Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
-        {/* Card 1: Client Companies */}
-        <div
-          onClick={() => onNavigateTab("companies")}
-          style={{
-            background: C.paper,
-            borderRadius: 14,
-            border: `1px solid ${C.line}`,
-            padding: "18px 20px",
-            cursor: "pointer",
-            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            userSelect: "none",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-3px)";
-            e.currentTarget.style.borderColor = C.accent;
-            e.currentTarget.style.boxShadow = `0 8px 20px -4px ${C.accentSoft}`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.borderColor = C.line;
-            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-          }}
-          title="Click to view Client Companies"
-          role="button"
-          tabIndex={0}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Building2 size={24} color={C.accent} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Client Companies</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{companies.length}</div>
-            </div>
-          </div>
-          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
-        </div>
-
-        {/* Card 2: Active Opening Jobs */}
-        <div
-          onClick={() => onNavigateTab("jobs", { step: 1 })}
-          style={{
-            background: C.paper,
-            borderRadius: 14,
-            border: `1px solid ${C.line}`,
-            padding: "18px 20px",
-            cursor: "pointer",
-            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            userSelect: "none",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-3px)";
-            e.currentTarget.style.borderColor = C.accent;
-            e.currentTarget.style.boxShadow = `0 8px 20px -4px ${C.accentSoft}`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.borderColor = C.line;
-            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-          }}
-          title="Click to view Active Opening Jobs"
-          role="button"
-          tabIndex={0}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Briefcase size={24} color={C.accent} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Active Opening Jobs</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{filteredJobs.length}</div>
-            </div>
-          </div>
-          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
-        </div>
-
-        {/* Card 3: Total Resumes Screened */}
-        <div
-          onClick={() => onNavigateTab("jobs", { step: 3 })}
-          style={{
-            background: C.paper,
-            borderRadius: 14,
-            border: `1px solid ${C.line}`,
-            padding: "18px 20px",
-            cursor: "pointer",
-            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            userSelect: "none",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-3px)";
-            e.currentTarget.style.borderColor = C.accent;
-            e.currentTarget.style.boxShadow = `0 8px 20px -4px ${C.accentSoft}`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.borderColor = C.line;
-            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-          }}
-          title="Click to view Total Resumes Screened & Results"
-          role="button"
-          tabIndex={0}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Users size={24} color={C.accent} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Total Resumes Screened</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{totalCandidates}</div>
-            </div>
-          </div>
-          <div style={{ color: C.accent, fontSize: 20, fontWeight: 700, opacity: 0.7 }}>›</div>
-        </div>
-
-        {/* Card 4: Shortlisted Candidates */}
-        <div
-          onClick={() => onNavigateTab("jobs", { step: 3, filter: "shortlisted" })}
-          style={{
-            background: C.paper,
-            borderRadius: 14,
-            border: `1px solid ${C.line}`,
-            padding: "18px 20px",
-            cursor: "pointer",
-            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            userSelect: "none",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-3px)";
-            e.currentTarget.style.borderColor = "#16A34A";
-            e.currentTarget.style.boxShadow = "0 8px 20px -4px rgba(22, 163, 74, 0.25)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.borderColor = C.line;
-            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-          }}
-          title="Click to view Shortlisted Candidates"
-          role="button"
-          tabIndex={0}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Star size={24} color="#16A34A" />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>Shortlisted Candidates</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: "#16A34A", fontFamily: DISPLAY, lineHeight: 1.1, marginTop: 2 }}>{totalShortlisted}</div>
-            </div>
-          </div>
-          <div style={{ color: "#16A34A", fontSize: 20, fontWeight: 700, opacity: 0.8 }}>›</div>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* Note: WelcomeDashboard & Role Dashboards are imported from ./RoleViews.jsx */
 
 /* ============================== CLIENT COMPANIES MANAGEMENT ============================== */
 function CompanyManager({ companies, jobs, onCreateCompany, onEditCompany, onDeleteCompany, onSelectCompanyJobs, C }) {
@@ -3312,7 +3391,7 @@ function CompanyManager({ companies, jobs, onCreateCompany, onEditCompany, onDel
                     <Trash2 size={16} color={C.faint} style={{ cursor: "pointer", marginLeft: 4 }} title="Delete Company" onClick={() => onDeleteCompany(comp.id)} />
                   </div>
                 </div>
-                <h3 style={{ fontSize: 17, fontWeight: 700, color: C.ink, margin: "12px 0 4px", fontFamily: DISPLAY }}>{comp.name}</h3>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: C.ink, margin: "12px 0 4px", fontFamily: DISPLAY }}><button onClick={()=>onSelectCompanyJobs(comp)} style={{font:"inherit",color:"inherit",background:"none",border:0,padding:0,cursor:"pointer",textDecoration:"underline",textUnderlineOffset:4}}>{comp.name}</button></h3>
                 <div style={{ fontSize: 12, color: C.sub }}>Industry: {comp.industry}</div>
                 <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5 }}>
                   {comp.contactEmail && (
@@ -3346,7 +3425,7 @@ function CompanyManager({ companies, jobs, onCreateCompany, onEditCompany, onDel
                     fontFamily: BODY,
                   }}
                 >
-                  View Openings →
+                  View Dashboard →
                 </button>
               </div>
             </Panel>
@@ -3833,7 +3912,7 @@ function UserGuideView({ onNavigateTab, C }) {
         <Panel title="📋 Defining Job Criteria &amp; Scoring Formulas" sub="How to configure job openings for maximum assessment precision" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
-              In Step 1 (<strong>Define Job Criteria</strong>), recruiters configure the benchmark requirements the AI uses to evaluate resumes:
+              Managers configure job criteria and post openings. Recruiters view these criteria and perform screening. In the job criteria form, managers configure the benchmark requirements the AI uses to evaluate resumes:
             </p>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -4093,7 +4172,7 @@ function UserGuideView({ onNavigateTab, C }) {
         <Panel title="☁️ Data Persistence &amp; Google Cloud Storage" sub="How your job data, candidate resumes, and interview records remain safe" C={C}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: 0 }}>
-              Recruiters frequently ask: <em>"Will my created jobs and candidate marks be lost if I reload the page or when Cloud Run restarts?"</em>
+              Recruiters frequently ask: <em>"Will the manager-posted jobs and candidate results be lost if I reload the page or when Cloud Run restarts?"</em>
             </p>
 
             <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: "16px 20px" }}>
@@ -4214,14 +4293,19 @@ function UserGuideView({ onNavigateTab, C }) {
 
 /* ============================== MAIN APP COMPONENT ============================== */
 export default function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [route,navigate]=useNavigation();
+  const activeTab=route.tab;
+  const setActiveTab=value=>navigate({tab:typeof value==='function'?value(route.tab):value});
   const [themeKey, setThemeKey] = useState("light");
   const [companies, setCompanies] = useState(SAMPLE_COMPANIES);
-  const [activeCompany, setActiveCompany] = useState(null);
+  const activeCompany=companies.find(c=>c.id===route.customerId)||null;
+  const setActiveCompany=value=>{const company=typeof value==='function'?value(activeCompany):value;navigate({customerId:company?.id||null});};
   const [jobs, setJobs] = useState([]);
-  const [activeJobId, setActiveJobId] = useState(null);
-  const [step, setStep] = useState(1);
-  const [maxReached, setMaxReached] = useState(1);
+  const activeJobId=route.jobId;
+  const setActiveJobId=value=>navigate({jobId:typeof value==='function'?value(route.jobId):value});
+  const step=route.step;
+  const setStep=value=>navigate({step:typeof value==='function'?value(route.step):value});
+  const [maxReached, setMaxReached] = useState(5);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [llmProvider, setLlmProvider] = useState("claude");
@@ -4232,8 +4316,24 @@ export default function App() {
   const [resultsFilter, setResultsFilter] = useState("all");
   const [showChangelogModal, setShowChangelogModal] = useState(false);
 
-  const handleSaveJobExplicitly = () => {
-    saveJobsToServer(jobs);
+  // Multi-tenant RBAC State
+  const [saveError,setSaveError]=useState('');
+  const [accountNotice,setAccountNotice]=useState('');
+  const [currentUser,setCurrentUser]=useState(null);
+  const pendingJobSaves=useRef(0);
+  useEffect(()=>{if(!currentUser||currentUser.role==='manager'&&activeTab==='jobs')return;const refresh=()=>{if(pendingJobSaves.current||activeInterviewCandidate||jobs.some(j=>j.screening==='running'))return;fetch('/api/jobs').then(r=>r.ok?r.json():null).then(data=>{if(data)setJobs(data);}).catch(()=>{});};const timer=setInterval(refresh,15000);return()=>clearInterval(timer);},[currentUser?.id,activeTab,activeInterviewCandidate,jobs.some(j=>j.screening==='running')]);
+  useEffect(()=>{fetch('/api/auth/me').then(r=>r.ok?r.json():null).then(d=>setCurrentUser(d?.user||null));},[]);
+  const [clusters, setClusters] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [clusterModalOpen, setClusterModalOpen] = useState(false);
+  const [clusterTargetCompanyId, setClusterTargetCompanyId] = useState(null);
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [userModalRole, setUserModalRole] = useState("manager");
+  const [userTargetCustomerId, setUserTargetCustomerId] = useState(null);
+  const [userTargetClusterId, setUserTargetClusterId] = useState(null);
+
+  const handleSaveJobExplicitly = async () => {
+    if(!await saveJobsToServer(jobs))return;
     setSavedJobNotice(true);
     setTimeout(() => setSavedJobNotice(false), 2500);
   };
@@ -4257,7 +4357,9 @@ export default function App() {
           loadedJobs = await jobsRes.json();
           if (Array.isArray(loadedJobs) && loadedJobs.length > 0) {
             setJobs(loadedJobs);
-            if (!activeJobId) setActiveJobId(loadedJobs[0].id);
+            const urlParamJobId = new URLSearchParams(window.location.search).get("job_id");
+            const targetJob = urlParamJobId ? loadedJobs.find(j => j.id === urlParamJobId) : null;
+            setActiveJobId(targetJob ? targetJob.id : loadedJobs[0].id);
           }
         }
 
@@ -4271,6 +4373,11 @@ export default function App() {
           if (Array.isArray(lData)) setLogs(lData);
         }
 
+        if(currentUser){
+          const [clusterRes,userRes]=await Promise.all([fetch('/api/clusters'),fetch('/api/users')]);
+          if(clusterRes.ok)setClusters(await clusterRes.json());
+          if(userRes.ok)setUsers(await userRes.json());
+        }
         // Detect if opened via candidate interview URL
         const urlParams = new URLSearchParams(window.location.search);
         const candIdParam = urlParams.get("cand") || urlParams.get("candidate");
@@ -4309,16 +4416,23 @@ export default function App() {
       }
     };
     fetchData();
-  }, []);
+  }, [currentUser?.id]);
 
   const saveJobsToServer = async (jobsList) => {
+    pendingJobSaves.current++;
     try {
-      await fetch("/api/save-jobs", {
+      const response=await fetch("/api/save-jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobs: jobsList })
       });
-    } catch (e) {}
+      if(!response.ok)throw new Error((await response.json()).error);
+      const data=await response.json();
+      setSaveError('');
+      if(data.jobReferences)setJobs(prev=>prev.map(j=>({...j,jobReference:data.jobReferences[j.id]||j.jobReference})));
+      if(data.interviewTokens)setJobs(prev=>prev.map(j=>({...j,candidates:(j.candidates||[]).map(c=>({...c,interviewToken:data.interviewTokens[c.id]||c.interviewToken}))})));
+      return true;
+    } catch (e) {setSaveError(e.message || "Unable to save jobs. Retry after checking the server.");return false;}finally{pendingJobSaves.current--;}
   };
 
   const saveCompaniesToServer = async (compList) => {
@@ -4329,6 +4443,125 @@ export default function App() {
         body: JSON.stringify({ companies: compList })
       });
     } catch (e) {}
+  };
+
+  // Auth Handlers
+  const handleLogin = (authData) => {
+    if (authData?.user) {
+      setCurrentUser(authData.user);
+      localStorage.setItem("cognihire_user", JSON.stringify(authData.user));
+      setActiveTab("workflow");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (e) {}
+    localStorage.removeItem("cognihire_user");
+    setCurrentUser(null);
+  };
+
+  // Cluster & User CRUD Handlers
+  const handleSaveCluster = async (clusterData) => {
+    try {
+      const res = await fetch("/api/clusters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clusterData)
+      });
+      if (res.ok) {
+        const {cluster:newCl} = await res.json();
+        setClusters(prev => [newCl, ...prev]);
+        setClusterModalOpen(false);
+        setSaveError('');
+      } else {
+        const data=await res.json();throw new Error(data.error||'Unable to save. Please retry.');
+      }
+    } catch (e) {
+      console.error("Failed to create cluster:", e);
+      setSaveError(e.message);
+    }
+  };
+
+  const handleDeleteCluster = async (clusterId) => {
+    try {
+      const res = await fetch(`/api/clusters/${clusterId}`, { method: "DELETE" });
+      if (res.ok) {
+        setClusters(prev => prev.filter(c => c.id !== clusterId));
+      }
+    } catch (e) {
+      console.error("Failed to delete cluster:", e);
+    }
+  };
+
+  const handleSaveUser = async (userData) => {
+    try {
+      if(userData.existingUserId){
+        const response=await fetch('/api/workflow/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:userData.existingUserId,customerId:userData.customerId,clusterId:userData.clusterId})});
+        const data=await response.json();if(!response.ok)throw new Error(data.error);
+        const usersResponse=await fetch('/api/users');if(!usersResponse.ok)throw new Error('Assignment saved. Refresh to reload the manager directory.');
+        setUsers(await usersResponse.json());setUserModalOpen(false);setSaveError('');return data;
+      }
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData)
+      });
+      if (res.ok) {
+        const {user:newUser,emailDelivery} = await res.json();
+        setUsers(prev => [{...newUser,assignments:newUser.clusterId?[{customerId:newUser.customerId,clusterId:newUser.clusterId}]:[]}, ...prev]);
+        setUserModalOpen(false);
+        setSaveError('');
+        setAccountNotice(emailDelivery?.message||'Account created.');
+        return newUser;
+      } else {
+        const data=await res.json();throw new Error(data.error||'Unable to save. Please retry.');
+      }
+    } catch (e) {
+      console.error("Failed to create user:", e);
+      setSaveError(e.message);
+      throw e;
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    try {
+      const res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== userId));
+      }
+    } catch (e) {
+      console.error("Failed to delete user:", e);
+    }
+  };
+
+  const handleUpdateJobStatus = async (jobId, newStatus) => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setJobs(prevJobs=>prevJobs.map(j=>j.id===jobId?{...j,...data.job}:j));setSaveError('');
+      } else {const data=await res.json();setSaveError(data.error||'Unable to update posting status');}
+    } catch (e) {
+      console.error("Failed to update job status:", e);setSaveError(e.message);
+    }
+  };
+
+  const handleOpenAddCluster = (targetCompId = null) => {
+    setClusterTargetCompanyId(targetCompId || activeCompany?.id || null);
+    setClusterModalOpen(true);
+  };
+
+  const handleOpenAddUser = (role = "manager", targetCompId = null, targetClId = null) => {
+    setUserModalRole(role);
+    setUserTargetCustomerId(targetCompId || (currentUser?.role === "manager" ? currentUser.customerId : (activeCompany?.id || null)));
+    setUserTargetClusterId(targetClId || (currentUser?.role === "manager" ? currentUser.clusterId : null));
+    setUserModalOpen(true);
   };
 
   const handleOpenAddCompany = () => {
@@ -4387,13 +4620,24 @@ export default function App() {
 
   const handleAddCompany = (newComp) => handleSaveCompany(newComp);
 
-  const handleCreateJobForCompany = () => {
-    const targetComp = activeCompany || companies[0] || SAMPLE_COMPANIES[0];
+  const handleCreateJobForCompany = (customerId = null) => {
+    if(currentUser?.role!=="manager"){setSaveError("Only managers can create and post jobs.");return;}
+    let targetComp = companies.find(c=>c.id===customerId) || activeCompany || companies[0] || SAMPLE_COMPANIES[0];
+    if (currentUser?.role === "manager" && currentUser.customerId && !companies.some(c=>c.id===customerId)) {
+      targetComp = companies.find(c => c.id === currentUser.customerId) || targetComp;
+    }
+    const defaultClusterId = (currentUser?.role === "manager" && currentUser.clusterId && clusters.some(c=>c.id===currentUser.clusterId && c.customerId===targetComp.id))
+      ? currentUser.clusterId
+      : (clusters.find(cl => cl.customerId === targetComp.id)?.id || null);
+
     const newId = `job_${Date.now()}`;
     const newJob = {
       id: newId,
       companyId: targetComp.id,
       companyName: targetComp.name,
+      clusterId: defaultClusterId,
+      clientManagerName: "",
+      status: "draft",
       title: "",
       seniority: "Senior",
       minYears: 3,
@@ -4439,6 +4683,7 @@ export default function App() {
   };
 
   const handleUpdateJobDetails = (updatedJobDetails) => {
+    if(currentUser?.role!=="manager")return;
     updateActiveJob((j) => ({ ...j, ...updatedJobDetails }));
   };
 
@@ -4452,7 +4697,8 @@ export default function App() {
   const goto = (n) => { setStep(n); setMaxReached((m) => Math.max(m, n)); };
 
   const runScreening = async (forceAll = false) => {
-    if (!activeJob) return;
+    if (!activeJob||currentUser?.role!=="recruiter"||activeJob.status!=="posted") return;
+    if(!await saveJobsToServer(jobs))return;
 
     const candidatesToScreen = forceAll
       ? activeJob.candidates
@@ -4497,7 +4743,7 @@ export default function App() {
         const { candidates: _, ...jobCriteria } = activeJob;
 
         try {
-          const result = await analyzeCandidate(jobCriteria, resume, llmProvider);
+          const result = await analyzeCandidate(jobCriteria, {...resume,candidateId:cand.id}, llmProvider);
           updateActiveJob((j) => {
             const newCandidates = (j.candidates || []).map((c) => (c.id === cand.id ? { ...c, status: "done", result, base64: null } : c));
             const isAllDone = newCandidates.length > 0 && newCandidates.every(c => c.status === "done" || c.status === "error");
@@ -4533,9 +4779,9 @@ export default function App() {
   };
 
   const displayedJobs = useMemo(() => {
-    if (!activeCompany) return jobs;
-    return jobs.filter(j => isMatchForComp(j, activeCompany));
-  }, [jobs, activeCompany]);
+    let list = jobs;
+    return activeCompany ? list.filter(j=>isMatchForComp(j,activeCompany)) : list;
+  }, [jobs, activeCompany, currentUser]);
 
   useEffect(() => {
     if (activeTab === "jobs" && displayedJobs.length > 0) {
@@ -4559,6 +4805,10 @@ export default function App() {
     );
   }
 
+  if (!currentUser) {
+    return <LoginView onLogin={handleLogin} C={C} />;
+  }
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg, color: C.ink, fontFamily: BODY }}>
       {/* Persistent Sidebar */}
@@ -4570,26 +4820,48 @@ export default function App() {
         companies={companies}
         activeCompany={activeCompany}
         setActiveCompany={setActiveCompany}
+        clusters={clusters}
+        users={users}
+        jobs={jobs}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         onOpenChangelog={() => setShowChangelogModal(true)}
+        onOpenAddCustomer={handleOpenAddCompany}
+        onOpenAddCluster={() => handleOpenAddCluster()}
+        onOpenAddManager={() => handleOpenAddUser("manager")}
+        onOpenAddRecruiter={() => handleOpenAddUser("recruiter")}
+        onOpenCreateJob={handleCreateJobForCompany}
         C={C}
       />
 
       {/* Main Content Area */}
       <main style={{ flex: 1, padding: "28px 36px", maxWidth: 1200, margin: "0 auto", boxSizing: "border-box", overflowX: "hidden" }}>
+        {accountNotice&&<div role="status" style={{background:'#eff6ff',color:'#1e40af',border:'1px solid #bfdbfe',borderRadius:8,padding:14,marginBottom:16}}>{accountNotice}<button onClick={()=>setAccountNotice('')} style={{marginLeft:12}} aria-label="Dismiss account notification">Dismiss</button></div>}
+        {saveError && <div role="alert" style={{background:"#fff5eb",color:"#9a3412",border:"1px solid #fed7aa",borderRadius:8,padding:14,marginBottom:16}}>Changes could not be saved: {saveError}</div>}
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
             <Loader2 className="spin" size={40} color={C.accent} />
           </div>
         ) : (
           <>
+            {activeTab === "customer-dashboard" && activeCompany && <CustomerDashboard key={activeCompany.id} company={companies.find(c=>c.id===activeCompany.id)||activeCompany} jobs={jobs} clusters={clusters} users={users} C={C} currentUser={currentUser} onBack={()=>{setActiveCompany(null);setActiveTab('companies');}} onJobs={()=>setActiveTab('jobs')} onCreateCluster={handleOpenAddCluster} onCreateManager={(compId,clId)=>handleOpenAddUser('manager',compId,clId)} onCreateRecruiter={(compId,clId)=>handleOpenAddUser('recruiter',compId,clId)} onCreateJob={handleCreateJobForCompany}/>}
+            {activeTab === "workflow" && <WorkflowWorkspace currentUser={currentUser} C={C} jobs={jobs} onOpenJob={id=>{fetch('/api/jobs').then(r=>r.json()).then(data=>{setJobs(data);setActiveCompany(companies.find(c=>c.id===data.find(j=>j.id===id)?.companyId)||null);setActiveJobId(id);setActiveTab('jobs');});}} />}
             {activeTab === "dashboard" && (
               <WelcomeDashboard
                 companies={companies}
+                clusters={clusters}
+                users={users}
                 jobs={jobs}
+                currentUser={currentUser}
                 activeCompany={activeCompany}
                 setActiveCompany={setActiveCompany}
                 onCreateCompany={handleOpenAddCompany}
+                onOpenCustomer={comp=>{setActiveCompany(comp);setActiveTab("customer-dashboard");}}
+                onCreateCluster={handleOpenAddCluster}
+                onCreateManager={(compId, clId) => handleOpenAddUser("manager", compId, clId)}
+                onCreateRecruiter={(compId, clId) => handleOpenAddUser("recruiter", compId, clId)}
                 onCreateJob={handleCreateJobForCompany}
+                onUpdateJobStatus={handleUpdateJobStatus}
                 onSelectJob={(jId) => { setActiveJobId(jId); setActiveTab("jobs"); setStep(3); setMaxReached(4); }}
                 onOpenChangelog={() => setShowChangelogModal(true)}
                 onNavigateTab={(tab, options = {}) => {
@@ -4621,6 +4893,42 @@ export default function App() {
               />
             )}
 
+            {activeTab === "clusters" && (
+              <ClustersView
+                companies={companies}
+                clusters={clusters}
+                users={users}
+                jobs={jobs}
+                onCreateCluster={handleOpenAddCluster}
+                onDeleteCluster={handleDeleteCluster}
+                onCreateManager={(compId, clId) => handleOpenAddUser("manager", compId, clId)}
+                C={C}
+              />
+            )}
+
+            {activeTab === "managers" && (
+              <ManagersView
+                companies={companies}
+                clusters={clusters}
+                users={users}
+                onCreateManager={(compId, clId) => handleOpenAddUser("manager", compId, clId)}
+                onDeleteUser={handleDeleteUser}
+                C={C}
+              />
+            )}
+
+            {activeTab === "recruiters" && (
+              <RecruitersView
+                companies={companies}
+                clusters={clusters}
+                users={users}
+                currentUser={currentUser}
+                onCreateRecruiter={(compId, clId) => handleOpenAddUser("recruiter", compId, clId)}
+                onDeleteUser={handleDeleteUser}
+                C={C}
+              />
+            )}
+
             {activeTab === "companies" && (
               <CompanyManager
                 companies={companies}
@@ -4628,7 +4936,7 @@ export default function App() {
                 onCreateCompany={handleOpenAddCompany}
                 onEditCompany={handleOpenEditCompany}
                 onDeleteCompany={handleDeleteCompany}
-                onSelectCompanyJobs={(comp) => { setActiveCompany(comp); setActiveTab("jobs"); }}
+                onSelectCompanyJobs={(comp) => { setActiveCompany(comp); setActiveTab("customer-dashboard"); }}
                 C={C}
               />
             )}
@@ -4822,7 +5130,7 @@ export default function App() {
                                 const compPrefix = !activeCompany && j.companyName ? `${j.companyName} — ` : "";
                                 return (
                                   <option key={j.id} value={j.id}>
-                                    🎯 {compPrefix}{j.title || "Untitled Role"}{statusTag} ({j.seniority || "Junior/Mid"}, {j.minYears || 0}+ yrs)
+                                    🎯 {compPrefix}{j.jobReference ? `${j.jobReference} · ` : ""}{j.title || "Untitled Role"}{statusTag} ({j.seniority || "Junior/Mid"}, {j.minYears || 0}+ yrs)
                                   </option>
                                 );
                               })
@@ -4849,7 +5157,7 @@ export default function App() {
                         );
                       })()}
 
-                      <button
+                      {currentUser?.role==="manager" && (<button
                         onClick={handleCreateJobForCompany}
                         style={{
                           ...btn("primary", C),
@@ -4862,7 +5170,7 @@ export default function App() {
                         }}
                       >
                         <Plus size={14} /> Post New Job
-                      </button>
+                      </button>)}
                     </div>
                   </div>
                 </div>
@@ -4871,36 +5179,24 @@ export default function App() {
                   <Panel C={C}>
                     <div style={{ textAlign: "center", padding: "40px 0", color: C.sub }}>
                       <div>No job openings posted for <strong>{activeCompany ? activeCompany.name : "this client company"}</strong> yet.</div>
-                      <button onClick={handleCreateJobForCompany} style={{ ...btn("primary", C), marginTop: 14 }}>
+                      {currentUser?.role==="manager" && (<button onClick={handleCreateJobForCompany} style={{ ...btn("primary", C), marginTop: 14 }}>
                         + Post New Opening Job for {activeCompany ? activeCompany.name : "Company"}
-                      </button>
+                      </button>)}
                     </div>
                   </Panel>
                 ) : (
                   <div>
                     {activeJob && (
                       <div style={{ marginBottom: 20 }}>
+                        {currentUser.role==='manager'?<><RoleStep job={activeJob} setJob={handleUpdateJobDetails} companies={companies} clusters={clusters} currentUser={currentUser} onUpdateJobStatus={handleUpdateJobStatus} onNext={()=>document.getElementById('job-monitor')?.scrollIntoView({behavior:'smooth'})} onSave={handleSaveJobExplicitly} savedNotice={savedJobNotice} C={C}/><JobMonitor job={activeJob} C={C} onFollowUp={()=>{navigate({tab:'workflow',workflowTab:'applications',workflowJobId:activeJob.id});}}/></>:currentUser.role==='super_admin'||activeJob.status!=='posted'?<JobMonitor job={activeJob} C={C} onFollowUp={()=>navigate({tab:'workflow',workflowTab:'applications',workflowJobId:activeJob.id})}/>:<>
+                        <div style={{padding:12,background:C.accentSoft,borderRadius:8,marginBottom:16,fontSize:13}}>Posted job → Resume upload → Screening → AI interview → Compiled results → Offer / joining follow-up <button onClick={()=>navigate({tab:'workflow',workflowTab:'applications',workflowJobId:activeJob.id})} style={btn('soft',C)}>Candidate follow-up</button></div>
                         {/* Stepper Header */}
                         <div style={{ marginBottom: 16 }}>
                           <Stepper step={step} maxReached={maxReached} go={goto} C={C} />
                         </div>
 
                         {/* Step Views */}
-                        {step === 1 && (
-                          <RoleStep
-                            job={activeJob}
-                            setJob={handleUpdateJobDetails}
-                            companies={companies}
-                            onNext={() => goto(2)}
-                            onSave={handleSaveJobExplicitly}
-                            onDelete={() => handleDeleteJob(activeJob.id)}
-                            savedNotice={savedJobNotice}
-                            onEditCompany={handleOpenEditCompany}
-                            onCreateCompany={handleOpenAddCompany}
-                            C={C}
-                          />
-                        )}
-
+                        {step===1&&<><JobMonitor job={activeJob} C={C} showCandidates={false}/><button onClick={()=>goto(2)} style={btn('primary',C)}>Upload resumes for this posted job</button></>}
                         {step === 2 && (
                           <CandidateStep
                             candidates={activeJob.candidates || []}
@@ -4942,6 +5238,8 @@ export default function App() {
                             C={C}
                           />
                         ) : null}
+                        {step>=3&&<JobMonitor job={activeJob} C={C} onFollowUp={()=>navigate({tab:'workflow',workflowTab:'applications',workflowJobId:activeJob.id})}/>}
+                        </>}
                       </div>
                     )}
                   </div>
@@ -4951,6 +5249,31 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* Dynamic Cluster Modal */}
+      <ClusterModal
+        isOpen={clusterModalOpen}
+        targetCompanyId={clusterTargetCompanyId}
+        companies={companies}
+        onClose={() => setClusterModalOpen(false)}
+        onSave={handleSaveCluster}
+        C={C}
+      />
+
+      {/* User (Manager or Recruiter) Modal */}
+      <UserModal
+        isOpen={userModalOpen}
+        role={userModalRole}
+        targetCustomerId={userTargetCustomerId}
+        targetClusterId={userTargetClusterId}
+        users={users}
+        companies={companies}
+        clusters={clusters}
+        currentUser={currentUser}
+        onClose={() => setUserModalOpen(false)}
+        onSave={handleSaveUser}
+        C={C}
+      />
 
       {/* Client Company Add / Edit Modal */}
       <CompanyModal
@@ -4973,10 +5296,11 @@ export default function App() {
       />
 
       {/* AI Interview Modal */}
-      {activeInterviewCandidate && (
+      {currentUser?.role==='recruiter'&&activeInterviewCandidate && (
         <InterviewModal
           candidate={activeInterviewCandidate}
           job={activeJob}
+          llmProvider={llmProvider}
           onClose={() => setActiveInterviewCandidate(null)}
           C={C}
         />
@@ -5354,7 +5678,7 @@ function ChangelogModal({ isOpen, onClose, C }) {
 }
 
 /* ============================== AI INTERVIEW SESSION MODAL ============================== */
-function InterviewModal({ candidate, job, onClose, C }) {
+function InterviewModal({ candidate, job, onClose, C, llmProvider }) {
   const r = candidate?.result || {};
   const questions = r.interviewQuestions && r.interviewQuestions.length > 0
     ? r.interviewQuestions
@@ -5372,6 +5696,8 @@ function InterviewModal({ candidate, job, onClose, C }) {
   const [loading, setLoading] = useState(false);
   const [interviewCompleted, setInterviewCompleted] = useState(false);
   const [evaluation, setEvaluation] = useState(null);
+  const [evaluationError,setEvaluationError]=useState('');
+  const finishEvaluation=async transcript=>{setLoading(true);setEvaluationError('');try{const report=await evaluateInterview(job,candidate,transcript.map(m=>({role:m.role==='assistant'?'interviewer':'candidate',content:m.text})),{},llmProvider);setEvaluation(report);}catch(e){setEvaluationError(e.message||'AI evaluation failed. Retry evaluation.');}finally{setLoading(false);}};
 
   const handleSend = () => {
     if (!userInput.trim() || loading) return;
@@ -5382,22 +5708,10 @@ function InterviewModal({ candidate, job, onClose, C }) {
     setMessages(newMsgs);
     setLoading(true);
 
-    setTimeout(() => {
-      const nextIndex = currentQIndex + 1;
-      if (nextIndex < questions.length) {
-        setCurrentQIndex(nextIndex);
-        setMessages([...newMsgs, { role: "assistant", text: `Thank you for your response. Let's proceed to Question ${nextIndex + 1}:\n\n${questions[nextIndex]}` }]);
-      } else {
-        setInterviewCompleted(true);
-        setEvaluation({
-          communicationScore: 92,
-          technicalScore: 94,
-          overallPerformance: "Strong Technical Candidate",
-          keyTakeaways: "Demonstrated articulate technical reasoning, structured problem solving, and strong domain confidence."
-        });
-      }
-      setLoading(false);
-    }, 900);
+    const nextIndex=currentQIndex+1;
+    if(nextIndex<questions.length){setCurrentQIndex(nextIndex);setMessages([...newMsgs,{role:'assistant',text:questions[nextIndex]}]);setLoading(false);}
+    else{setInterviewCompleted(true);finishEvaluation(newMsgs);}
+
   };
 
   return (
@@ -5439,17 +5753,19 @@ function InterviewModal({ candidate, job, onClose, C }) {
             </div>
           ))}
 
+          {loading&&interviewCompleted&&<p>Evaluating and saving the interview…</p>}
+          {evaluationError&&<div role="alert" style={{padding:16,color:"#b91c1c"}}>{evaluationError}<button onClick={()=>finishEvaluation(messages)} disabled={loading}>Retry AI evaluation</button></div>}
           {interviewCompleted && evaluation && (
             <div style={{ background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 12, padding: 16, marginTop: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 800, color: "#15803D", display: "flex", alignItems: "center", gap: 6 }}>
                 <Check size={18} /> Interview Completed &amp; Evaluated
               </div>
               <div style={{ fontSize: 13, color: "#166534", marginTop: 6, lineHeight: 1.5 }}>
-                {evaluation.keyTakeaways}
+                {evaluation.summary}
               </div>
               <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
-                <div><span style={{ fontSize: 11, fontWeight: 700, color: "#15803D" }}>Technical Depth:</span> <strong>{evaluation.technicalScore}%</strong></div>
-                <div><span style={{ fontSize: 11, fontWeight: 700, color: "#15803D" }}>Communication:</span> <strong>{evaluation.communicationScore}%</strong></div>
+                <div><span style={{ fontSize: 11, fontWeight: 700, color: "#15803D" }}>Technical Depth:</span> <strong>{evaluation.score}/100</strong></div>
+                
               </div>
             </div>
           )}
@@ -5475,3 +5791,7 @@ function InterviewModal({ candidate, job, onClose, C }) {
     </div>
   );
 }
+
+
+
+

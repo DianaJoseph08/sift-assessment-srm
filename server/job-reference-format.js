@@ -1,0 +1,5 @@
+const words=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').match(/[A-Za-z0-9]+/g)||[];
+export function companyCode(name){return words(name).map(w=>w.toUpperCase()).join('').slice(0,12)||'COMPANY';}
+export function clusterCode(name){const text=words(name).join('').toUpperCase();if(text.startsWith('EMBED'))return 'EMB';if(text.startsWith('MECH'))return 'MECH';if(text.startsWith('HARDWARE'))return 'HW';if(text.startsWith('SOFTWARE'))return 'SW';const w=words(name);return (w.length>1?w.map(x=>x[0]).join(''):text).toUpperCase().slice(0,6)||'CLUSTER';}
+export function vacancyCode(title){const tokens=words(title).filter(w=>!['a','an','the','and','of','for','in','with','to'].includes(w.toLowerCase()));return tokens.map(w=>w===w.toUpperCase()&&w.length<=5?w:w[0]).join('').toUpperCase().slice(0,12)||'ROLE';}
+export function formattedJobReference(company,cluster,title,sequence){return [companyCode(company),clusterCode(cluster),vacancyCode(title),String(sequence).padStart(6,'0')].join('-');}

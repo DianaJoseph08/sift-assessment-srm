@@ -1,4 +1,4 @@
-﻿# Multi-stage Dockerfile for CogniHire
+# Multi-stage Dockerfile for CogniHire
 # Stage 1: Build the frontend
 FROM node:22-slim AS builder
 
@@ -28,10 +28,13 @@ ENV PORT=8080
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy compiled frontend, backend server, and pre-seeded SQLite database
+# Copy compiled frontend, backend server, shared models, pre-seeded SQLite database, and workflow workbooks
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/sift.db ./sift.db
+COPY --from=builder ["/app/customers and clusters and rms.xlsx", "./"]
+COPY --from=builder ["/app/Daily Tracker _ SAP Backup.xlsx", "./"]
 
 # Expose standard Cloud Run port (Cloud Run automatically injects PORT=8080)
 EXPOSE 8080

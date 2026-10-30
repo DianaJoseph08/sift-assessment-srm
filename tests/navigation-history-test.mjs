@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {createNavigationHistory,readNavigation,navigationURL} from '../client/src/navigation-history.mjs';
+const listeners=new Map(),entries=['http://localhost:5173/'];let index=0;
+const win={location:{href:entries[0]},Event:class{constructor(type){this.type=type;}},history:{pushState(_,__,href){entries.splice(++index);entries.push(href);win.location.href=href;}},addEventListener(type,cb){listeners.set(type,[...(listeners.get(type)||[]),cb]);},removeEventListener(type,cb){listeners.set(type,(listeners.get(type)||[]).filter(x=>x!==cb));},dispatchEvent(event){for(const cb of listeners.get(event.type)||[])cb();}};
+const history=createNavigationHistory(win);let route;history.subscribe(value=>route=value);
+history.update({customerId:'skoda'});history.update({tab:'customer-dashboard'});await Promise.resolve();
+assert.equal(entries.length,2);assert.equal(route.customerId,'skoda');assert.equal(route.tab,'customer-dashboard');
+history.update({tab:'jobs',jobId:'job1',step:3});await Promise.resolve();assert.equal(entries.length,3);
+win.location.href=entries[--index];win.dispatchEvent(new win.Event('popstate'));assert.equal(route.tab,'customer-dashboard');assert.equal(route.customerId,'skoda');assert.equal(entries.length,3);
+win.location.href=entries[++index];win.dispatchEvent(new win.Event('popstate'));assert.equal(route.tab,'jobs');assert.equal(route.step,3);
+history.update({workflowTab:'offers',tab:'workflow'});await Promise.resolve();assert.equal(route.workflowTab,'offers');
+assert.equal(readNavigation(win.location.href).workflowTab,'offers');
+assert.equal(navigationURL('http://localhost:5173/?token=secret&cand=1',{tab:'jobs'}).searchParams.get('token'),'secret');
+console.log('PASS: batched navigation, browser Back/Forward, customer/job restoration, workflow tabs, reload parsing and interview query preservation.');

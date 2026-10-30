@@ -162,6 +162,7 @@ function schemaBlock(job, extractedEmails = []) {
  "email": "string (the candidate's actual personal or contact email address. You MUST select it ONLY from this list of parsed emails: ${emailsList}. Choose the one that belongs to the candidate — usually the first one or the one matching/containing their name. If the list is empty or none match the candidate, return 'N/A'. Never guess, fabricate, or hallucinate an email not explicitly present in the list.)",
  "currentTitle": string,
  "yearsExperience": number,
+ "trackerDetails": {"phone": string|null, "totalExperience": string|null, "relevantExperience": string|null, "noticePeriod": string|null, "currentCompany": string|null, "currentLocation": string|null, "preferredLocation": string|null, "qualification": string|null, "currentCTC": string|null, "expectedCTC": string|null, "employmentType": string|null, "grade": string|null}, // Extract these ONLY when explicitly stated in the resume. Otherwise null. Never infer pay, notice period, preferred location, employment type or grade; preserve units.
  "education": string,
  "topSkills": string[] (max 8),
  "subScores": {

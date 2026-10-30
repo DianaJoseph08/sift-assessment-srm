@@ -1,3 +1,4 @@
+import { hashPassword, verifyPassword } from "./passwords.js";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import fs from "node:fs";
@@ -130,10 +131,39 @@ try {
 } catch (e) {}
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS clusters (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL, -- 'super_admin', 'manager', 'recruiter'
+    customer_id TEXT,
+    cluster_id TEXT,
+    created_by TEXT,
+    created_at TEXT
+  );
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
     company_id TEXT,
     company_name TEXT,
+    cluster_id TEXT,
+    client_manager_name TEXT,
+    status TEXT DEFAULT 'draft',
+    posted_at TEXT,
+    closed_at TEXT,
     title TEXT,
     seniority TEXT,
     minYears INTEGER,
@@ -145,12 +175,18 @@ db.exec(`
   );
 `);
 
-// Migration safeguard for existing DBs without company_id / company_name
+// Migration safeguards for existing DBs
+try { db.exec("ALTER TABLE jobs ADD COLUMN company_id TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE jobs ADD COLUMN company_name TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE jobs ADD COLUMN cluster_id TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE jobs ADD COLUMN client_manager_name TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE jobs ADD COLUMN status TEXT DEFAULT 'draft'"); } catch (e) {}
+try { db.exec("ALTER TABLE jobs ADD COLUMN posted_at TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE jobs ADD COLUMN closed_at TEXT"); } catch (e) {}
+
+// For existing legacy jobs without status, set them to 'posted' so they remain accessible
 try {
-  db.exec("ALTER TABLE jobs ADD COLUMN company_id TEXT");
-} catch (e) {}
-try {
-  db.exec("ALTER TABLE jobs ADD COLUMN company_name TEXT");
+  db.exec("UPDATE jobs SET status = 'posted' WHERE status IS NULL OR status = ''");
 } catch (e) {}
 
 // ONE-TIME FIX: Restore orphaned jobs to their correct UI companies
@@ -160,7 +196,6 @@ try {
     UPDATE jobs SET company_id = 'comp_1787762242113', company_name = 'Motherson' WHERE company_id = 'comp_motherson';
   `);
 } catch (e) {}
-
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS candidates (
@@ -324,6 +359,11 @@ export function getJobs() {
       id: job.id,
       companyId: resolvedCompId,
       companyName: resolvedCompName,
+      clusterId: job.cluster_id || "",
+      clientManagerName: job.client_manager_name || "",
+      status: job.status || "posted",
+      postedAt: job.posted_at || null,
+      closedAt: job.closed_at || null,
       title: job.title || "",
       seniority: job.seniority || "Senior",
       minYears: Number(job.minYears || 0),
@@ -361,8 +401,8 @@ export function saveJobs(jobs) {
     db.exec("DELETE FROM jobs");
     
     const insertJob = db.prepare(`
-      INSERT INTO jobs (id, company_id, company_name, title, seniority, minYears, location, description, mustHave, niceToHave, screening)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO jobs (id, company_id, company_name, cluster_id, client_manager_name, status, posted_at, closed_at, title, seniority, minYears, location, description, mustHave, niceToHave, screening)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertCandidate = db.prepare(`
@@ -375,6 +415,11 @@ export function saveJobs(jobs) {
         job.id,
         job.companyId || "comp_default",
         job.companyName || "General Client",
+        job.clusterId || null,
+        job.clientManagerName || null,
+        job.status || "draft",
+        job.postedAt || (job.status === "posted" ? new Date().toISOString() : null),
+        job.closedAt || null,
         job.title || "",
         job.seniority || "",
         job.minYears || 0,
@@ -450,3 +495,307 @@ export function saveCandidateInterview(id, interviewData) {
   updateQuery.run(JSON.stringify(resultObj), id);
   syncToPersistentStorage(true);
 }
+
+/**
+ * Clusters Management
+ */
+export function getClusters(customerId = null) {
+  try {
+    let query;
+    if (customerId) {
+      query = db.prepare("SELECT * FROM clusters WHERE customer_id = ? ORDER BY rowid ASC");
+      return query.all(customerId).map(r => ({
+        id: r.id,
+        customerId: r.customer_id,
+        name: r.name,
+        description: r.description || "",
+        createdAt: r.created_at || new Date().toISOString()
+      }));
+    } else {
+      query = db.prepare("SELECT * FROM clusters ORDER BY rowid ASC");
+      return query.all().map(r => ({
+        id: r.id,
+        customerId: r.customer_id,
+        name: r.name,
+        description: r.description || "",
+        createdAt: r.created_at || new Date().toISOString()
+      }));
+    }
+  } catch (e) {
+    console.error("Failed to get clusters:", e.message);
+    return [];
+  }
+}
+
+export function createCluster({ id, customerId, name, description }) {
+  const insert = db.prepare(`
+    INSERT INTO clusters (id, customer_id, name, description, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const clusterId = id || `cluster_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+  const createdAt = new Date().toISOString();
+  insert.run(clusterId, customerId, name, description || "", createdAt);
+  syncToPersistentStorage(true);
+  return { id: clusterId, customerId, name, description: description || "", createdAt };
+}
+
+export function deleteCluster(clusterId) {
+  const del = db.prepare("DELETE FROM clusters WHERE id = ?");
+  del.run(clusterId);
+  syncToPersistentStorage(true);
+  return { ok: true };
+}
+
+/**
+ * Users & Roles Management
+ */
+export function getUsers(filter = {}) {
+  try {
+    let sql = "SELECT id, name, email, role, customer_id, cluster_id, created_by, created_at FROM users";
+    const params = [];
+    const clauses = [];
+
+    if (filter.role) {
+      clauses.push("role = ?");
+      params.push(filter.role);
+    }
+    if (filter.customerId) {
+      clauses.push("customer_id = ?");
+      params.push(filter.customerId);
+    }
+    if (filter.clusterId) {
+      clauses.push("cluster_id = ?");
+      params.push(filter.clusterId);
+    }
+
+    if (clauses.length > 0) {
+      sql += " WHERE " + clauses.join(" AND ");
+    }
+    sql += " ORDER BY rowid ASC";
+
+    const q = db.prepare(sql);
+    const rows = q.all(...params);
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      role: r.role,
+      customerId: r.customer_id,
+      clusterId: r.cluster_id,
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    }));
+  } catch (e) {
+    console.error("Failed to get users:", e.message);
+    return [];
+  }
+}
+
+export function getUserById(id) {
+  try {
+    const q = db.prepare("SELECT id, name, email, role, customer_id, cluster_id, created_by, created_at FROM users WHERE id = ?");
+    const r = q.get(id);
+    if (!r) return null;
+    return {
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      role: r.role,
+      customerId: r.customer_id,
+      clusterId: r.cluster_id,
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+export function getUserByEmail(email) {
+  try {
+    const q = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)");
+    return q.get(email) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function createUser({ id, name, email, password, role, customerId, clusterId, createdBy }) {
+  const insert = db.prepare(`
+    INSERT INTO users (id, name, email, password, role, customer_id, cluster_id, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const userId = id || `user_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+  const createdAt = new Date().toISOString();
+  insert.run(
+    userId,
+    name,
+    email.trim().toLowerCase(),
+    hashPassword(password),
+    role,
+    customerId || null,
+    clusterId || null,
+    createdBy || null,
+    createdAt
+  );
+  syncToPersistentStorage(true);
+  return { id: userId, name, email: email.trim().toLowerCase(), role, customerId, clusterId, createdBy, createdAt };
+}
+
+export function deleteUser(id) {
+  const del = db.prepare("DELETE FROM users WHERE id = ?");
+  del.run(id);
+  syncToPersistentStorage(true);
+  return { ok: true };
+}
+
+export function upsertSuperAdmin({ name, email, password }) {
+  const cleanEmail = email.trim().toLowerCase();
+  const existing = getUserByEmail(cleanEmail);
+  if (existing) {
+    const update = db.prepare(`
+      UPDATE users SET name = ?, password = ?, role = 'super_admin' WHERE id = ?
+    `);
+    update.run(name || existing.name || "Motherson Super Admin", hashPassword(password), existing.id);
+    syncToPersistentStorage(true);
+    return {
+      id: existing.id,
+      name: name || existing.name || "Motherson Super Admin",
+      email: cleanEmail,
+      role: 'super_admin',
+      customerId: null,
+      clusterId: null,
+      createdBy: existing.created_by,
+      createdAt: existing.created_at
+    };
+  } else {
+    return createUser({
+      name: name || "Motherson Super Admin",
+      email: cleanEmail,
+      password,
+      role: "super_admin",
+      createdBy: "self_setup"
+    });
+  }
+}
+
+export function authenticateUser(email, password) {
+  if (!email || !password) return null;
+  const user = getUserByEmail(email);
+  if (!user) return null;
+  if (!verifyPassword(password, user.password)) return null;
+  if (!user.password.startsWith('scrypt:')) {
+    db.prepare('UPDATE users SET password=? WHERE id=?').run(hashPassword(password),user.id);
+    syncToPersistentStorage(true);
+  }
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    customerId: user.customer_id,
+    clusterId: user.cluster_id,
+    createdBy: user.created_by,
+    createdAt: user.created_at
+  };
+}
+
+/**
+ * Initial System Seeding
+ */
+export function seedInitialAuthAndTenantData() {
+  if(process.env.NODE_ENV==='production')return;
+  try {
+    const userCountQ = db.prepare("SELECT COUNT(*) as count FROM users");
+    const count = userCountQ.get()?.count || 0;
+
+    if (count === 0) {
+      console.log("[db] Seeding initial Motherson Admin, Bosch customer, clusters, and users...");
+
+      // 1. Motherson Super Admin
+      createUser({
+        id: "user_admin_motherson",
+        name: "Motherson Group Admin",
+        email: "admin@motherson.com",
+        password: "admin123",
+        role: "super_admin",
+        customerId: null,
+        clusterId: null,
+        createdBy: "system"
+      });
+
+      // 2. Ensure Bosch customer exists
+      const compQ = db.prepare("SELECT * FROM companies WHERE name LIKE '%Bosch%'");
+      let bosch = compQ.get();
+      if (!bosch) {
+        bosch = {
+          id: "comp_bosch",
+          name: "Bosch Global Software & Engineering",
+          industry: "Automotive & Industrial Technology",
+          contact_email: "recruitment@bosch.com",
+          sender_name: "Bosch Talent Acquisition",
+          notes: "Global automotive and industrial electronics partner"
+        };
+        const insComp = db.prepare(`
+          INSERT INTO companies (id, name, industry, contact_email, sender_name, notes, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        insComp.run(bosch.id, bosch.name, bosch.industry, bosch.contact_email, bosch.sender_name, bosch.notes, new Date().toISOString());
+      }
+
+      // 3. Seed initial clusters for Bosch (Mechanical and SAP)
+      const clusterMech = createCluster({
+        id: "cluster_bosch_mech",
+        customerId: bosch.id,
+        name: "Mechanical",
+        description: "Automotive chassis, powertrain, and thermal engineering"
+      });
+
+      createCluster({
+        id: "cluster_bosch_sap",
+        customerId: bosch.id,
+        name: "SAP",
+        description: "SAP ERP, S/4HANA, Supply Chain & Logistics solutions"
+      });
+
+      // 4. Seed Manager for Bosch Mechanical
+      createUser({
+        id: "user_manager_mech",
+        name: "Klaus Richter",
+        email: "manager.mech@bosch.com",
+        password: "manager123",
+        role: "manager",
+        customerId: bosch.id,
+        clusterId: clusterMech.id,
+        createdBy: "user_admin_motherson"
+      });
+
+      // 5. Seed Recruiter for Bosch Mechanical
+      createUser({
+        id: "user_recruiter_mech",
+        name: "Sarah Jenkins",
+        email: "recruiter.mech@bosch.com",
+        password: "recruiter123",
+        role: "recruiter",
+        customerId: bosch.id,
+        clusterId: clusterMech.id,
+        createdBy: "user_manager_mech"
+      });
+
+      // 6. Ensure existing jobs have cluster_id if unassigned
+      try {
+        db.exec(`UPDATE jobs SET cluster_id = '${clusterMech.id}', status = 'posted' WHERE cluster_id IS NULL OR cluster_id = ''`);
+      } catch (e) {}
+
+      console.log("[db] Initial auth & tenant data seeded successfully.");
+    }
+  } catch (err) {
+    console.error("[db] Seeding error:", err.message);
+  }
+}
+
+// Run initial seeding
+seedInitialAuthAndTenantData();
+
+
+export { db as database };

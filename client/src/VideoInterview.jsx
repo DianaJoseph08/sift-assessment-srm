@@ -350,7 +350,7 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
       const res = await fetch("/api/interview/video-questions", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          job: { title: job?.title, description: job?.description, mustHave: job?.mustHave },
+          job: { id:job?.id,title: job?.title, description: job?.description, mustHave: job?.mustHave },
           candidate: { name: candidateName, skills: r.topSkills, education: r.education, summary: r.summary },
           provider: effectiveProvider,
           apiKey
@@ -412,8 +412,8 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
       const res = await fetch("/api/interview/video-evaluate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          job: { title: job?.title, description: job?.description, mustHave: job?.mustHave },
-          candidate: { name: candidateName },
+          job: { id:job?.id,title: job?.title, description: job?.description, mustHave: job?.mustHave },
+          candidate: { id:candidate?.id,name: candidateName },
           transcript: transcriptData,
           malpractice: proctoringPayload,
           provider: effectiveProvider,
@@ -491,7 +491,8 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
       // Completed all questions! Stop timer and evaluate
       clearInterval(timerRef.current);
       setPhase("evaluating");
-      fetchEvaluation(updatedTranscript).then(report => {
+      fetchEvaluation(updatedTranscript).then(async report => {
+        if(report.overallGrade==='Error'){setFinalReport(report);setPhase('completed');streamRef.current?.getTracks().forEach(t=>t.stop());clearInterval(faceIntervalRef.current);return;}
         setFinalReport(report);
         setPhase("completed");
         
@@ -503,7 +504,8 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
         
         // SAVE THE EVALUATION TO THE DATABASE
         if (candidate?.id) {
-          fetch("/api/candidate-interview-submit", {
+          try{
+          const saved=await fetch("/api/candidate-interview-submit", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               candidateId: candidate.id,
@@ -512,7 +514,9 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
               transcript: updatedTranscript,
               proctoring: malpractice
             })
-          }).catch(() => {});
+          });
+          if(!saved.ok){const failure=await saved.json();setFinalReport({...report,summary:report.summary+' Result was not saved: '+(failure.error||'retry required')});}
+          }catch(e){setFinalReport({...report,summary:report.summary+' Result was not saved: '+e.message});}
         }
 
         streamRef.current?.getTracks().forEach(t => t.stop());
@@ -678,8 +682,8 @@ export default function VideoInterview({ candidate, job, llmProvider = "claude",
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
             {[
-              { label: "Technical Score", value: `${finalReport.technicalScore ?? 85}%`, color: "#3B82F6" },
-              { label: "Communication", value: `${finalReport.communicationScore ?? 82}%`, color: "#8B5CF6" },
+              { label: "Technical Score", value: finalReport.overallGrade==='Error'?'Unavailable':finalReport.technicalScore==null?'Pending':`${finalReport.technicalScore}%`, color: "#3B82F6" },
+              { label: "Communication", value: finalReport.overallGrade==='Error'?'Unavailable':finalReport.communicationScore==null?'Pending':`${finalReport.communicationScore}%`, color: "#8B5CF6" },
               { label: "Integrity Score", value: `${finalReport.integrityScore ?? integrityPct}%`, color: integrityColor },
               { 
                 label: "AI Content Risk", 

@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {formattedJobReference,companyCode,clusterCode,vacancyCode} from '../server/job-reference-format.js';
+assert.equal(formattedJobReference('Skoda','Embedded','Software Engineer',17),'SKODA-EMB-SE-000017');
+assert.equal(formattedJobReference('Bosch','SAP','SAP SD Consultant',18),'BOSCH-SAP-SAPSDC-000018');
+assert.equal(companyCode('Škoda Auto'),'SKODAAUTO');assert.equal(clusterCode('Mechanical'),'MECH');assert.equal(vacancyCode('Senior engineer for testing'),'SET');
+assert.notEqual(formattedJobReference('Skoda','Embedded','Developer',1),formattedJobReference('Skoda','Embedded','Developer',2));
+console.log('PASS: company/cluster/title abbreviations, punctuation and accents, six-digit sequence and uniqueness.');
+const {DatabaseSync}=await import('node:sqlite');
+const {createScreeningSynchronizer}=await import('../server/screening-sync.js');
+const db=new DatabaseSync(':memory:');db.exec("CREATE TABLE job_tracking(sequence INTEGER PRIMARY KEY AUTOINCREMENT,job_id TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL); INSERT INTO job_tracking VALUES(42,'old-job','2026-10-29')");
+const job={id:'old-job',companyId:'c',clusterId:'cl',title:'Software Engineer'};const company={id:'c',name:'Skoda'},cluster={id:'cl',name:'Embedded'};
+const sync=createScreeningSynchronizer({db,getJobs:()=>[job],getCompanies:()=>[company],getClusters:()=>[cluster]});
+assert.equal(sync.reference(job.id),'SKODA-EMB-SE-000042');assert.equal(db.prepare('SELECT job_id FROM job_reference_aliases WHERE reference=?').get('JOB-000042').job_id,job.id);
+job.title='Updated vacancy title';company.name='Changed customer name';assert.equal(sync.reference(job.id),'SKODA-EMB-SE-000042');assert.equal(db.prepare('SELECT COUNT(*) n FROM job_tracking').get().n,1);
+db.close();console.log('PASS: migration retains sequence and legacy alias; assigned reference survives title and company-name edits.');

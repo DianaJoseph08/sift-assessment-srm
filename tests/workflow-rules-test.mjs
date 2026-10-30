@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {isoDate,sowKey,canonicalStage,vacancyMetrics,nextTask} from '../server/workflow-rules.js';
+assert.equal(isoDate('31/02/2026'),null);
+assert.equal(isoDate('29/02/2024'),'2024-02-29');
+assert.equal(isoDate(new Date(NaN)),null);
+assert.equal(sowKey('REQ_1234'),'1234');
+assert.notEqual(sowKey('ABC1234'),sowKey('XYZ1234'));
+assert.equal(canonicalStage('Internal porfile Reject'),'Internal Profile Reject');
+assert.deepEqual(nextTask({stage:'Customer Feedback Pending',stageChangedAt:'2026-10-08T20:00:00Z'},{feedbackDays:2}),{action:'Collect feedback',due:'2026-10-11'});
+assert.equal(nextTask({stage:'Shared Profile to Customer',internalSubmissionDate:'2026-10-09'},{feedbackDays:2}).due,'2026-10-11');
+assert.equal(nextTask({stage:'Joined'},{feedbackDays:2}),null);
+assert.equal(nextTask({stage:'Offered'},{feedbackDays:2}).missing,true);
+const d={id:'d',vacancies:5,baseline:{joined:1,offered:1,hold:1,nonDoable:0}};
+const m=vacancyMetrics(d,[{demandId:'d',counted:true,stage:'Offered'},{demandId:'other',counted:true,stage:'Joined'}]);assert.equal(m.active,1);assert.equal(m.offered,2);
+console.log('PASS: 11 date, SOW, stage, India timezone, follow-up and vacancy rule assertions.');

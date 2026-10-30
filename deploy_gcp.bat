@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 title Push CogniHire to GitHub for Google Cloud Deployment
 echo =========================================================
 echo   CogniHire - Google Cloud Deployment Assistant
@@ -13,11 +13,11 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
-echo 1. Staging updated project files (Dockerfile, client, server)...
+echo 1. Staging updated project files (Dockerfile, client, server, db)...
 git add .
 
 echo 2. Committing changes...
-git commit -m "Configure CogniHire for Google Cloud Run / Compute Engine deployment"
+git commit -m "Deploy latest CogniHire build to Google Cloud Run (asia-south1)"
 
 echo 3. Pushing to GitHub (origin main)...
 git push origin main
@@ -28,18 +28,18 @@ if %errorlevel% equ 0 (
     echo [SUCCESS] Code successfully pushed to GitHub!
     echo =========================================================
     echo.
-    echo Next Steps in Google Cloud (sureshscience@gmail.com):
+    echo Next Steps in Google Cloud Shell (https://console.cloud.google.com/):
     echo.
-    echo OPTION A: Google Cloud Run (Fastest Serverless)
-    echo 1. Open Google Cloud Console: https://console.cloud.google.com/
-    echo 2. Click the Cloud Shell icon [>_] in the top right.
-    echo 3. Run:
+    echo 1. Open Google Cloud Shell (click the [>_] icon in top-right)
+    echo 2. Paste and run this command:
+    echo.
+    echo    cd ~/sift-assessment-srm ^&^& git pull origin main ^&^& gcloud run deploy cognihire --source . --region asia-south1 --allow-unauthenticated
+    echo.
+    echo If this is the first time cloning on Cloud Shell, run:
+    echo.
     echo    git clone https://github.com/DianaJoseph08/sift-assessment-srm.git
     echo    cd sift-assessment-srm
-    echo    gcloud run deploy cognihire --source . --region us-central1 --allow-unauthenticated
-    echo.
-    echo OPTION B: Compute Engine (Free Tier VM with permanent SQLite)
-    echo Refer to GCP_DEPLOYMENT_GUIDE.md for step-by-step instructions.
+    echo    gcloud run deploy cognihire --source . --region asia-south1 --allow-unauthenticated
     echo.
 ) else (
     echo.

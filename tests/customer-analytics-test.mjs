@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {customerAnalytics} from '../client/src/customer-analytics.mjs';
+const clusters=[{id:'c1',customerId:'skoda',name:'Embedded'},{id:'c2',customerId:'other',name:'IT'}];
+const jobs=[{id:'j1',companyId:'skoda',clusterId:'c1',status:'posted',candidates:[{status:'done',result:{score:80}},{status:'error'}]},{id:'j2',companyId:'skoda',clusterId:'c1',status:'closed',candidates:[]},{id:'j3',companyId:'other',clusterId:'c2',status:'posted',candidates:[{status:'done',result:{}}]}];
+const users=[{id:'m',role:'manager',customerId:'other',clusterId:'c2',assignments:[{customerId:'other',clusterId:'c2'},{customerId:'skoda',clusterId:'c1'}]},{id:'r',role:'recruiter',customerId:'skoda',clusterId:'c1'}];
+const data=customerAnalytics('skoda','',jobs,clusters,users);
+assert.deepEqual(data.summary,{jobs:2,active:1,closed:1,screened:1,resumes:2});assert.equal(data.customerClusters.length,1);assert.equal(data.managers.length,1);assert.equal(data.recruiters.length,1);assert.equal(data.clusterStats[0].screened,1);
+assert.equal(customerAnalytics('skoda','missing',jobs,clusters,users).summary.jobs,0);
+assert.equal(customerAnalytics('new-customer','',jobs,clusters,users).summary.screened,0);
+console.log('PASS: customer isolation, job statuses, completed screening counts, multi-cluster manager membership, cluster filtering and new-customer empty state.');
