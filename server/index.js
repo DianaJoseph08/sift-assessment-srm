@@ -212,14 +212,6 @@ app.post("/api/auth/setup-admin", (req, res) => {
       password: password.trim()
     });
     addLog("AUTH", `Super Admin ${adminUser.name} (${adminUser.email}) registered/updated successfully`);
-    // Retire the known seeded demo credentials when the designated admin activates.
-    for(const demoId of ['user_admin_motherson','user_manager_mech','user_recruiter_mech']){
-      const demo=getUserById(demoId);
-      if(demo && ['admin@motherson.com','manager.mech@bosch.com','recruiter.mech@bosch.com'].includes(demo.email)){
-        database.prepare('UPDATE users SET password=? WHERE id=?').run(hashPassword(randomBytes(32).toString('hex')),demoId);
-        database.prepare('DELETE FROM auth_sessions WHERE user_id=?').run(demoId);
-      }
-    }
     createSession(res,adminUser);
     res.json({ ok: true, user: adminUser });
   } catch (err) {

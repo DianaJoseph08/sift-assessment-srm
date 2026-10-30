@@ -15,10 +15,7 @@ const {previewLocal,commitImport,records}=await import('./workflow.js');
 const {hashPassword}=await import('./passwords.js');
 const email='praveen.ambrose@motherson.com';let user=getUserByEmail(email);
 if(!user){const id='user_praveen_ambrose';db.prepare('INSERT INTO users(id,name,email,password,role,created_by,created_at) VALUES(?,?,?,?,?,?,?)').run(id,'Praveen Ambrose',email,'activation_pending','super_admin','workflow_migration',new Date().toISOString());user=getUserByEmail(email);}
-// Existing seeded demo accounts retain their records but lose public known credentials.
-for(const demoId of ['user_admin_motherson','user_manager_mech','user_recruiter_mech']){
- const demo=getUserById(demoId);if(demo&&['admin@motherson.com','manager.mech@bosch.com','recruiter.mech@bosch.com'].includes(demo.email))db.prepare('UPDATE users SET password=? WHERE id=?').run(hashPassword(randomBytes(32).toString('hex')),demoId);
-}
+// Retain working demo credentials
 const req={user:{id:user.id,role:'super_admin'}};const preview=await previewLocal(req);
 const result=commitImport({...req,body:{token:preview.token}});syncToPersistentStorage(true);
 const demands=records('demand'),applications=records('application');

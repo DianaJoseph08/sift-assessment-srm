@@ -257,13 +257,13 @@ export function LoginView({ onLogin, C }) {
 
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94A3B8', marginBottom: 6 }}>
-                {mode === 'setup' ? 'Your Super Admin Email Address' : 'Email Address'}
+                {mode === 'setup' ? 'Your Super Admin Email Address' : 'Email Address or Username'}
               </label>
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="e.g. your.email@domain.com"
+                placeholder={mode === 'setup' ? "Praveen.Ambrose@motherson.com" : "admin@motherson.com (or admin)"}
                 required
                 autoFocus={mode === 'setup'}
                 style={{
@@ -287,7 +287,7 @@ export function LoginView({ onLogin, C }) {
               </label>
               <input
                 type="password"
-                minLength={8}
+                minLength={mode === 'setup' ? 8 : undefined}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -392,7 +392,78 @@ export function LoginView({ onLogin, C }) {
             ) : null}
           </form>
 
-          <p style={{fontSize:12,color:'#94A3B8'}}>Super Admin: Praveen Ambrose · Praveen.Ambrose@motherson.com</p>
+          {/* Quick Demo Sign In Shortcuts */}
+          {mode === 'login' && (
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94A3B8', marginBottom: 10, textAlign: 'center' }}>
+                Quick Demo Sign-In (1-Click)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin('admin@motherson.com', 'admin123')}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: 8,
+                    background: '#0F172A',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    color: '#38BDF8',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Click to sign in instantly as Super Admin"
+                >
+                  👑 Admin<br />
+                  <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 400 }}>admin@motherson.com</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin('manager.mech@bosch.com', 'manager123')}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: 8,
+                    background: '#0F172A',
+                    border: '1px solid rgba(52, 211, 153, 0.35)',
+                    color: '#34D399',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Click to sign in instantly as Manager"
+                >
+                  👔 Manager<br />
+                  <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 400 }}>manager.mech@bosch.com</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin('recruiter.mech@bosch.com', 'recruiter123')}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: 8,
+                    background: '#0F172A',
+                    border: '1px solid rgba(244, 114, 182, 0.35)',
+                    color: '#F472B6',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Click to sign in instantly as Recruiter"
+                >
+                  🎯 Recruiter<br />
+                  <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 400 }}>recruiter.mech@bosch.com</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          <p style={{fontSize:12,color:'#94A3B8',marginTop:14,textAlign:'center'}}>Super Admin: Praveen Ambrose · Praveen.Ambrose@motherson.com</p>
 
         </div>
       </div>
